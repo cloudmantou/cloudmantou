@@ -1,0 +1,160 @@
+import { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { PostContent } from "./PostContent";
+
+type PageProps = {
+  params: { slug: string };
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const post = await prisma.post.findUnique({
+    where: { slug: params.slug },
+    select: { title: true, excerpt: true, coverImage: true, status: true },
+  });
+
+  if (!post || post.status === "DRAFT") {
+    return { title: "文章不存在" };
+  }
+
+  return {
+    title: post.title,
+    description: post.excerpt || undefined,
+    openGraph: {
+      title: post.title,
+      description: post.excerpt || undefined,
+      type: "article",
+      ...(post.coverImage ? { images: [post.coverImage] } : {}),
+    },
+  };
+}
+
+export default async function PostPage({ params }: PageProps) {
+  const { slug } = params;
+  const session = await auth();
+
+  const post = await prisma.post.findUnique({
+    where: { slug },
+    include: {
+      author: {
+        select: { id: true, username: true, nickname: true, avatar: true },
+      },
+      category: {
+        select: { id: true, name: true, slug: true },
+      },
+      tags: {
+        select: {
+          tag: { select: { id: true, name: true, slug: true, color: true } },
+        },
+      },
+      paidContent: {
+        select: { price: true },
+      },
+      comments: {
+        where: { parentId: null, status: "APPROVED" },
+        include: {
+          user: {
+            select: { id: true, username: true, nickname: true, avatar: true },
+          },
+          replies: {
+            where: { status: "APPROVED" },
+            include: {
+              user: {
+                select: { id: true, username: true, nickname: true, avatar: true },
+              },
+              replies: {
+                where: { status: "APPROVED" },
+                include: {
+                  user: {
+                    select: { id: true, username: true, nickname: true, avatar: true },
+                  },
+                },
+                orderBy: { createdAt: "asc" as const },
+              },
+            },
+            orderBy: { createdAt: "asc" as const },
+          },
+        },
+        orderBy: { createdAt: "desc" as const },
+        take: 10,
+      },
+    },
+  });
+
+  if (!post || post.status === "DRAFT") {
+    notFound();
+  }
+
+  // Increment view count
+  await prisma.$executeRaw`
+    UPDATE posts SET viewCount = viewCount + 1 WHERE id = ${post.id}
+  `;
+
+  // Check if user has liked
+  let isLiked = false;
+  if (session?.user?.id) {
+    const like = await prisma.like.findUnique({
+      where: {
+        userId_postId: {
+          userId: session.user.id,
+          postId: post.id,
+        },
+      },
+    });
+    isLiked = !!like;
+  }
+
+  const tags = post.tags.map((pt) => pt.tag);
+  const isPaidOnly = post.status === "PAID_ONLY";
+
+  // Format comments for client
+  const formatComment = (c: any): any => ({
+    id: c.id,
+    content: c.content,
+    createdAt: c.createdAt.toISOString(),
+    user: c.user,
+    children: (c.replies || []).map(formatComment),
+  });
+
+  const commentsData = {
+    comments: post.comments.map(formatComment),
+    totalCount: post.commentCount,
+    hasMore: post.commentCount > 10,
+    nextCursor:
+      post.comments.length === 10
+        ? post.comments[post.comments.length - 1].createdAt.toISOString()
+        : null,
+  };
+
+  return (
+    <div
+      className="min-h-screen"
+      style={{ background: "var(--article-bg)" }}
+    >
+      <PostContent
+        post={{
+          id: post.id,
+          title: post.title,
+          slug: post.slug,
+          content: isPaidOnly ? null : post.content,
+          excerpt: post.excerpt,
+          coverImage: post.coverImage,
+          status: post.status,
+          publishedAt: post.publishedAt?.toISOString() ?? null,
+          viewCount: post.viewCount,
+          likeCount: post.likeCount,
+          commentCount: post.commentCount,
+          author: post.author,
+          category: post.category,
+          tags,
+          paidContent: post.paidContent
+            ? { price: Number(post.paidContent.price) }
+            : null,
+          isLiked,
+        }}
+        commentsData={commentsData}
+      />
+    </div>
+  );
+}

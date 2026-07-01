@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  username    String    @unique
+  password    String
+  nickname    String?
+  avatar      String?
+  role        Role      @default(USER)
+  vipLevel    Int       @default(0)
+  vipExpireAt DateTime?
+  bio         String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  orders       Order[]
+  usedCards    Card[]        @relation("CardUser")
+  entitlements Entitlement[]
+
+  @@map("users")
+}
+
+model Post {
+  id           String     @id @default(cuid())
+  title        String
+  slug         String     @unique
+  excerpt      String?    @db.Text
+  content      String     @db.LongText
+  coverImage   String?
+  authorId     String
+  categoryId   String?
+  status       PostStatus @default(DRAFT)
+  isTop        Boolean    @default(false)
+  viewCount    Int        @default(0)
+  likeCount    Int        @default(0)
+  commentCount Int        @default(0)
+  publishedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  author       User          @relation(fields: [authorId], references: [id])
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  tags         PostTag[]
+  comments     Comment[]
+  likes        Like[]
+  paidContent  PaidContent?
+  entitlements Entitlement[]
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@index([categoryId])
+  @@map("posts")
+}
+
+model PaidContent {
+  id        String   @id @default(cuid())
+  postId    String   @unique
+  content   String   @db.LongText
+  price     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("paid_content")
+}
+
+model Entitlement {
+  id        String          @id @default(cuid())
+  userId    String
+  postId    String?
+  orderId   String?
+  type      EntitlementType
+  startsAt  DateTime        @default(now())
+  expiresAt DateTime?
+  createdAt DateTime        @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post  Post?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type])
+  @@index([postId])
+  @@map("entitlements")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  posts Post[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  color     String?
+  createdAt DateTime @default(now())
+
+  posts PostTag[]
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  postId    String
+  userId    String
+  parentId  String?
+  content   String        @db.Text
+  status    CommentStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([postId, status])
+  @@index([userId])
+  @@map("comments")
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNo     String      @unique
+  userId      String
+  productType ProductType
+  productId   String?
+  title       String
+  amount      Decimal     @db.Decimal(10, 2)
+  status      OrderStatus @default(PENDING)
+  paidAt      DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  payment      Payment?
+  entitlements Entitlement[]
+
+  @@index([userId, status])
+  @@index([orderNo])
+  @@map("orders")
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  orderId     String        @unique
+  tradeNo     String?
+  channel     PaymentChannel
+  amount      Decimal       @db.Decimal(10, 2)
+  status      PaymentStatus @default(WAITING)
+  rawCallback String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tradeNo])
+  @@map("payments")
+}
+
+model Card {
+  id         String     @id @default(cuid())
+  cardNo     String     @unique
+  cardSecret String     @unique
+  type       CardType
+  value      Int
+  status     CardStatus @default(ACTIVE)
+  batchNo    String?
+  usedBy     String?
+  usedAt     DateTime?
+  expireAt   DateTime?
+  createdAt  DateTime   @default(now())
+
+  user User? @relation("CardUser", fields: [usedBy], references: [id])
+
+  @@index([cardNo])
+  @@index([batchNo])
+  @@index([status])
+  @@map("cards")
+}
+
+model SiteSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  type      String   @default("string")
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+enum Role {
+  USER
+  EDITOR
+  ADMIN
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  PAID_ONLY
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductType {
+  VIP_MONTH
+  VIP_QUARTER
+  VIP_YEAR
+  PAID_POST
+  CARD_PACKAGE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentChannel {
+  ALIPAY
+  WECHAT
+  CARD_KEY
+}
+
+enum PaymentStatus {
+  WAITING
+  SUCCESS
+  FAILED
+  CLOSED
+}
+
+enum CardType {
+  VIP_DAYS
+  PAID_ARTICLE
+  BALANCE
+}
+
+enum CardStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  DISABLED
+}
+
+enum EntitlementType {
+  VIP
+  PAID_POST
+  CARD_BALANCE
+}

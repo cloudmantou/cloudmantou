@@ -1,0 +1,12 @@
+.next/
+node_modules/
+coverage/
+dist/
+*.log
+.env
+.env*.local
+!.env.example
+prisma/dev.db
+public/uploads/
+.omx/
+.claude/
