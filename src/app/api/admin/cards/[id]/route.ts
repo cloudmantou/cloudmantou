@@ -9,10 +9,11 @@ const updateSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const card = await prisma.card.findUnique({ where: { id: params.id } });
+    const card = await prisma.card.findUnique({ where: { id: id } });
     if (!card) {
       return fail("卡密不存在", 40400, 404);
     }
@@ -27,11 +28,11 @@ export async function PUT(
     }
 
     await prisma.card.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { status: parsed.data.status },
     });
 
-    return ok({ id: params.id, status: parsed.data.status });
+    return ok({ id: id, status: parsed.data.status });
   } catch (error) {
     console.error("[Admin Update Card Error]", error);
     return fail("更新卡密状态失败", 50000, 500);

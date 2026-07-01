@@ -11,10 +11,11 @@ const updateTagSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const tag = await prisma.tag.findUnique({ where: { id: params.id } });
+    const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);
     }
@@ -29,7 +30,7 @@ export async function PUT(
     if (data.name || data.slug) {
       const existing = await prisma.tag.findFirst({
         where: {
-          id: { not: params.id },
+          id: { not: id },
           OR: [
             ...(data.name ? [{ name: data.name }] : []),
             ...(data.slug ? [{ slug: data.slug }] : []),
@@ -41,8 +42,8 @@ export async function PUT(
       }
     }
 
-    await prisma.tag.update({ where: { id: params.id }, data });
-    return ok({ id: params.id });
+    await prisma.tag.update({ where: { id: id }, data });
+    return ok({ id: id });
   } catch (error) {
     console.error("[Admin Update Tag Error]", error);
     return fail("更新标签失败", 50000, 500);
@@ -51,15 +52,16 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const tag = await prisma.tag.findUnique({ where: { id: params.id } });
+    const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);
     }
 
-    await prisma.tag.delete({ where: { id: params.id } });
+    await prisma.tag.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
     console.error("[Admin Delete Tag Error]", error);

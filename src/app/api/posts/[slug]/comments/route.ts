@@ -11,10 +11,10 @@ const createCommentSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
-    const { slug } = params;
     const { searchParams } = req.nextUrl;
     const cursor = searchParams.get("cursor");
     const limit = Math.min(20, Math.max(1, parseInt(searchParams.get("limit") || "10")));
@@ -100,15 +100,15 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return fail("请先登录", 40100, 401);
     }
 
-    const { slug } = params;
     const post = await prisma.post.findUnique({
       where: { slug },
       select: { id: true },

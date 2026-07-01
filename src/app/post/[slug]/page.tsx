@@ -5,12 +5,13 @@ import { auth } from "@/lib/auth";
 import { PostContent } from "./PostContent";
 
 type PageProps = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
   const post = await prisma.post.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: { title: true, excerpt: true, coverImage: true, status: true },
   });
 
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function PostPage({ params }: PageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   const session = await auth();
 
   const post = await prisma.post.findUnique({

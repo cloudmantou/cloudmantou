@@ -5,10 +5,10 @@ import { ok, fail } from "@/lib/api-response";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
-    const { slug } = params;
     const session = await auth();
 
     const post = await prisma.post.findUnique({

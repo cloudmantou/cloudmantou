@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Check, X, Trash2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 
@@ -35,7 +35,7 @@ export default function AdminCommentsPage() {
   const [loadError, setLoadError] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const load = async (p: number, status?: string) => {
+  const load = useCallback(async (p: number, status?: string) => {
     setLoading(true);
     setLoadError("");
     try {
@@ -51,11 +51,11 @@ export default function AdminCommentsPage() {
       setLoadError(e.message || "加载失败");
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     load(page, statusFilter);
-  }, [page, statusFilter]);
+  }, [page, statusFilter, load]);
 
   const handleStatus = (id: string, newStatus: string) => {
     startTransition(async () => {

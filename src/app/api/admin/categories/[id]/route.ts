@@ -12,10 +12,11 @@ const updateCategorySchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const category = await prisma.category.findUnique({ where: { id: params.id } });
+    const category = await prisma.category.findUnique({ where: { id: id } });
     if (!category) {
       return fail("分类不存在", 40400, 404);
     }
@@ -32,7 +33,7 @@ export async function PUT(
     if (data.name || data.slug) {
       const existing = await prisma.category.findFirst({
         where: {
-          id: { not: params.id },
+          id: { not: id },
           OR: [
             ...(data.name ? [{ name: data.name }] : []),
             ...(data.slug ? [{ slug: data.slug }] : []),
@@ -44,8 +45,8 @@ export async function PUT(
       }
     }
 
-    await prisma.category.update({ where: { id: params.id }, data });
-    return ok({ id: params.id });
+    await prisma.category.update({ where: { id: id }, data });
+    return ok({ id: id });
   } catch (error) {
     console.error("[Admin Update Category Error]", error);
     return fail("更新分类失败", 50000, 500);
@@ -54,11 +55,12 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
     const category = await prisma.category.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: { _count: { select: { posts: true } } },
     });
     if (!category) {
@@ -68,7 +70,7 @@ export async function DELETE(
       return fail("该分类下还有文章，请先移除", 40000, 400);
     }
 
-    await prisma.category.delete({ where: { id: params.id } });
+    await prisma.category.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
     console.error("[Admin Delete Category Error]", error);

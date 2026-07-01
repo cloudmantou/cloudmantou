@@ -9,10 +9,11 @@ const updateCommentSchema = z.object({
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const comment = await prisma.comment.findUnique({ where: { id: params.id } });
+    const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);
     }
@@ -24,11 +25,11 @@ export async function PUT(
     }
 
     await prisma.comment.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { status: parsed.data.status },
     });
 
-    return ok({ id: params.id, status: parsed.data.status });
+    return ok({ id: id, status: parsed.data.status });
   } catch (error) {
     console.error("[Admin Update Comment Error]", error);
     return fail("更新评论状态失败", 50000, 500);
@@ -37,10 +38,11 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const comment = await prisma.comment.findUnique({ where: { id: params.id } });
+    const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);
     }
@@ -51,7 +53,7 @@ export async function DELETE(
       data: { commentCount: { decrement: 1 } },
     });
 
-    await prisma.comment.delete({ where: { id: params.id } });
+    await prisma.comment.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
     console.error("[Admin Delete Comment Error]", error);

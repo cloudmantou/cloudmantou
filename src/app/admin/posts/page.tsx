@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Search, Trash2, Edit, Eye, Pin, Lock } from "lucide-react";
 
@@ -40,7 +40,7 @@ export default function AdminPostsPage() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  const loadPosts = async (p: number, status?: string, q?: string) => {
+  const loadPosts = useCallback(async (p: number, status?: string, q?: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(p), pageSize: "15" });
@@ -55,11 +55,11 @@ export default function AdminPostsPage() {
       // ignore
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     loadPosts(page, statusFilter, search);
-  }, [page, statusFilter]);
+  }, [page, statusFilter, search, loadPosts]);
 
   const handleDelete = (id: string, title: string) => {
     if (!confirm(`确定删除「${title}」？此操作不可撤销。`)) return;

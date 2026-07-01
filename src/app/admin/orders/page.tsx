@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, ExternalLink } from "lucide-react";
 
 type Order = {
@@ -50,7 +50,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const load = async (p: number) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     setLoadError("");
     try {
@@ -67,9 +67,9 @@ export default function AdminOrdersPage() {
       setLoadError(e.message || "加载失败");
     }
     setLoading(false);
-  };
+  }, [statusFilter, search]);
 
-  useEffect(() => { load(page); }, [page, statusFilter]);
+  useEffect(() => { load(page); }, [page, load]);
 
   return (
     <div>

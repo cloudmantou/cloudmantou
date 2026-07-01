@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { MessageCircle, User } from "lucide-react";
 import { CommentForm } from "./CommentForm";
 
@@ -55,10 +56,13 @@ export function CommentItem({ comment, slug, depth = 0 }: CommentItemProps) {
             style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
           >
             {comment.user.avatar ? (
-              <img
+              <Image
                 src={comment.user.avatar}
                 alt=""
-                className="w-7 h-7 rounded-full object-cover"
+                width={28}
+                height={28}
+                className="rounded-full object-cover"
+                unoptimized
               />
             ) : (
               <User size={14} aria-hidden="true" />

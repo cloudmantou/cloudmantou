@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { CategoryPosts } from "./CategoryPosts";
 
 type PageProps = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
   const category = await prisma.category.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: { name: true, description: true },
   });
 
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function CategoryPage({ params }: PageProps) {
-  const { slug } = params;
+  const { slug } = await params;
 
   const category = await prisma.category.findUnique({
     where: { slug },

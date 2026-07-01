@@ -21,11 +21,12 @@ const updatePostSchema = z.object({
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
     const post = await prisma.post.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         author: { select: { id: true, username: true, nickname: true } },
         category: { select: { id: true, name: true, slug: true } },
@@ -53,10 +54,11 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const post = await prisma.post.findUnique({ where: { id: params.id } });
+    const post = await prisma.post.findUnique({ where: { id: id } });
     if (!post) {
       return fail("文章不存在", 40400, 404);
     }
@@ -80,7 +82,7 @@ export async function PUT(
     await prisma.$transaction(async (tx) => {
       // Update post
       await tx.post.update({
-        where: { id: params.id },
+        where: { id: id },
         data: {
           ...(data.title !== undefined && { title: data.title }),
           ...(data.slug !== undefined && { slug: data.slug }),
@@ -101,21 +103,21 @@ export async function PUT(
 
       // Update tags if provided
       if (data.tagIds !== undefined) {
-        await tx.postTag.deleteMany({ where: { postId: params.id } });
+        await tx.postTag.deleteMany({ where: { postId: id } });
         if (data.tagIds.length > 0) {
           await tx.postTag.createMany({
-            data: data.tagIds.map((tagId) => ({ postId: params.id, tagId })),
+            data: data.tagIds.map((tagId) => ({ postId: id, tagId })),
           });
         }
       }
 
       // Update paid content
       if (data.paidContent !== undefined) {
-        await tx.paidContent.deleteMany({ where: { postId: params.id } });
+        await tx.paidContent.deleteMany({ where: { postId: id } });
         if (data.paidContent) {
           await tx.paidContent.create({
             data: {
-              postId: params.id,
+              postId: id,
               content: data.paidContent.content,
               price: data.paidContent.price,
             },
@@ -124,7 +126,7 @@ export async function PUT(
       }
     });
 
-    return ok({ id: params.id });
+    return ok({ id: id });
   } catch (error) {
     console.error("[Admin Update Post Error]", error);
     return fail("更新文章失败", 50000, 500);
@@ -133,15 +135,16 @@ export async function PUT(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
   try {
-    const post = await prisma.post.findUnique({ where: { id: params.id } });
+    const post = await prisma.post.findUnique({ where: { id: id } });
     if (!post) {
       return fail("文章不存在", 40400, 404);
     }
 
-    await prisma.post.delete({ where: { id: params.id } });
+    await prisma.post.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
     console.error("[Admin Delete Post Error]", error);

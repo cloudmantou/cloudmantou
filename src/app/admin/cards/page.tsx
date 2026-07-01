@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Plus, Download, Ban, CheckCircle, Copy, ChevronDown } from "lucide-react";
 
 type Card = {
@@ -60,7 +60,7 @@ export default function AdminCardsPage() {
   const [genError, setGenError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const load = async (p: number) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     setLoadError("");
     try {
@@ -77,9 +77,9 @@ export default function AdminCardsPage() {
       setLoadError(e.message || "加载失败");
     }
     setLoading(false);
-  };
+  }, [typeFilter, statusFilter]);
 
-  useEffect(() => { load(page); }, [page, typeFilter, statusFilter]);
+  useEffect(() => { load(page); }, [page, load]);
 
   const handleGenerate = () => {
     setGenError("");
