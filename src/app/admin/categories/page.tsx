@@ -102,14 +102,14 @@ export default function AdminCategoriesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold" style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--text)" }}>
+        <h1 className="text-xl font-bold" style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--text)" }}>
           分类管理
         </h1>
         <button
           type="button"
           onClick={() => { setEditing(null); setForm(emptyForm); setShowForm(true); setError(""); }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace' }}
+          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           <Plus size={14} aria-hidden="true" />
           新建分类
@@ -134,7 +134,7 @@ export default function AdminCategoriesPage() {
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>名称</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>名称</label>
               <input
                 type="text"
                 value={form.name}
@@ -144,17 +144,17 @@ export default function AdminCategoriesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>Slug</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>Slug</label>
               <input
                 type="text"
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
                 className="w-full px-3 py-1.5 rounded-md text-xs outline-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>描述</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>描述</label>
               <input
                 type="text"
                 value={form.description}
@@ -164,13 +164,13 @@ export default function AdminCategoriesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>排序</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>排序</label>
               <input
                 type="number"
                 value={form.sortOrder}
                 onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-1.5 rounded-md text-xs outline-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
             </div>
           </div>
@@ -180,7 +180,7 @@ export default function AdminCategoriesPage() {
               onClick={handleSubmit}
               disabled={isPending}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors"
-              style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace', opacity: isPending ? 0.7 : 1 }}
+              style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: isPending ? 0.7 : 1 }}
             >
               <Save size={13} aria-hidden="true" />
               {isPending ? "保存中..." : "保存"}
@@ -200,18 +200,18 @@ export default function AdminCategoriesPage() {
             <div key={cat.id} className="flex items-center justify-between px-4 py-3 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{cat.name}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--card-hover)", color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--card-hover)", color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                   /{cat.slug}
                 </span>
                 {cat.description && (
                   <span className="text-xs truncate max-w-xs" style={{ color: "var(--text-muted)" }}>{cat.description}</span>
                 )}
-                <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                   {cat.postCount} 篇
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] mr-2" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                <span className="text-[10px] mr-2" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                   排序: {cat.sortOrder}
                 </span>
                 <button type="button" onClick={() => handleEdit(cat)} className="p-1.5 rounded-md hover:bg-[var(--card-hover)]" style={{ color: "var(--text-muted)" }}>

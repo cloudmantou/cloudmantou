@@ -16,13 +16,13 @@ export default function NotFound() {
         />
         <h1
           className="text-2xl font-bold mb-2"
-          style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif' }}
+          style={{ fontFamily: '"Inter", "PingFang SC", sans-serif' }}
         >
           页面不存在
         </h1>
         <p
           className="text-sm mb-8"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           404 — 你访问的页面不存在或已被移除
         </p>
@@ -33,7 +33,7 @@ export default function NotFound() {
             style={{
               background: "var(--accent)",
               color: "var(--bg)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
             }}
           >
             <Home size={14} aria-hidden="true" />

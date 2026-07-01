@@ -92,7 +92,7 @@ export function PostContent({ post, commentsData }: PostContentProps) {
         <Link
           href="/"
           className="inline-flex items-center gap-1.5 text-xs transition-colors hover:text-[var(--accent)]"
-          style={{ color: "var(--text-secondary)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-secondary)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           <ArrowLeft size={14} aria-hidden="true" />
           返回首页
@@ -114,7 +114,7 @@ export function PostContent({ post, commentsData }: PostContentProps) {
         {/* Title */}
         <h1
           className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-6 leading-tight"
-          style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--article-heading)" }}
+          style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--article-heading)" }}
         >
           {post.title}
         </h1>
@@ -164,7 +164,7 @@ export function PostContent({ post, commentsData }: PostContentProps) {
           />
           <span
             className="text-xs"
-            style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+            style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
           >
             觉得不错？点个赞吧
           </span>

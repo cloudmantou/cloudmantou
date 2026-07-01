@@ -1,10 +1,10 @@
 import type { BlogPost, DashboardMetric, Product, TimelineItem } from "@/types";
 
 export const stats: DashboardMetric[] = [
-  { label: "技术文章", value: "128", delta: "+12 本月", accent: "gold" },
-  { label: "付费会员", value: "2.1k", delta: "+18.4%", accent: "teal" },
-  { label: "自动发卡", value: "9.6k", delta: "99.2% 成功", accent: "blue" },
-  { label: "月收入", value: "¥38k", delta: "+24.8%", accent: "rose" }
+  { label: "公开文章", value: "12", delta: "持续更新", accent: "gold" },
+  { label: "会员专栏", value: "3", delta: "深度内容", accent: "teal" },
+  { label: "卡密库存", value: "84", delta: "自动兑换", accent: "blue" },
+  { label: "最近更新", value: "Today", delta: "保持记录", accent: "rose" }
 ];
 
 export const posts: BlogPost[] = [

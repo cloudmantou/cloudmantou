@@ -79,7 +79,7 @@ export default function AdminDashboard() {
                       border: "1px solid var(--border)",
                       background: "var(--card)",
                       color: item.type === "warning" ? "var(--orange)" : "var(--text-secondary)",
-                      fontFamily: '"DM Mono", monospace',
+                      fontFamily: '"JetBrains Mono", monospace',
                       textDecoration: "none",
                     }}
                   >

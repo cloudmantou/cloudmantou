@@ -28,13 +28,13 @@ export default function GlobalError({
         />
         <h1
           className="text-2xl font-bold mb-3"
-          style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif' }}
+          style={{ fontFamily: '"Inter", "PingFang SC", sans-serif' }}
         >
           出了点问题
         </h1>
         <p
           className="text-sm mb-6"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           页面遇到了意外错误，请尝试刷新。
         </p>
@@ -45,7 +45,7 @@ export default function GlobalError({
           style={{
             borderColor: "var(--border)",
             color: "var(--text-secondary)",
-            fontFamily: '"DM Mono", monospace',
+            fontFamily: '"JetBrains Mono", monospace',
           }}
         >
           <RefreshCw size={14} aria-hidden="true" />

@@ -29,7 +29,7 @@ export function CommentForm({
     return (
       <div
         className="text-center py-6 text-sm"
-        style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+        style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
       >
         <Link href="/login" style={{ color: "var(--accent)", textDecoration: "underline" }}>
           登录
@@ -72,7 +72,7 @@ export function CommentForm({
       {replyTo && (
         <div
           className="text-xs mb-2"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           回复 {replyTo}
         </div>
@@ -88,7 +88,7 @@ export function CommentForm({
           background: "var(--card)",
           border: "1px solid var(--border)",
           color: "var(--text)",
-          fontFamily: '"Noto Serif SC", Georgia, serif',
+          fontFamily: '"Inter", "PingFang SC", sans-serif',
         }}
         onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
         onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
@@ -103,7 +103,7 @@ export function CommentForm({
           className="text-xs"
           style={{
             color: content.length > 900 ? "var(--rose)" : "var(--text-muted)",
-            fontFamily: '"DM Mono", monospace',
+            fontFamily: '"JetBrains Mono", monospace',
           }}
         >
           {content.length}/1000
@@ -114,7 +114,7 @@ export function CommentForm({
               type="button"
               onClick={onCancel}
               className="px-3 py-1.5 text-xs rounded-md transition-colors"
-              style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+              style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
             >
               取消
             </button>
@@ -127,7 +127,7 @@ export function CommentForm({
             style={{
               background: content.trim() ? "var(--accent)" : "var(--border)",
               color: content.trim() ? "var(--bg)" : "var(--text-muted)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
               opacity: isPending ? 0.7 : 1,
               cursor: content.trim() ? "pointer" : "not-allowed",
             }}

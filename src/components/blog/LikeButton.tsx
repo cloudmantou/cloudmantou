@@ -59,7 +59,7 @@ export function LikeButton({ slug, initialLiked, initialCount }: LikeButtonProps
         borderColor: liked ? "var(--accent)" : "var(--border)",
         background: liked ? "var(--accent-dim)" : "transparent",
         color: liked ? "var(--accent)" : "var(--text-secondary)",
-        fontFamily: '"DM Mono", monospace',
+        fontFamily: '"JetBrains Mono", monospace',
         fontSize: "13px",
         opacity: isPending ? 0.7 : 1,
         transform: isPending ? "scale(0.95)" : "scale(1)",

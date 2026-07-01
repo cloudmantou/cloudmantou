@@ -90,14 +90,14 @@ export default function AdminTagsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold" style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--text)" }}>
+        <h1 className="text-xl font-bold" style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--text)" }}>
           标签管理
         </h1>
         <button
           type="button"
           onClick={() => { setEditing(null); setForm(emptyForm); setShowForm(true); setError(""); }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace' }}
+          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           <Plus size={14} aria-hidden="true" />
           新建标签
@@ -122,7 +122,7 @@ export default function AdminTagsPage() {
           )}
           <div className="flex items-end gap-3">
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>名称</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>名称</label>
               <input
                 type="text"
                 value={form.name}
@@ -132,17 +132,17 @@ export default function AdminTagsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>Slug</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>Slug</label>
               <input
                 type="text"
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
                 className="w-32 px-3 py-1.5 rounded-md text-xs outline-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>颜色 (可选)</label>
+              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>颜色 (可选)</label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
@@ -157,7 +157,7 @@ export default function AdminTagsPage() {
                   onChange={(e) => setForm({ ...form, color: e.target.value })}
                   placeholder="#000000"
                   className="w-24 px-3 py-1.5 rounded-md text-xs outline-none"
-                  style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                  style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
                 />
               </div>
             </div>
@@ -166,7 +166,7 @@ export default function AdminTagsPage() {
               onClick={handleSubmit}
               disabled={isPending}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors"
-              style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace', opacity: isPending ? 0.7 : 1 }}
+              style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: isPending ? 0.7 : 1 }}
             >
               <Save size={13} aria-hidden="true" />
               {isPending ? "保存中..." : "保存"}
@@ -190,7 +190,7 @@ export default function AdminTagsPage() {
             >
               <Hash size={12} style={{ color: tag.color || "var(--accent)" }} aria-hidden="true" />
               <span className="text-sm" style={{ color: "var(--text)" }}>{tag.name}</span>
-              <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+              <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                 {tag.postCount}
               </span>
               <div className="flex items-center gap-0.5 ml-1">

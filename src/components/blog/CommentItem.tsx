@@ -76,7 +76,7 @@ export function CommentItem({ comment, slug, depth = 0 }: CommentItemProps) {
           </span>
           <span
             className="text-xs"
-            style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+            style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
           >
             {timeAgo(comment.createdAt)}
           </span>
@@ -96,7 +96,7 @@ export function CommentItem({ comment, slug, depth = 0 }: CommentItemProps) {
             type="button"
             onClick={() => setShowReply(!showReply)}
             className="flex items-center gap-1 mt-2 text-xs transition-colors"
-            style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+            style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
           >
             <MessageCircle size={12} aria-hidden="true" />
             回复

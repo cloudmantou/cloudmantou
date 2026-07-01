@@ -75,10 +75,10 @@ export default function AdminOrdersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold" style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--text)" }}>
+          <h1 className="text-xl font-bold" style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--text)" }}>
             订单管理
           </h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
             共 {total} 笔订单
           </p>
         </div>
@@ -94,7 +94,7 @@ export default function AdminOrdersPage() {
             onKeyDown={(e) => e.key === "Enter" && load(1)}
             placeholder="搜索订单号/标题..."
             className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
-            style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+            style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
           />
           <button type="button" onClick={() => { setPage(1); load(1); }} className="p-1.5 rounded-md border transition-colors hover:border-[var(--accent)]" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             <Search size={14} aria-hidden="true" />
@@ -102,7 +102,7 @@ export default function AdminOrdersPage() {
         </div>
         <div className="flex gap-1">
           {[{ id: "", label: "全部" }, { id: "PENDING", label: "待支付" }, { id: "PAID", label: "已支付" }, { id: "CANCELLED", label: "已取消" }].map((f) => (
-            <button key={f.id} type="button" onClick={() => { setStatusFilter(f.id); setPage(1); }} className="px-2.5 py-1 rounded-md text-[10px] border transition-colors" style={{ borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)", background: statusFilter === f.id ? "var(--accent-dim)" : "transparent", color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+            <button key={f.id} type="button" onClick={() => { setStatusFilter(f.id); setPage(1); }} className="px-2.5 py-1 rounded-md text-[10px] border transition-colors" style={{ borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)", background: statusFilter === f.id ? "var(--accent-dim)" : "transparent", color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               {f.label}
             </button>
           ))}
@@ -115,7 +115,7 @@ export default function AdminOrdersPage() {
           <thead>
             <tr style={{ background: "var(--card)" }}>
               {["订单号", "用户", "商品", "金额", "状态", "支付方式", "时间"].map((h) => (
-                <th key={h} className="text-left px-3 py-2 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>{h}</th>
+                <th key={h} className="text-left px-3 py-2 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -128,20 +128,20 @@ export default function AdminOrdersPage() {
               <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无订单</td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} style={{ borderTop: "1px solid var(--border)" }}>
-                <td className="px-3 py-2 text-xs" style={{ fontFamily: '"DM Mono", monospace', color: "var(--text)" }}>{o.orderNo}</td>
+                <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text)" }}>{o.orderNo}</td>
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>{o.user.nickname || o.user.username}</td>
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>
                   <div>{o.title}</div>
                   <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{PRODUCT_LABELS[o.productType]}</div>
                 </td>
-                <td className="px-3 py-2 text-xs font-medium" style={{ color: "var(--accent)", fontFamily: '"DM Mono", monospace' }}>¥{o.amount.toFixed(2)}</td>
+                <td className="px-3 py-2 text-xs font-medium" style={{ color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>¥{o.amount.toFixed(2)}</td>
                 <td className="px-3 py-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLORS[o.status]}15`, color: STATUS_COLORS[o.status], fontFamily: '"DM Mono", monospace' }}>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLORS[o.status]}15`, color: STATUS_COLORS[o.status], fontFamily: '"JetBrains Mono", monospace' }}>
                     {STATUS_LABELS[o.status]}
                   </span>
                 </td>
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>{o.payment?.channel || "—"}</td>
-                <td className="px-3 py-2 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                <td className="px-3 py-2 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                   {new Date(o.createdAt).toLocaleDateString("zh-CN")}
                 </td>
               </tr>
@@ -154,7 +154,7 @@ export default function AdminOrdersPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
-            <button key={p} type="button" onClick={() => setPage(p)} className="w-7 h-7 rounded-md text-xs transition-colors" style={{ background: p === page ? "var(--accent)" : "transparent", color: p === page ? "var(--bg)" : "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+            <button key={p} type="button" onClick={() => setPage(p)} className="w-7 h-7 rounded-md text-xs transition-colors" style={{ background: p === page ? "var(--accent)" : "transparent", color: p === page ? "var(--bg)" : "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               {p}
             </button>
           ))}

@@ -47,7 +47,7 @@ export function CategoryNav({ currentSlug, className }: CategoryNavProps) {
               )}
               style={{
                 color: isActive ? "var(--accent)" : "var(--text-secondary)",
-                fontFamily: '"DM Mono", monospace',
+                fontFamily: '"JetBrains Mono", monospace',
               }}
             >
               <Folder size={12} aria-hidden="true" />

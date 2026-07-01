@@ -137,7 +137,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           <Link
             href="/admin/posts"
             className="inline-flex items-center gap-1.5 text-xs transition-colors hover:text-[var(--accent)]"
-            style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+            style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
           >
             <ArrowLeft size={14} aria-hidden="true" />
             返回列表
@@ -155,7 +155,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             onClick={() => handleSave("DRAFT")}
             disabled={isPending}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors hover:border-[var(--accent)]"
-            style={{ borderColor: "var(--border)", color: "var(--text-secondary)", fontFamily: '"DM Mono", monospace' }}
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)", fontFamily: '"JetBrains Mono", monospace' }}
           >
             <Save size={13} aria-hidden="true" />
             保存草稿
@@ -165,7 +165,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             onClick={() => handleSave(isPaid ? "PAID_ONLY" : "PUBLISHED")}
             disabled={isPending}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-            style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace', opacity: isPending ? 0.7 : 1 }}
+            style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: isPending ? 0.7 : 1 }}
           >
             <Send size={13} aria-hidden="true" />
             发布
@@ -194,14 +194,14 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
           {/* Slug */}
           <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>/post/</span>
+            <span className="text-xs" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>/post/</span>
             <input
               type="text"
               value={slug}
               onChange={(e) => { setSlug(e.target.value); setSlugEdited(true); }}
               placeholder="url-slug"
               className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
-              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
             />
           </div>
 
@@ -230,7 +230,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
         <div className="flex flex-col gap-4">
           {/* Cover image */}
           <div>
-            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               封面图 URL
             </label>
             <input
@@ -239,20 +239,20 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               onChange={(e) => setCoverImage(e.target.value)}
               placeholder="https://..."
               className="w-full px-3 py-1.5 rounded-md text-xs outline-none"
-              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               分类
             </label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full px-3 py-1.5 rounded-md text-xs outline-none"
-              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+              style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
             >
               <option value="">无分类</option>
               {categories.map((c) => (
@@ -263,7 +263,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
           {/* Tags */}
           <div>
-            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+            <label className="block text-xs mb-1.5" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               标签
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -283,7 +283,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                       borderColor: selected ? "var(--accent)" : "var(--border)",
                       background: selected ? "var(--accent-dim)" : "transparent",
                       color: selected ? "var(--accent)" : "var(--text-muted)",
-                      fontFamily: '"DM Mono", monospace',
+                      fontFamily: '"JetBrains Mono", monospace',
                     }}
                   >
                     {tag.name}
@@ -295,7 +295,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
           {/* Options */}
           <div className="flex flex-col gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)", fontFamily: '"DM Mono", monospace' }}>
+            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)", fontFamily: '"JetBrains Mono", monospace' }}>
               <input
                 type="checkbox"
                 checked={isTop}
@@ -304,7 +304,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               />
               置顶文章
             </label>
-            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)", fontFamily: '"DM Mono", monospace' }}>
+            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: "var(--text-secondary)", fontFamily: '"JetBrains Mono", monospace' }}>
               <input
                 type="checkbox"
                 checked={isPaid}
@@ -318,7 +318,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           {/* Paid content fields */}
           {isPaid && (
             <div className="flex flex-col gap-2 p-3 rounded-lg" style={{ background: "var(--accent-dim)", border: "1px solid var(--accent)" }}>
-              <label className="text-xs" style={{ color: "var(--accent)", fontFamily: '"DM Mono", monospace' }}>
+              <label className="text-xs" style={{ color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>
                 价格 (元)
               </label>
               <input
@@ -329,9 +329,9 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 onChange={(e) => setPaidPrice(e.target.value)}
                 placeholder="9.90"
                 className="w-full px-2 py-1 rounded text-xs outline-none"
-                style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
-              <label className="text-xs mt-1" style={{ color: "var(--accent)", fontFamily: '"DM Mono", monospace' }}>
+              <label className="text-xs mt-1" style={{ color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>
                 付费内容 (Markdown)
               </label>
               <textarea

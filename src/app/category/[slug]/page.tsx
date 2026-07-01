@@ -83,7 +83,7 @@ export default async function CategoryPage({ params }: PageProps) {
         )}
         <p
           className="text-xs mt-2"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           共 {total} 篇文章
         </p>

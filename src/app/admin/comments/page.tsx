@@ -80,10 +80,10 @@ export default function AdminCommentsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold" style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--text)" }}>
+          <h1 className="text-xl font-bold" style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--text)" }}>
             评论审核
           </h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
             共 {total} 条评论
           </p>
         </div>
@@ -106,7 +106,7 @@ export default function AdminCommentsPage() {
               borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)",
               background: statusFilter === f.id ? "var(--accent-dim)" : "transparent",
               color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
             }}
           >
             {f.label}
@@ -133,18 +133,18 @@ export default function AdminCommentsPage() {
                     </span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded-full"
-                      style={{ background: `${STATUS_COLORS[c.status]}15`, color: STATUS_COLORS[c.status], fontFamily: '"DM Mono", monospace' }}
+                      style={{ background: `${STATUS_COLORS[c.status]}15`, color: STATUS_COLORS[c.status], fontFamily: '"JetBrains Mono", monospace' }}
                     >
                       {STATUS_LABELS[c.status]}
                     </span>
-                    <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                       {new Date(c.createdAt).toLocaleString("zh-CN")}
                     </span>
                   </div>
                   <p className="text-sm m-0 mb-1.5" style={{ color: "var(--text-secondary)" }}>
                     {c.content}
                   </p>
-                  <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                  <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                     <MessageSquare size={10} aria-hidden="true" />
                     评论于
                     <Link href={`/post/${c.post.slug}`} className="hover:underline" style={{ color: "var(--accent)" }}>
@@ -206,7 +206,7 @@ export default function AdminCommentsPage() {
               style={{
                 background: p === page ? "var(--accent)" : "transparent",
                 color: p === page ? "var(--bg)" : "var(--text-muted)",
-                fontFamily: '"DM Mono", monospace',
+                fontFamily: '"JetBrains Mono", monospace',
               }}
             >
               {p}

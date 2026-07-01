@@ -57,7 +57,7 @@ export function CommentSection({
         </h2>
         <span
           className="text-xs px-2 py-0.5 rounded-full"
-          style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"DM Mono", monospace' }}
+          style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           {totalCount}
         </span>
@@ -83,7 +83,7 @@ export function CommentSection({
       ) : (
         <div
           className="text-center py-12 text-sm"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           暂无评论，来说两句吧
         </div>
@@ -100,7 +100,7 @@ export function CommentSection({
             style={{
               borderColor: "var(--border)",
               color: "var(--text-secondary)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
               opacity: isPending ? 0.6 : 1,
             }}
           >

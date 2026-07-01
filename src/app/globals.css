@@ -1,106 +1,104 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600;700&family=Syne:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
 :root {
-  /* ===== Dark mode (default) ===== */
-  --bg: #0b0c15;
-  --surface: #10111c;
-  --card: #161724;
-  --card-hover: #1c1d30;
-  --border: #252640;
-  --border-light: #35365a;
-  --accent: #e8b964;
-  --accent-dim: rgba(232, 185, 100, 0.12);
-  --teal: #4dd9b6;
-  --teal-dim: rgba(77, 217, 182, 0.12);
-  --rose: #e8637a;
-  --rose-dim: rgba(232, 99, 122, 0.12);
-  --blue: #6b9aff;
-  --blue-dim: rgba(107, 154, 255, 0.12);
-  --orange: #f09848;
-  --orange-dim: rgba(240, 152, 72, 0.12);
-  --text: #e0ddd6;
-  --text-secondary: #aaa5a7;
-  --text-muted: #65626a;
-  --sidebar-w: 268px;
+  /* ===== Light mode (default) — 简约技术博客 ===== */
+  --bg: #F7F5EF;
+  --surface: #FFFFFF;
+  --card: #FFFFFF;
+  --card-hover: #FAF8F3;
+  --border: #E8E4DA;
+  --border-light: #D9D4C8;
+  --accent: #B88718;
+  --accent-dim: rgba(184, 135, 24, 0.08);
+  --teal: #3F7D58;
+  --teal-dim: rgba(63, 125, 88, 0.08);
+  --rose: #C44D58;
+  --rose-dim: rgba(196, 77, 88, 0.08);
+  --blue: #4A6FA5;
+  --blue-dim: rgba(74, 111, 165, 0.08);
+  --orange: #C07830;
+  --orange-dim: rgba(192, 120, 48, 0.08);
+  --text: #25231D;
+  --text-secondary: #6B665A;
+  --text-muted: #9B9588;
+  --sidebar-w: 260px;
   --radius: 10px;
 
-  /* ===== Article reading (dark) ===== */
-  --article-bg: #0b0c15;
-  --article-surface: #161724;
-  --article-text: #e0ddd6;
-  --article-text-secondary: #b0aba4;
-  --article-border: #252640;
-  --article-code-bg: #1a1b2e;
-  --article-link: #e8b964;
-  --article-heading: #e8e5de;
-  --article-blockquote-border: #e8b964;
-  --article-blockquote-bg: rgba(232, 185, 100, 0.06);
-  --article-table-border: #2a2b44;
-  --article-table-stripe: rgba(255, 255, 255, 0.02);
-  --article-hr: #252640;
+  /* ===== Article reading (light) ===== */
+  --article-bg: #F7F5EF;
+  --article-surface: #FFFFFF;
+  --article-text: #25231D;
+  --article-text-secondary: #4A4640;
+  --article-border: #E8E4DA;
+  --article-code-bg: #F0EDE6;
+  --article-link: #9B6D1A;
+  --article-heading: #1A1814;
+  --article-blockquote-border: #C8A96E;
+  --article-blockquote-bg: rgba(184, 135, 24, 0.04);
+  --article-table-border: #E0DBD2;
+  --article-table-stripe: rgba(0, 0, 0, 0.02);
+  --article-hr: #DDD7CB;
 
-  /* ===== Code highlight (dark) ===== */
-  --hl-keyword: #e8637a;
-  --hl-string: #e8b964;
-  --hl-comment: #65626a;
-  --hl-function: #a78bfa;
-  --hl-number: #4dd9b6;
-  --hl-variable: #e0ddd6;
-  --hl-operator: #aaa5a7;
-  --hl-class: #6b9aff;
-  --hl-attr: #f09848;
-  --hl-tag: #e8637a;
+  /* ===== Code highlight (warm light) ===== */
+  --hl-keyword: #8B3A3A;
+  --hl-string: #6B5A2E;
+  --hl-comment: #A09A8C;
+  --hl-function: #6B4F8A;
+  --hl-number: #3A6B5A;
+  --hl-variable: #25231D;
+  --hl-operator: #6B665A;
+  --hl-class: #4A5A8A;
+  --hl-attr: #8A5A2E;
+  --hl-tag: #8B3A3A;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    /* ===== Light mode (paper feel) ===== */
-    --bg: #faf8f5;
-    --surface: #f3f0eb;
-    --card: #ffffff;
-    --card-hover: #f7f4ef;
-    --border: #e6e0d6;
-    --border-light: #d9d2c7;
-    --accent: #b8860b;
-    --accent-dim: rgba(184, 134, 11, 0.08);
-    --teal: #2e8b7a;
-    --teal-dim: rgba(46, 139, 122, 0.08);
-    --rose: #b04a5a;
-    --rose-dim: rgba(176, 74, 90, 0.08);
-    --blue: #4a7abf;
-    --blue-dim: rgba(74, 122, 191, 0.08);
-    --orange: #c07830;
-    --orange-dim: rgba(192, 120, 48, 0.08);
-    --text: #3d3929;
-    --text-secondary: #7a7265;
-    --text-muted: #a09a8c;
+    /* ===== Dark mode ===== */
+    --bg: #141310;
+    --surface: #1C1A16;
+    --card: #201E19;
+    --card-hover: #28251F;
+    --border: #33302A;
+    --border-light: #44403A;
+    --accent: #D4A43A;
+    --accent-dim: rgba(212, 164, 58, 0.10);
+    --teal: #5AAB7A;
+    --teal-dim: rgba(90, 171, 122, 0.10);
+    --rose: #E06070;
+    --rose-dim: rgba(224, 96, 112, 0.10);
+    --blue: #7AA0D0;
+    --blue-dim: rgba(122, 160, 208, 0.10);
+    --orange: #E09050;
+    --orange-dim: rgba(224, 144, 80, 0.10);
+    --text: #E8E4DA;
+    --text-secondary: #A09A8C;
+    --text-muted: #6B665A;
 
-    /* ===== Article reading (light paper) ===== */
-    --article-bg: #faf8f5;
-    --article-surface: #ffffff;
-    --article-text: #3d3929;
-    --article-text-secondary: #5c5648;
-    --article-border: #e6e0d6;
-    --article-code-bg: #f5f2ed;
-    --article-link: #9b6d1a;
-    --article-heading: #2a2518;
-    --article-blockquote-border: #c8a96e;
-    --article-blockquote-bg: rgba(184, 134, 11, 0.04);
-    --article-table-border: #e0dbd2;
-    --article-table-stripe: rgba(0, 0, 0, 0.02);
-    --article-hr: #ddd7cb;
+    --article-bg: #141310;
+    --article-surface: #201E19;
+    --article-text: #E8E4DA;
+    --article-text-secondary: #B0A898;
+    --article-border: #33302A;
+    --article-code-bg: #1A1916;
+    --article-link: #D4A43A;
+    --article-heading: #F0ECE2;
+    --article-blockquote-border: #D4A43A;
+    --article-blockquote-bg: rgba(212, 164, 58, 0.06);
+    --article-table-border: #33302A;
+    --article-table-stripe: rgba(255, 255, 255, 0.02);
+    --article-hr: #33302A;
 
-    /* ===== Code highlight (light warm) ===== */
-    --hl-keyword: #8b3a3a;
-    --hl-string: #6b5a2e;
-    --hl-comment: #a09a8c;
-    --hl-function: #6b4f8a;
-    --hl-number: #3a6b5a;
-    --hl-variable: #3d3929;
-    --hl-operator: #7a7265;
-    --hl-class: #4a5a8a;
-    --hl-attr: #8a5a2e;
-    --hl-tag: #8b3a3a;
+    --hl-keyword: #E06070;
+    --hl-string: #D4A43A;
+    --hl-comment: #6B665A;
+    --hl-function: #A78BFA;
+    --hl-number: #5AAB7A;
+    --hl-variable: #E8E4DA;
+    --hl-operator: #A09A8C;
+    --hl-class: #7AA0D0;
+    --hl-attr: #E09050;
+    --hl-tag: #E06070;
   }
 }
 
@@ -118,25 +116,19 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background:
-    linear-gradient(135deg, rgba(232, 185, 100, 0.035), transparent 26rem),
-    linear-gradient(315deg, rgba(77, 217, 182, 0.025), transparent 24rem),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: "Noto Serif SC", Georgia, serif;
-  line-height: 1.72;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   body {
     background:
-      linear-gradient(135deg, rgba(184, 134, 11, 0.03), transparent 26rem),
-      linear-gradient(315deg, rgba(46, 139, 122, 0.02), transparent 24rem),
+      linear-gradient(135deg, rgba(212, 164, 58, 0.02), transparent 26rem),
       var(--bg);
-  }
-  body::before {
-    background-image: radial-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px);
   }
 }
 
@@ -146,8 +138,8 @@ body::before {
   z-index: 0;
   content: "";
   pointer-events: none;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-  background-size: 28px 28px;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 a {
@@ -186,18 +178,18 @@ button {
   display: flex;
   width: var(--sidebar-w);
   flex-direction: column;
-  padding: 28px 20px 20px;
+  padding: 24px 16px 16px;
   overflow-y: auto;
-  background: linear-gradient(180deg, #101119 0%, var(--surface) 100%);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   transition: transform 260ms ease;
 }
 
 .avatar-wrap {
   position: relative;
-  width: 72px;
-  height: 72px;
-  margin-bottom: 16px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
 }
 
 .avatar,
@@ -212,10 +204,10 @@ button {
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, var(--accent), var(--teal));
-  color: var(--bg);
-  font-family: "Syne", sans-serif;
-  font-size: 20px;
-  font-weight: 800;
+  color: white;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .avatar-ring {
@@ -227,7 +219,7 @@ button {
 }
 
 .sidebar-name {
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 18px;
   font-weight: 700;
 }
@@ -248,7 +240,7 @@ button {
 .mood,
 .compact-row,
 .toast {
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .sidebar-tag {
@@ -283,36 +275,46 @@ button {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  margin-bottom: 2px;
-  padding: 8px 12px;
+  gap: 8px;
+  min-height: 34px;
+  margin-bottom: 1px;
+  padding: 6px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 13px;
   text-align: left;
+  position: relative;
   transition:
     background 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    color 160ms ease;
 }
 
 .nav-link {
   min-height: 38px;
 }
 
-.nav-item:hover,
-.nav-item.active {
-  background: rgba(255, 255, 255, 0.035);
+.nav-item:hover {
+  background: var(--accent-dim);
   color: var(--text);
 }
 
 .nav-item.active {
   background: var(--accent-dim);
   color: var(--accent);
+}
+
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--accent);
 }
 
 .nav-badge {
@@ -381,10 +383,11 @@ button {
 .home-title {
   max-width: 840px;
   margin: 0 0 16px;
-  font-family: "Syne", sans-serif;
-  font-size: 52px;
+  font-family: "Inter", "PingFang SC", sans-serif;
+  font-size: clamp(36px, 5vw, 64px);
   font-weight: 800;
-  line-height: 1.12;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
 }
 
 .home-title span {
@@ -433,13 +436,13 @@ button {
 .product-card:hover,
 .timeline-card:hover,
 .workspace-panel:hover {
-  border-color: var(--border-light);
-  background: var(--card-hover);
+  border-color: rgba(184, 135, 24, 0.3);
   transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(37, 35, 29, 0.06);
 }
 
 .metric-value {
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 30px;
   font-weight: 800;
   line-height: 1;
@@ -467,7 +470,7 @@ button {
   align-items: center;
   gap: 10px;
   margin: 0 0 14px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 19px;
   font-weight: 700;
 }
@@ -499,7 +502,7 @@ button {
   border-radius: 999px;
   background: var(--card);
   color: var(--text-secondary);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
 }
 
@@ -515,7 +518,7 @@ button {
 
 .page-title {
   margin: 0 0 6px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 32px;
   font-weight: 800;
   line-height: 1.2;
@@ -607,7 +610,7 @@ button {
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.24);
   color: rgba(255, 255, 255, 0.84);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 21px;
   font-weight: 500;
 }
@@ -666,7 +669,7 @@ button {
   display: block;
   margin-bottom: 5px;
   color: var(--text);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 17px;
   font-weight: 700;
   line-height: 1.42;
@@ -717,7 +720,7 @@ button {
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--bg);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   font-weight: 500;
 }
@@ -728,7 +731,7 @@ button {
 
 .product-content h3 {
   margin: 0 0 4px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 15px;
 }
 
@@ -766,7 +769,7 @@ button {
   gap: 7px;
   border-radius: 8px;
   cursor: pointer;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   transition:
     background 160ms ease,
     border-color 160ms ease,
@@ -907,7 +910,7 @@ button {
 
 .article-shell h1 {
   margin: 0 0 22px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 34px;
   line-height: 1.24;
 }
@@ -953,7 +956,7 @@ button {
 }
 
 .mobile-logo {
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 800;
 }
 
@@ -992,7 +995,7 @@ button {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 9px;
 }
 
@@ -1079,7 +1082,7 @@ button {
 
 .vip-panel span {
   color: var(--text-muted);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
 }
 
@@ -1105,7 +1108,7 @@ button {
 
 .workspace-panel h2 {
   margin: 14px 0 7px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 17px;
 }
 
@@ -1536,7 +1539,7 @@ button {
 .article-prose h5,
 .article-prose h6 {
   color: var(--article-heading);
-  font-family: "Syne", "Noto Serif SC", sans-serif;
+  font-family: "Inter", "PingFang SC", sans-serif;
   font-weight: 700;
   line-height: 1.35;
   margin-top: 2em;
@@ -1645,7 +1648,7 @@ button {
   padding: 0.15em 0.4em;
   border-radius: 4px;
   background: var(--article-code-bg);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 0.88em;
 }
 
@@ -1662,7 +1665,7 @@ button {
 .article-prose pre code {
   padding: 0;
   background: transparent;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 0.88em;
   line-height: 1.65;
 }
@@ -1747,7 +1750,7 @@ button {
 
 .paid-cta h3 {
   margin: 0 0 8px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 18px;
   color: var(--accent);
 }
@@ -1759,7 +1762,7 @@ button {
 }
 
 .paid-cta .paid-price {
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 28px;
   font-weight: 800;
   color: var(--accent);

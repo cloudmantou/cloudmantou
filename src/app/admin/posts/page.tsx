@@ -88,18 +88,18 @@ export default function AdminPostsPage() {
         <div>
           <h1
             className="text-xl font-bold"
-            style={{ fontFamily: '"Syne", "Noto Serif SC", sans-serif', color: "var(--text)" }}
+            style={{ fontFamily: '"Inter", "PingFang SC", sans-serif', color: "var(--text)" }}
           >
             文章管理
           </h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+          <p className="text-xs mt-1" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
             共 {total} 篇文章
           </p>
         </div>
         <Link
           href="/admin/posts/new"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors"
-          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace' }}
+          style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           <Plus size={14} aria-hidden="true" />
           新建文章
@@ -116,7 +116,7 @@ export default function AdminPostsPage() {
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="搜索标题..."
             className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
-            style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+            style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
           />
           <button
             type="button"
@@ -143,7 +143,7 @@ export default function AdminPostsPage() {
                 borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)",
                 background: statusFilter === f.id ? "var(--accent-dim)" : "transparent",
                 color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)",
-                fontFamily: '"DM Mono", monospace',
+                fontFamily: '"JetBrains Mono", monospace',
               }}
             >
               {f.label}
@@ -157,12 +157,12 @@ export default function AdminPostsPage() {
         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "var(--card)" }}>
-              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>标题</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>状态</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>分类</th>
-              <th className="text-center px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>浏览</th>
-              <th className="text-center px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>评论</th>
-              <th className="text-right px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>操作</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>标题</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>状态</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>分类</th>
+              <th className="text-center px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>浏览</th>
+              <th className="text-center px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>评论</th>
+              <th className="text-right px-3 py-2.5 text-xs font-medium" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -188,7 +188,7 @@ export default function AdminPostsPage() {
                   <td className="px-3 py-2.5">
                     <span
                       className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{ background: `${STATUS_COLORS[post.status]}15`, color: STATUS_COLORS[post.status], fontFamily: '"DM Mono", monospace' }}
+                      style={{ background: `${STATUS_COLORS[post.status]}15`, color: STATUS_COLORS[post.status], fontFamily: '"JetBrains Mono", monospace' }}
                     >
                       {STATUS_LABELS[post.status] || post.status}
                     </span>
@@ -196,10 +196,10 @@ export default function AdminPostsPage() {
                   <td className="px-3 py-2.5 text-xs" style={{ color: "var(--text-secondary)" }}>
                     {post.category?.name || "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-center text-xs" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                  <td className="px-3 py-2.5 text-center text-xs" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                     {post.viewCount}
                   </td>
-                  <td className="px-3 py-2.5 text-center text-xs" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                  <td className="px-3 py-2.5 text-center text-xs" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                     {post.commentCount}
                   </td>
                   <td className="px-3 py-2.5">
@@ -251,7 +251,7 @@ export default function AdminPostsPage() {
               style={{
                 background: p === page ? "var(--accent)" : "transparent",
                 color: p === page ? "var(--bg)" : "var(--text-muted)",
-                fontFamily: '"DM Mono", monospace',
+                fontFamily: '"JetBrains Mono", monospace',
               }}
             >
               {p}

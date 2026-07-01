@@ -97,7 +97,7 @@ export default function DashboardPage() {
                 onChange={(e) => setCardNo(e.target.value)}
                 placeholder="卡号"
                 className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
               <input
                 type="text"
@@ -105,14 +105,14 @@ export default function DashboardPage() {
                 onChange={(e) => setCardSecret(e.target.value)}
                 placeholder="卡密"
                 className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
-                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"DM Mono", monospace' }}
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
               <button
                 type="button"
                 onClick={handleRedeem}
                 disabled={redeemLoading || !cardNo.trim() || !cardSecret.trim()}
                 className="px-4 py-1.5 text-xs rounded-md transition-colors"
-                style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"DM Mono", monospace', opacity: redeemLoading ? 0.7 : 1 }}
+                style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: redeemLoading ? 0.7 : 1 }}
               >
                 {redeemLoading ? "兑换中..." : "兑换"}
               </button>
@@ -120,7 +120,7 @@ export default function DashboardPage() {
             {redeemMsg && (
               <div
                 className="text-xs"
-                style={{ color: redeemMsg.includes("成功") ? "var(--teal)" : "var(--rose)", fontFamily: '"DM Mono", monospace' }}
+                style={{ color: redeemMsg.includes("成功") ? "var(--teal)" : "var(--rose)", fontFamily: '"JetBrains Mono", monospace' }}
               >
                 {redeemMsg}
               </div>

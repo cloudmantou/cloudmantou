@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 style={{
                   background: active || isExactDashboard ? "var(--accent-dim)" : "transparent",
                   color: active || isExactDashboard ? "var(--accent)" : "var(--text-secondary)",
-                  fontFamily: '"DM Mono", monospace',
+                  fontFamily: '"JetBrains Mono", monospace',
                 }}
               >
                 <Icon size={14} aria-hidden="true" />

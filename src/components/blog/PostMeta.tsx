@@ -47,7 +47,7 @@ export function PostMeta({
   return (
     <div className="flex flex-col gap-3 mb-8">
       {/* Author + Date row */}
-      <div className="flex items-center gap-3 text-sm" style={{ color: "var(--text-secondary)", fontFamily: '"DM Mono", monospace' }}>
+      <div className="flex items-center gap-3 text-sm" style={{ color: "var(--text-secondary)", fontFamily: '"JetBrains Mono", monospace' }}>
         <span className="font-medium" style={{ color: "var(--text)" }}>
           {author.nickname || author.username}
         </span>
@@ -63,7 +63,7 @@ export function PostMeta({
       </div>
 
       {/* Stats row */}
-      <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+      <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
         <span className="flex items-center gap-1.5">
           <Eye size={13} aria-hidden="true" />
           {viewCount}
@@ -83,7 +83,7 @@ export function PostMeta({
             style={{
               color: "var(--accent)",
               background: "var(--accent-dim)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
             }}
           >
             {category.name}

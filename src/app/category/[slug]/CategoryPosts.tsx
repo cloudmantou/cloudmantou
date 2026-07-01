@@ -130,7 +130,7 @@ export function CategoryPosts({
             style={{
               borderColor: "var(--border)",
               color: "var(--text-secondary)",
-              fontFamily: '"DM Mono", monospace',
+              fontFamily: '"JetBrains Mono", monospace',
               opacity: isPending ? 0.6 : 1,
             }}
           >
@@ -143,7 +143,7 @@ export function CategoryPosts({
       {posts.length === 0 && (
         <div
           className="text-center py-12 text-sm"
-          style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
         >
           该分类暂无文章
         </div>
