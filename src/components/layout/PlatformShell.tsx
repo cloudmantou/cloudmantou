@@ -38,6 +38,7 @@ type ApiPost = {
   publishedAt: string | null;
   viewCount: number;
   isTop: boolean;
+  premium: boolean;
   author: { username: string; nickname: string | null };
   category: { name: string; slug: string } | null;
   tags: Array<{ id: string; name: string; slug: string; color: string | null }>;
@@ -199,15 +200,44 @@ export function PlatformShell() {
         <main className="main">
           {section === "home" ? (
             <section className="page active" aria-labelledby="home-title">
-              <div className="home-greeting">CloudMantou Membership Studio</div>
+              <div className="home-greeting">CloudMantou</div>
               <h1 className="home-title" id="home-title">
-                博客、会员内容与<span>自动发卡</span>
+                个人技术博客，
                 <br />
-                合在一个运营系统里
+                也卖一点<span>会员内容</span>。
               </h1>
               <p className="home-sub">
-                Next.js App Router · MySQL/Prisma · 支付回调 · 卡密库存 · 后台运营
+                记录开发、运维、独立产品和自动发卡系统的真实实践。
+                <br />
+                公开文章免费阅读，深度内容支持会员或卡密解锁。
               </p>
+
+              {/* Quick actions */}
+              <div className="flex flex-wrap gap-3 mb-10">
+                <button
+                  type="button"
+                  onClick={() => selectSection("blog")}
+                  className="px-5 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{ background: "var(--accent)", color: "white" }}
+                >
+                  阅读最新文章
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                >
+                  兑换卡密
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => selectSection("blog")}
+                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                >
+                  查看会员内容
+                </button>
+              </div>
 
               <div className="metrics-grid">
                 {stats.map((metric, index) => (
@@ -215,29 +245,49 @@ export function PlatformShell() {
                 ))}
               </div>
 
-              <section className="section-block" aria-labelledby="platform-focus">
-                <h2 className="section-title" id="platform-focus">
-                  项目定位
-                </h2>
-                <p className="about-text">
-                  CloudMantou 不是单独的商城，也不是只有文章列表的博客。它把公开内容、会员专栏、单篇付费、卡密兑换和站长后台放在一套订单与权限模型里，适合个人知识产品长期运营。
-                </p>
-              </section>
-
-              <section className="section-block" aria-labelledby="stack-title">
-                <h2 className="section-title" id="stack-title">
-                  技术栈
-                </h2>
-                <div className="tech-grid">
-                  {["Next.js 15", "TypeScript", "React Server Components", "Prisma", "MySQL", "Zod", "Redis", "Docker"].map(
-                    (item, index) => (
-                      <span className={clsx("tech-pill", index < 3 && "hot")} key={item}>
-                        {item}
-                      </span>
-                    )
-                  )}
-                </div>
-              </section>
+              {/* Latest articles preview */}
+              {apiPosts.length > 0 && (
+                <section className="section-block mt-8">
+                  <h2 className="section-title">最新文章</h2>
+                  <div className="flex flex-col gap-3">
+                    {apiPosts.slice(0, 3).map((post, i) => (
+                      <Link
+                        key={post.id}
+                        href={`/post/${post.slug}`}
+                        className="flex items-center justify-between p-4 rounded-lg border transition-all hover:border-[var(--accent)] hover:translate-y-[-2px]"
+                        style={{
+                          borderColor: "var(--border)",
+                          background: "var(--card)",
+                          textDecoration: "none",
+                          animationDelay: `${i * 80}ms`,
+                        }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            {post.premium && (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded"
+                                style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}
+                              >
+                                会员
+                              </span>
+                            )}
+                            <span className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                              {post.title}
+                            </span>
+                          </div>
+                          <div className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                            {post.excerpt || ""}
+                          </div>
+                        </div>
+                        <div className="text-[10px] ml-4 flex-shrink-0" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
+                          {post.category?.name || ""}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              )}
             </section>
           ) : null}
 
@@ -270,7 +320,7 @@ export function PlatformShell() {
               </div>
               <div className="blog-list">
                 {apiPosts.length === 0 ? (
-                  <div className="text-center py-12 text-sm" style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}>
+                  <div className="text-center py-12 text-sm" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
                     暂无文章
                   </div>
                 ) : (

@@ -97,7 +97,7 @@ export function SearchDialog() {
         style={{
           borderColor: "var(--border)",
           color: "var(--text-muted)",
-          fontFamily: '"DM Mono", monospace',
+          fontFamily: '"JetBrains Mono", monospace',
         }}
         aria-label="搜索文章"
       >
@@ -170,7 +170,7 @@ export function SearchDialog() {
           {loading && (
             <div
               className="text-center py-8 text-xs"
-              style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+              style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
             >
               搜索中...
             </div>
@@ -179,7 +179,7 @@ export function SearchDialog() {
           {!loading && query.trim() && results.length === 0 && (
             <div
               className="text-center py-8 text-xs"
-              style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+              style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
             >
               未找到相关文章
             </div>
@@ -218,7 +218,7 @@ export function SearchDialog() {
                 {result.category && (
                   <span
                     className="inline-block text-[10px] mt-1 px-1.5 py-0.5 rounded"
-                    style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"DM Mono", monospace' }}
+                    style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}
                   >
                     {result.category.name}
                   </span>
@@ -239,7 +239,7 @@ export function SearchDialog() {
           {!loading && !query.trim() && (
             <div
               className="text-center py-8 text-xs"
-              style={{ color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+              style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
             >
               输入关键词搜索文章
             </div>
@@ -252,7 +252,7 @@ export function SearchDialog() {
           style={{
             borderTop: "1px solid var(--border)",
             color: "var(--text-muted)",
-            fontFamily: '"DM Mono", monospace',
+            fontFamily: '"JetBrains Mono", monospace',
           }}
         >
           <span>↑↓ 导航</span>
