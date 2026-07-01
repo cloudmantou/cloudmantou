@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- **框架**: Next.js 14 App Router
+- **框架**: Next.js 15 App Router
 - **语言**: TypeScript + React 18
 - **数据库**: MySQL 8.0 + Prisma ORM
 - **认证**: NextAuth.js v5 (JWT)

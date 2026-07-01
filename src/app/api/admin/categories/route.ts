@@ -1,3 +1,4 @@
+import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -12,6 +13,7 @@ const createCategorySchema = z.object({
 
 export async function GET() {
   try {
+    await requireAdmin();
     const categories = await prisma.category.findMany({
       include: {
         _count: { select: { posts: true } },
@@ -30,6 +32,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const parsed = createCategorySchema.safeParse(body);
     if (!parsed.success) {

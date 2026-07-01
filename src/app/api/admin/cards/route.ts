@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
-export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import { requireAdmin, ApiError } from "@/lib/guards";
+import { hashCardSecret, generateCardNo, generateCardSecret } from "@/lib/card-crypto";
 import { z } from "zod";
-import crypto from "crypto";
+
+export const dynamic = "force-dynamic";
 
 const generateSchema = z.object({
   type: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE"]),
@@ -13,19 +15,9 @@ const generateSchema = z.object({
   batchNo: z.string().max(50).optional(),
 });
 
-function generateCardNo(): string {
-  const prefix = "CM";
-  const timestamp = Date.now().toString(36).toUpperCase().slice(-5);
-  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
-  return `${prefix}-${timestamp}-${random}`;
-}
-
-function generateSecret(): string {
-  return crypto.randomBytes(6).toString("hex").toUpperCase();
-}
-
 export async function GET(req: NextRequest) {
   try {
+    await requireAdmin();
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
@@ -52,8 +44,26 @@ export async function GET(req: NextRequest) {
       prisma.card.count({ where }),
     ]);
 
-    return ok(cards, { page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
+    // 不返回哈希值，只返回卡号和脱敏信息
+    const safe = cards.map((c) => ({
+      id: c.id,
+      cardNo: c.cardNo,
+      type: c.type,
+      value: c.value,
+      status: c.status,
+      batchNo: c.batchNo,
+      usedBy: c.usedBy,
+      usedAt: c.usedAt,
+      expireAt: c.expireAt,
+      createdAt: c.createdAt,
+      user: c.user,
+    }));
+
+    return ok(safe, { page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Cards List Error]", error);
     return fail("获取卡密列表失败", 50000, 500);
   }
@@ -61,6 +71,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const parsed = generateSchema.safeParse(body);
     if (!parsed.success) {
@@ -73,27 +84,25 @@ export async function POST(req: NextRequest) {
       ? new Date(Date.now() + expireDays * 24 * 60 * 60 * 1000)
       : null;
 
-    // Generate cards in batches to avoid unique collisions
-    const cards: Array<{ cardNo: string; cardSecret: string }> = [];
+    // 生成卡密，只在本次返回明文
+    const cards: Array<{ cardNo: string; secret: string; hash: string }> = [];
     const cardNos = new Set<string>();
-    const secrets = new Set<string>();
 
     for (let i = 0; i < count; i++) {
       let cardNo = generateCardNo();
-      let secret = generateSecret();
-      // Ensure uniqueness within batch
       while (cardNos.has(cardNo)) cardNo = generateCardNo();
-      while (secrets.has(secret)) secret = generateSecret();
       cardNos.add(cardNo);
-      secrets.add(secret);
-      cards.push({ cardNo, cardSecret: secret });
+
+      const secret = generateCardSecret();
+      const hash = hashCardSecret(secret);
+      cards.push({ cardNo, secret, hash });
     }
 
-    // Bulk insert
+    // 批量插入（只存哈希）
     await prisma.card.createMany({
       data: cards.map((c) => ({
         cardNo: c.cardNo,
-        cardSecret: c.cardSecret,
+        cardSecretHash: c.hash,
         type,
         value,
         status: "ACTIVE" as const,
@@ -102,12 +111,16 @@ export async function POST(req: NextRequest) {
       })),
     });
 
+    // 返回明文卡密（仅此一次）
     return ok({
       batchNo: batch,
       count: cards.length,
-      cards: cards.map((c) => ({ cardNo: c.cardNo, cardSecret: c.cardSecret })),
+      cards: cards.map((c) => ({ cardNo: c.cardNo, cardSecret: c.secret })),
     });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Generate Cards Error]", error);
     return fail("生成卡密失败", 50000, 500);
   }

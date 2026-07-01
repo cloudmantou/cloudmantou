@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
+import { getPostAccess } from "@/lib/post-access";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
           },
         },
         paidContent: {
-          select: { price: true },
+          select: { content: true, price: true },
         },
       },
     });
@@ -54,18 +55,23 @@ export async function GET(
       isLiked = !!like;
     }
 
-    // Format tags
     const tags = post.tags.map((pt) => pt.tag);
 
-    // For PAID_ONLY, return excerpt but not full content
-    const isPaidOnly = post.status === "PAID_ONLY";
+    // 统一访问权限判断（和 SSR 页面逻辑一致）
+    const access = await getPostAccess(
+      session?.user?.id || null,
+      post.id,
+      post.content,
+      post.paidContent?.content || null,
+      post.status
+    );
 
     return ok({
       id: post.id,
       title: post.title,
       slug: post.slug,
       excerpt: post.excerpt,
-      content: isPaidOnly ? null : post.content,
+      content: access.content,
       coverImage: post.coverImage,
       status: post.status,
       publishedAt: post.publishedAt,
@@ -77,8 +83,11 @@ export async function GET(
       author: post.author,
       category: post.category,
       tags,
-      paidContent: post.paidContent,
+      paidContent: post.paidContent
+        ? { price: Number(post.paidContent.price) }
+        : null,
       isLiked,
+      accessReason: access.reason,
     });
   } catch (error) {
     console.error("[Post Detail API Error]", error);

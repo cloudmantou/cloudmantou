@@ -1,3 +1,4 @@
+import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -20,6 +21,7 @@ const createPostSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
+  await requireAdmin();
   try {
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
@@ -65,6 +67,9 @@ export async function GET(req: NextRequest) {
 
     return ok(formatted, { page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Posts List Error]", error);
     return fail("获取文章列表失败", 50000, 500);
   }
@@ -72,6 +77,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const parsed = createPostSchema.safeParse(body);
     if (!parsed.success) {

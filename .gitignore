@@ -10,3 +10,4 @@ prisma/dev.db
 public/uploads/
 .omx/
 .claude/
+tsconfig.tsbuildinfo

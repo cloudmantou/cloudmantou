@@ -229,7 +229,7 @@ export function PlatformShell() {
                   技术栈
                 </h2>
                 <div className="tech-grid">
-                  {["Next.js 14", "TypeScript", "React Server Components", "Prisma", "MySQL", "Zod", "Redis", "Docker"].map(
+                  {["Next.js 15", "TypeScript", "React Server Components", "Prisma", "MySQL", "Zod", "Redis", "Docker"].map(
                     (item, index) => (
                       <span className={clsx("tech-pill", index < 3 && "hot")} key={item}>
                         {item}

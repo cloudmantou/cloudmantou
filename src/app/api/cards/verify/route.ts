@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api-response";
 import { cardVerifySchema } from "@/lib/validators/card";
 import { auth } from "@/lib/auth";
+import { hashCardSecret } from "@/lib/card-crypto";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -21,9 +22,10 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
 
   try {
-    // 查找卡密（只做读取校验，不在事务外修改状态）
+    // 用哈希比对，不在数据库存储明文卡密
+    const secretHash = hashCardSecret(cardSecret);
     const card = await prisma.card.findFirst({
-      where: { cardNo, cardSecret },
+      where: { cardNo, cardSecretHash: secretHash },
     });
 
     if (!card) {

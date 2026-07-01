@@ -1,9 +1,16 @@
+import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
+import { fail } from "@/lib/api-response";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * 卡密导出 CSV
+ * 卡密哈希不可逆，导出只包含卡号。明文仅在生成时返回一次。
+ */
 export async function GET(req: NextRequest) {
   try {
+    await requireAdmin();
     const { searchParams } = req.nextUrl;
     const batchNo = searchParams.get("batchNo") || undefined;
     const type = searchParams.get("type") || undefined;
@@ -27,12 +34,10 @@ export async function GET(req: NextRequest) {
       BALANCE: "余额",
     };
 
-    // Generate CSV
-    const header = "卡号,卡密,类型,数值,状态,批次,使用者,使用时间,过期时间,创建时间";
+    const header = "卡号,类型,数值,状态,批次,使用者,使用时间,过期时间,创建时间";
     const rows = cards.map((c) =>
       [
         c.cardNo,
-        c.cardSecret,
         TYPE_LABELS[c.type] || c.type,
         c.value,
         c.status,
@@ -45,7 +50,7 @@ export async function GET(req: NextRequest) {
     );
 
     const csv = [header, ...rows].join("\n");
-    const BOM = "﻿"; // Excel UTF-8 BOM
+    const BOM = "﻿";
 
     return new Response(BOM + csv, {
       headers: {
@@ -54,7 +59,10 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Export Cards Error]", error);
-    return new Response("导出失败", { status: 500 });
+    return fail("导出失败", 50000, 500);
   }
 }

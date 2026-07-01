@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const q = searchParams.get("q") || undefined;
 
     const where: any = {
-      status: "PUBLISHED",
+      status: { in: ["PUBLISHED", "PAID_ONLY"] },
       ...(categoryId && { categoryId }),
       ...(tag && {
         tags: { some: { tag: { slug: tag } } },
@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
     const formatted = posts.map((p) => ({
       ...p,
       tags: p.tags.map((pt) => pt.tag),
+      premium: p.status === "PAID_ONLY",
       // Include matched content snippet when searching
       ...(q
         ? {

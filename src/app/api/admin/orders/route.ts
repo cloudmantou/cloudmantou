@@ -1,3 +1,4 @@
+import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
@@ -5,6 +6,7 @@ import { ok, fail } from "@/lib/api-response";
 
 export async function GET(req: NextRequest) {
   try {
+    await requireAdmin();
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(50, parseInt(searchParams.get("pageSize") || "20"));

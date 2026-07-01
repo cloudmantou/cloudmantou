@@ -203,17 +203,17 @@ model Payment {
 }
 
 model Card {
-  id         String     @id @default(cuid())
-  cardNo     String     @unique
-  cardSecret String     @unique
-  type       CardType
-  value      Int
-  status     CardStatus @default(ACTIVE)
-  batchNo    String?
-  usedBy     String?
-  usedAt     DateTime?
-  expireAt   DateTime?
-  createdAt  DateTime   @default(now())
+  id              String     @id @default(cuid())
+  cardNo          String     @unique
+  cardSecretHash  String     @unique
+  type            CardType
+  value           Int
+  status          CardStatus @default(ACTIVE)
+  batchNo         String?
+  usedBy          String?
+  usedAt          DateTime?
+  expireAt        DateTime?
+  createdAt       DateTime   @default(now())
 
   user User? @relation("CardUser", fields: [usedBy], references: [id])
 

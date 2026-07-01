@@ -1,3 +1,4 @@
+import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -11,6 +12,7 @@ const createTagSchema = z.object({
 
 export async function GET() {
   try {
+    await requireAdmin();
     const tags = await prisma.tag.findMany({
       include: {
         _count: { select: { posts: true } },
@@ -29,6 +31,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAdmin();
     const body = await req.json();
     const parsed = createTagSchema.safeParse(body);
     if (!parsed.success) {
