@@ -46,6 +46,7 @@ export default function AdminCardsPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   // Generate form
@@ -61,16 +62,20 @@ export default function AdminCardsPage() {
 
   const load = async (p: number) => {
     setLoading(true);
+    setLoadError("");
     try {
       const params = new URLSearchParams({ page: String(p), pageSize: "20" });
       if (typeFilter) params.set("type", typeFilter);
       if (statusFilter) params.set("status", statusFilter);
       const res = await fetch(`/api/admin/cards?${params}`);
+      if (!res.ok) throw new Error(`请求失败 (${res.status})`);
       const data = await res.json();
       setCards(data.data || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setLoadError(e.message || "加载失败");
+    }
     setLoading(false);
   };
 
@@ -253,6 +258,8 @@ export default function AdminCardsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</td></tr>
+            ) : loadError ? (
+              <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</td></tr>
             ) : cards.length === 0 ? (
               <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无卡密</td></tr>
             ) : cards.map((c) => (

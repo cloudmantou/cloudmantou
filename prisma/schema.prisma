@@ -17,6 +17,7 @@ model User {
   role        Role      @default(USER)
   vipLevel    Int       @default(0)
   vipExpireAt DateTime?
+  balance     Int       @default(0)
   bio         String?   @db.Text
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

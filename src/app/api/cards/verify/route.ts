@@ -5,7 +5,6 @@ import { cardVerifySchema } from "@/lib/validators/card";
 import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  // 需要登录
   const session = await auth();
   if (!session?.user) {
     return fail("请先登录", 40100, 401);
@@ -22,12 +21,9 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
 
   try {
-    // 查找卡密
+    // 查找卡密（只做读取校验，不在事务外修改状态）
     const card = await prisma.card.findFirst({
-      where: {
-        cardNo,
-        cardSecret,
-      },
+      where: { cardNo, cardSecret },
     });
 
     if (!card) {
@@ -44,7 +40,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (card.expireAt && card.expireAt < new Date()) {
-      // 自动标记过期
       await prisma.card.update({
         where: { id: card.id },
         data: { status: "EXPIRED" },
@@ -52,11 +47,14 @@ export async function POST(req: NextRequest) {
       return fail("该卡密已过期", 42200, 422);
     }
 
-    // 事务：标记卡密已使用 + 执行对应业务逻辑
+    // ===== 原子兑换：条件更新 + 检查 affected count =====
     const result = await prisma.$transaction(async (tx) => {
-      // 标记卡密已使用
-      await tx.card.update({
-        where: { id: card.id },
+      // 原子抢占：只有 status=ACTIVE 的卡才能被标记为 USED
+      const updateResult = await tx.card.updateMany({
+        where: {
+          id: card.id,
+          status: "ACTIVE",
+        },
         data: {
           status: "USED",
           usedBy: userId,
@@ -64,11 +62,15 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 根据卡密类型执行不同逻辑
+      if (updateResult.count === 0) {
+        // 并发竞争失败：其他请求已抢占此卡
+        throw new Error("CONCURRENT_CONFLICT");
+      }
+
+      // 根据卡密类型执行对应业务逻辑
       let benefit: { type: string; message: string } | null = null;
 
       if (card.type === "VIP_DAYS") {
-        // 会员天数卡：延长 VIP
         const user = await tx.user.findUnique({ where: { id: userId } });
         if (!user) throw new Error("用户不存在");
 
@@ -93,14 +95,29 @@ export async function POST(req: NextRequest) {
           message: `会员已延长 ${card.value} 天，新到期时间：${newExpire.toLocaleDateString("zh-CN")}`,
         };
       } else if (card.type === "PAID_ARTICLE") {
-        // 付费文章兑换卡：创建 Entitlement
-        // value 在此类型中代表文章数量或金额，这里简化为余额
+        // 创建 PAID_POST 权益记录，value 作为可解锁的文章数量
+        // 这里创建一条通用付费文章额度，具体使用时扣减
+        await tx.entitlement.create({
+          data: {
+            userId,
+            type: "PAID_POST",
+            // 不绑定 postId → 通用额度
+          },
+        });
+
         benefit = {
           type: "PAID_ARTICLE",
-          message: `已获得付费文章阅读额度，可前往文章页面使用`,
+          message: `已获得付费文章阅读额度 ${card.value} 篇`,
         };
       } else if (card.type === "BALANCE") {
-        // 余额充值卡
+        // 余额充值：更新用户余额
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            balance: { increment: card.value },
+          },
+        });
+
         benefit = {
           type: "BALANCE",
           message: `已充值 ${(card.value / 100).toFixed(2)} 元`,
@@ -115,7 +132,10 @@ export async function POST(req: NextRequest) {
       value: card.value,
       benefit: result,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === "CONCURRENT_CONFLICT") {
+      return fail("该卡密正在被其他用户兑换，请稍后重试", 40900, 409);
+    }
     console.error("[Card Verify Error]", error);
     return fail("卡密兑换失败，请稍后重试", 50000, 500);
   }

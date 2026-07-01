@@ -48,19 +48,24 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = async (p: number) => {
     setLoading(true);
+    setLoadError("");
     try {
       const params = new URLSearchParams({ page: String(p), pageSize: "20" });
       if (statusFilter) params.set("status", statusFilter);
       if (search) params.set("q", search);
       const res = await fetch(`/api/admin/orders?${params}`);
+      if (!res.ok) throw new Error(`请求失败 (${res.status})`);
       const data = await res.json();
       setOrders(data.data || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setLoadError(e.message || "加载失败");
+    }
     setLoading(false);
   };
 
@@ -117,6 +122,8 @@ export default function AdminOrdersPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</td></tr>
+            ) : loadError ? (
+              <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</td></tr>
             ) : orders.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无订单</td></tr>
             ) : orders.map((o) => (

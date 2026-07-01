@@ -32,19 +32,24 @@ export default function AdminCommentsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const load = async (p: number, status?: string) => {
     setLoading(true);
+    setLoadError("");
     try {
       const params = new URLSearchParams({ page: String(p), pageSize: "20" });
       if (status) params.set("status", status);
       const res = await fetch(`/api/admin/comments?${params}`);
+      if (!res.ok) throw new Error(`请求失败 (${res.status})`);
       const data = await res.json();
       setComments(data.data || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.totalPages || 1);
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setLoadError(e.message || "加载失败");
+    }
     setLoading(false);
   };
 
@@ -113,6 +118,8 @@ export default function AdminCommentsPage() {
       <div className="flex flex-col gap-2">
         {loading ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</div>
+        ) : loadError ? (
+          <div className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</div>
         ) : comments.length === 0 ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无评论</div>
         ) : (

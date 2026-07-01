@@ -49,7 +49,7 @@ export default async function PostPage({ params }: PageProps) {
         },
       },
       paidContent: {
-        select: { price: true },
+        select: { content: true, price: true },
       },
       comments: {
         where: { parentId: null, status: "APPROVED" },
@@ -108,6 +108,50 @@ export default async function PostPage({ params }: PageProps) {
   const tags = post.tags.map((pt) => pt.tag);
   const isPaidOnly = post.status === "PAID_ONLY";
 
+  // ===== Entitlement check for PAID_ONLY posts =====
+  let hasAccess = !isPaidOnly; // PUBLISHED → always accessible
+  let postContent: string | null = post.content;
+
+  if (isPaidOnly) {
+    const userId = session?.user?.id;
+    if (userId) {
+      const now = new Date();
+      // Check: active VIP entitlement
+      const vipEntitlement = await prisma.entitlement.findFirst({
+        where: {
+          userId,
+          type: "VIP",
+          OR: [
+            { expiresAt: null },          // permanent VIP
+            { expiresAt: { gt: now } },   // active VIP
+          ],
+        },
+        select: { id: true },
+      });
+
+      // Check: PAID_POST entitlement for this specific post
+      const postEntitlement = await prisma.entitlement.findFirst({
+        where: {
+          userId,
+          type: "PAID_POST",
+          postId: post.id,
+        },
+        select: { id: true },
+      });
+
+      if (vipEntitlement || postEntitlement) {
+        hasAccess = true;
+        // Return full content: public + paid
+        const paidBody = post.paidContent?.content || "";
+        postContent = post.content + "\n\n" + paidBody;
+      }
+    }
+    // No access → don't send paid content
+    if (!hasAccess) {
+      postContent = null;
+    }
+  }
+
   // Format comments for client
   const formatComment = (c: any): any => ({
     id: c.id,
@@ -137,7 +181,7 @@ export default async function PostPage({ params }: PageProps) {
           id: post.id,
           title: post.title,
           slug: post.slug,
-          content: isPaidOnly ? null : post.content,
+          content: postContent,
           excerpt: post.excerpt,
           coverImage: post.coverImage,
           status: post.status,
