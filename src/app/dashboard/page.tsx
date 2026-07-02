@@ -51,15 +51,15 @@ export default function DashboardPage() {
             <h1 className="page-title">会员中心</h1>
             <p className="page-desc">
               {session?.user
-                ? `欢迎回来，${(session.user as any).nickname || (session.user as any).username || session.user.name || session.user.email || "用户"}`
+                ? `欢迎回来，${session.user.nickname || session.user.username || session.user.name || session.user.email || "用户"}`
                 : "登录后管理你的会员权益。"}
             </p>
           </div>
           <div className="vip-panel">
             <ShieldCheck size={24} aria-hidden="true" />
             <div>
-              <strong>{(session?.user as any)?.nickname || (session?.user as any)?.username || session?.user?.name || "未登录"}</strong>
-              <span>{(session?.user as any)?.role === "ADMIN" ? "管理员 · 全站权限" : "普通会员"}</span>
+              <strong>{session?.user?.nickname || session?.user?.username || session?.user?.name || "未登录"}</strong>
+              <span>{session?.user?.role === "ADMIN" ? "管理员 · 全站权限" : "普通会员"}</span>
             </div>
           </div>
         </section>
@@ -90,13 +90,22 @@ export default function DashboardPage() {
             className="p-4 rounded-lg"
             style={{ background: "var(--card)", border: "1px solid var(--border)" }}
           >
-            <div className="flex gap-3 mb-3">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr auto",
+                gap: 10,
+                alignItems: "stretch",
+              }}
+              className="dashboard-redeem-row"
+            >
               <input
                 type="text"
                 value={cardNo}
                 onChange={(e) => setCardNo(e.target.value)}
                 placeholder="卡号"
-                className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
+                aria-label="卡号"
+                className="px-3 py-2 rounded-md text-xs outline-none"
                 style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
               <input
@@ -104,15 +113,16 @@ export default function DashboardPage() {
                 value={cardSecret}
                 onChange={(e) => setCardSecret(e.target.value)}
                 placeholder="卡密"
-                className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
+                aria-label="卡密"
+                className="px-3 py-2 rounded-md text-xs outline-none"
                 style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
               />
               <button
                 type="button"
                 onClick={handleRedeem}
                 disabled={redeemLoading || !cardNo.trim() || !cardSecret.trim()}
-                className="px-4 py-1.5 text-xs rounded-md transition-colors"
-                style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: redeemLoading ? 0.7 : 1 }}
+                className="px-5 py-2 text-xs rounded-md transition-colors"
+                style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: redeemLoading ? 0.7 : 1, whiteSpace: "nowrap" }}
               >
                 {redeemLoading ? "兑换中..." : "兑换"}
               </button>

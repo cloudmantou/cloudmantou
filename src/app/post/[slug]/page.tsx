@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getPostAccess } from "@/lib/post-access";
 import { PostContent } from "./PostContent";
+import { MarketingShell } from "@/components/layout/MarketingShell";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -139,33 +140,37 @@ export default async function PostPage({ params }: PageProps) {
   };
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "var(--article-bg)" }}
-    >
-      <PostContent
-        post={{
-          id: post.id,
-          title: post.title,
-          slug: post.slug,
-          content: postContent,
-          excerpt: post.excerpt,
-          coverImage: post.coverImage,
-          status: post.status,
-          publishedAt: post.publishedAt?.toISOString() ?? null,
-          viewCount: post.viewCount,
-          likeCount: post.likeCount,
-          commentCount: post.commentCount,
-          author: post.author,
-          category: post.category,
-          tags,
-          paidContent: post.paidContent
-            ? { price: Number(post.paidContent.price) }
-            : null,
-          isLiked,
-        }}
-        commentsData={commentsData}
-      />
-    </div>
+    <MarketingShell>
+      <article
+        className="min-h-screen px-4 py-10 md:px-8"
+        style={{ background: "var(--article-bg)" }}
+      >
+        <div className="mx-auto" style={{ maxWidth: 860 }}>
+          <PostContent
+            post={{
+              id: post.id,
+              title: post.title,
+              slug: post.slug,
+              content: postContent,
+              excerpt: post.excerpt,
+              coverImage: post.coverImage,
+              status: post.status,
+              publishedAt: post.publishedAt?.toISOString() ?? null,
+              viewCount: post.viewCount,
+              likeCount: post.likeCount,
+              commentCount: post.commentCount,
+              author: post.author,
+              category: post.category,
+              tags,
+              paidContent: post.paidContent
+                ? { price: Number(post.paidContent.price) }
+                : null,
+              isLiked,
+            }}
+            commentsData={commentsData}
+          />
+        </div>
+      </article>
+    </MarketingShell>
   );
 }

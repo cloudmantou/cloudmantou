@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { Plus, Edit, Trash2, Save, X, Hash } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Tag = {
   id: string;
@@ -179,7 +180,7 @@ export default function AdminTagsPage() {
       {loading ? (
         <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</div>
       ) : tags.length === 0 ? (
-        <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无标签</div>
+        <EmptyState title="暂无标签" description="还没有任何标签。" />
       ) : (
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (

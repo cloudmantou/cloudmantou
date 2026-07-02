@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { Check, X, Trash2, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Comment = {
   id: string;
@@ -121,7 +122,7 @@ export default function AdminCommentsPage() {
         ) : loadError ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无评论</div>
+          <EmptyState title="暂无评论" description="还没有用户发表评论。" />
         ) : (
           comments.map((c) => (
             <div key={c.id} className="comment-box">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { Plus, Edit, Trash2, Save, X } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Category = {
   id: string;
@@ -194,7 +195,7 @@ export default function AdminCategoriesPage() {
         {loading ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</div>
         ) : categories.length === 0 ? (
-          <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无分类</div>
+          <EmptyState title="暂无分类" description="还没有任何分类。" />
         ) : (
           categories.map((cat) => (
             <div key={cat.id} className="flex items-center justify-between px-4 py-3 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>

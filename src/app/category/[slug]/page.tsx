@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { CategoryPosts } from "./CategoryPosts";
+import { MarketingShell } from "@/components/layout/MarketingShell";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -74,26 +75,28 @@ export default async function CategoryPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="page" style={{ maxWidth: 860 }}>
-      {/* Category header */}
-      <div className="page-head" style={{ marginBottom: 28 }}>
-        <h1 className="page-title">{category.name}</h1>
-        {category.description && (
-          <p className="page-desc">{category.description}</p>
-        )}
-        <p
-          className="text-xs mt-2"
-          style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
-        >
-          共 {total} 篇文章
-        </p>
-      </div>
+    <MarketingShell>
+      <div className="page" style={{ maxWidth: 860 }}>
+        {/* Category header */}
+        <div className="page-head" style={{ marginBottom: 28 }}>
+          <h1 className="page-title">{category.name}</h1>
+          {category.description && (
+            <p className="page-desc">{category.description}</p>
+          )}
+          <p
+            className="text-xs mt-2"
+            style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
+          >
+            共 {total} 篇文章
+          </p>
+        </div>
 
-      <CategoryPosts
-        categoryId={category.id}
-        initialPosts={formattedPosts}
-        initialHasMore={total > 10}
-      />
-    </div>
+        <CategoryPosts
+          categoryId={category.id}
+          initialPosts={formattedPosts}
+          initialHasMore={total > 10}
+        />
+      </div>
+    </MarketingShell>
   );
 }

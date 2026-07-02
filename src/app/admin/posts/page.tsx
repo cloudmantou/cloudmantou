@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useTransition, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, Edit, Eye, Pin, Lock } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Eye, Pin } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Post = {
   id: string;
@@ -38,28 +39,33 @@ export default function AdminPostsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const loadPosts = useCallback(async (p: number, status?: string, q?: string) => {
     setLoading(true);
+    setError(false);
     try {
       const params = new URLSearchParams({ page: String(p), pageSize: "15" });
       if (status) params.set("status", status);
       if (q) params.set("q", q);
       const res = await fetch(`/api/admin/posts?${params}`);
+      if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setPosts(data.data || []);
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.totalPages || 1);
     } catch {
-      // ignore
+      setError(true);
+      setPosts([]);
     }
     setLoading(false);
   }, []);
 
+  // Only react to page and statusFilter changes; search is triggered manually via handleSearch
   useEffect(() => {
     loadPosts(page, statusFilter, search);
-  }, [page, statusFilter, search, loadPosts]);
+  }, [page, statusFilter, loadPosts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = (id: string, title: string) => {
     if (!confirm(`确定删除「${title}」？此操作不可撤销。`)) return;
@@ -107,8 +113,8 @@ export default function AdminPostsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex items-center gap-1.5 flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-1.5" style={{ minWidth: 240, maxWidth: 320 }}>
           <input
             type="text"
             value={search}
@@ -170,9 +176,19 @@ export default function AdminPostsPage() {
               <tr>
                 <td colSpan={6} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</td>
               </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={6} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>
+                  获取文章失败，请检查网络或刷新重试
+                </td>
+              </tr>
             ) : posts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无文章</td>
+                <td colSpan={6}>
+                  <div style={{ padding: "32px 16px" }}>
+                    <EmptyState title="暂无文章" description="还没有发布任何文章。" />
+                  </div>
+                </td>
               </tr>
             ) : (
               posts.map((post) => (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, ExternalLink } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Order = {
   id: string;
@@ -101,7 +102,7 @@ export default function AdminOrdersPage() {
           </button>
         </div>
         <div className="flex gap-1">
-          {[{ id: "", label: "全部" }, { id: "PENDING", label: "待支付" }, { id: "PAID", label: "已支付" }, { id: "CANCELLED", label: "已取消" }].map((f) => (
+          {[{ id: "", label: "全部" }, { id: "PENDING", label: "待支付" }, { id: "PAID", label: "已支付" }, { id: "CANCELLED", label: "已取消" }, { id: "REFUNDED", label: "已退款" }, { id: "EXPIRED", label: "已过期" }].map((f) => (
             <button key={f.id} type="button" onClick={() => { setStatusFilter(f.id); setPage(1); }} className="px-2.5 py-1 rounded-md text-[10px] border transition-colors" style={{ borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)", background: statusFilter === f.id ? "var(--accent-dim)" : "transparent", color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               {f.label}
             </button>
@@ -125,7 +126,7 @@ export default function AdminOrdersPage() {
             ) : loadError ? (
               <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无订单</td></tr>
+              <tr><td colSpan={7}><div style={{ padding: "32px 16px" }}><EmptyState title="暂无订单" description="还没有任何订单记录。" /></div></td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text)" }}>{o.orderNo}</td>

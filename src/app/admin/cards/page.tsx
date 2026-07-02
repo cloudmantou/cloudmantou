@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { Plus, Download, Ban, CheckCircle, Copy, ChevronDown } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Card = {
   id: string;
@@ -261,11 +262,11 @@ export default function AdminCardsPage() {
             ) : loadError ? (
               <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</td></tr>
             ) : cards.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>暂无卡密</td></tr>
+              <tr><td colSpan={8}><div style={{ padding: "32px 16px" }}><EmptyState title="暂无卡密" description="还没有任何卡密记录。" /></div></td></tr>
             ) : cards.map((c) => (
               <tr key={c.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text)" }}>{c.cardNo}</td>
-                <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text-muted)" }}>{c.cardSecret}</td>
+                <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text-muted)" }}>••••••••</td>
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>{TYPE_LABELS[c.type]}</td>
                 <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--accent)" }}>{c.value}</td>
                 <td className="px-3 py-2">

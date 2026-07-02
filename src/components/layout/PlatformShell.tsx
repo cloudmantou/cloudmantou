@@ -2,7 +2,9 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
 import {
+  Bookmark,
   CalendarDays,
   Github,
   Home,
@@ -15,19 +17,21 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
-  X
+  X,
+  ArrowRight,
 } from "lucide-react";
 import clsx from "clsx";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { ArticleOverlay } from "@/components/blog/ArticleOverlay";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { MetricCard } from "@/components/ui/MetricCard";
+import { TypingEffect } from "@/components/ui/TypingEffect";
 import { SearchDialog } from "@/components/layout/SearchDialog";
-import { products, stats, timeline } from "@/data/mock";
+import { favorites, products, stats, timeline } from "@/data/mock";
 import { siteConfig } from "@/config/site";
-import type { BlogCategory, BlogPost, Product, ProductCategory } from "@/types";
+import type { BlogCategory, BlogPost, FavoriteCategory, Product, ProductCategory } from "@/types";
 
-type Section = "home" | "blog" | "shop" | "daily";
+type Section = "home" | "blog" | "shop" | "daily" | "favorites";
 
 type ApiPost = {
   id: string;
@@ -48,7 +52,8 @@ const sections: Array<{ id: Section; label: string; icon: typeof Home; badge?: s
   { id: "home", label: "首页", icon: Home },
   { id: "blog", label: "技术博客", icon: PenLine },
   { id: "shop", label: "会员与卡密", icon: KeyRound, badge: String(products.length) },
-  { id: "daily", label: "运营记录", icon: CalendarDays }
+  { id: "daily", label: "日常记录", icon: CalendarDays },
+  { id: "favorites", label: "收藏夹", icon: Bookmark }
 ];
 
 const productFilters: Array<{ id: ProductCategory; label: string }> = [
@@ -60,8 +65,10 @@ const productFilters: Array<{ id: ProductCategory; label: string }> = [
 ];
 
 export function PlatformShell() {
+  const { data: session } = useSession();
   const [section, setSection] = useState<Section>("home");
   const [productCategory, setProductCategory] = useState<ProductCategory>("all");
+  const [favCategory, setFavCategory] = useState<FavoriteCategory | "all">("all");
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -99,6 +106,27 @@ export function PlatformShell() {
     () => products.filter((product) => productCategory === "all" || product.category === productCategory),
     [productCategory]
   );
+
+  const filteredFavorites = useMemo(
+    () => favorites.filter((fav) => favCategory === "all" || fav.category === favCategory),
+    [favCategory]
+  );
+
+  const favFilters: Array<{ id: FavoriteCategory | "all"; label: string }> = [
+    { id: "all", label: "全部" },
+    { id: "post", label: "文章" },
+    { id: "tool", label: "工具" },
+    { id: "resource", label: "资源" },
+    { id: "link", label: "链接" }
+  ];
+
+  const moodStyles: Record<string, { bg: string; color: string; label: string }> = {
+    happy: { bg: "rgba(250,204,21,0.08)", color: "#CA8A04", label: "☺ 开心" },
+    productive: { bg: "var(--teal-dim)", color: "var(--teal)", label: "💻 高产" },
+    tired: { bg: "var(--rose-dim)", color: "var(--rose)", label: "😴 疲惫" },
+    excited: { bg: "var(--blue-dim)", color: "var(--blue)", label: "⚡ 兴奋" },
+    chill: { bg: "rgba(168,130,255,0.08)", color: "#7C3AED", label: "🎧 专注" }
+  };
 
   const showToast = (message: string) => {
     setToast(message);
@@ -195,46 +223,77 @@ export function PlatformShell() {
               <Send size={15} />
             </a>
           </div>
+
+          {session ? (
+            <div className="sidebar-user">
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-avatar">
+                  {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="sidebar-user-meta">
+                  <span className="sidebar-user-name">{session.user?.nickname || session.user?.username}</span>
+                  <span className="sidebar-user-role">{session.user?.role === "ADMIN" ? "管理员" : "会员"}</span>
+                </div>
+              </div>
+              <button
+                className="sidebar-logout"
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+              >
+                退出
+              </button>
+            </div>
+          ) : (
+            <div className="sidebar-user">
+              <Link href="/login" className="sidebar-login-btn">
+                登录 / 注册
+              </Link>
+            </div>
+          )}
         </aside>
 
         <main className="main">
           {section === "home" ? (
-            <section className="page active" aria-labelledby="home-title">
-              <div className="home-greeting">CloudMantou</div>
+            <section className="page active home-hero" aria-labelledby="home-title">
+              <div className="home-greeting" aria-hidden="true">
+                <span className="greeting-diamond" /> CLOUDMANTOU · BLOG &amp; MEMBERSHIP
+              </div>
               <h1 className="home-title" id="home-title">
                 个人技术博客，
                 <br />
                 也卖一点<span>会员内容</span>。
               </h1>
               <p className="home-sub">
-                记录开发、运维、独立产品和自动发卡系统的真实实践。
-                <br />
-                公开文章免费阅读，深度内容支持会员或卡密解锁。
+                <TypingEffect
+                  phrases={[
+                    "记录开发、运维、独立产品和自动发卡系统的真实实践。",
+                    "公开文章免费阅读 · 深度内容支持会员或卡密解锁。",
+                    "Next.js 15 · Prisma · MySQL · NextAuth · Docker",
+                    "分享技术，记录运营，创造价值。",
+                  ]}
+                />
               </p>
 
               {/* Quick actions */}
-              <div className="flex flex-wrap gap-3 mb-10">
+              <div className="quick-actions">
                 <button
                   type="button"
                   onClick={() => selectSection("blog")}
-                  className="px-5 py-2 rounded-lg text-sm font-medium transition-all"
-                  style={{ background: "var(--accent)", color: "white" }}
+                  className="quick-btn primary"
                 >
                   阅读最新文章
+                  <ArrowRight size={15} aria-hidden="true" />
                 </button>
-                <Link
-                  href="/dashboard"
-                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                >
+                <Link href="/dashboard" className="quick-btn ghost">
+                  <KeyRound size={15} aria-hidden="true" />
                   兑换卡密
                 </Link>
                 <button
                   type="button"
-                  onClick={() => selectSection("blog")}
-                  className="px-5 py-2 rounded-lg text-sm font-medium border transition-colors"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  onClick={() => selectSection("shop")}
+                  className="quick-btn ghost"
                 >
+                  <Sparkles size={15} aria-hidden="true" />
                   查看会员内容
                 </button>
               </div>
@@ -244,6 +303,33 @@ export function PlatformShell() {
                   <MetricCard index={index} key={metric.label} metric={metric} />
                 ))}
               </div>
+
+              {/* About + Tech stack */}
+              <section className="section-block">
+                <h2 className="section-title">关于平台</h2>
+                <p className="about-text">
+                  CloudMantou 是一套面向独立开发者的内容变现工具：把博客、会员付费、卡密自动交付和运营后台整合在同一个 Next.js 应用里。
+                  公开文章免费阅读并做好 SEO，深度内容通过会员订阅或单篇卡密解锁，支付回调、库存锁定和发卡补偿链路分层设计，保证交付可靠。
+                </p>
+              </section>
+
+              <section className="section-block">
+                <h2 className="section-title">技术栈</h2>
+                <div className="tech-grid">
+                  <span className="tech-pill hot">Next.js 15</span>
+                  <span className="tech-pill hot">React 18</span>
+                  <span className="tech-pill">TypeScript</span>
+                  <span className="tech-pill hot">Prisma</span>
+                  <span className="tech-pill">MySQL 8</span>
+                  <span className="tech-pill">NextAuth v5</span>
+                  <span className="tech-pill">Vitest</span>
+                  <span className="tech-pill">Docker</span>
+                  <span className="tech-pill">Redis</span>
+                  <span className="tech-pill">Tailwind 思路</span>
+                  <span className="tech-pill">Markdown</span>
+                  <span className="tech-pill">Zod</span>
+                </div>
+              </section>
 
               {/* Latest articles preview */}
               {apiPosts.length > 0 && (
@@ -345,7 +431,7 @@ export function PlatformShell() {
                         : "linear-gradient(135deg, rgba(232,185,100,0.22), rgba(77,217,182,0.16))",
                       icon: post.title.slice(0, 2).toUpperCase(),
                       premium: false,
-                      content: [],
+                      content: "",
                       slug: post.slug,
                     };
                     return (
@@ -396,18 +482,124 @@ export function PlatformShell() {
             <section className="page active" aria-labelledby="daily-title">
               <div className="page-head">
                 <h2 className="page-title" id="daily-title">
-                  运营记录
+                  日常记录
                 </h2>
-                <p className="page-desc">把开发阶段、支付上线和后台运营拆成可追踪节点。</p>
+                <p className="page-desc">{"// 生活不止代码，还有诗和远方"}</p>
               </div>
-              <div className="timeline">
-                {timeline.map((item, index) => (
-                  <article className="timeline-item fade-up" key={item.id} style={{ animationDelay: `${index * 80}ms` }}>
-                    <span className="timeline-date">{item.date}</span>
-                    <div className="timeline-card">
-                      <span className={clsx("mood", `accent-${item.accent}`)}>{item.mood}</span>
-                      <p>{item.text}</p>
+              <div className="daily-timeline">
+                {timeline.map((item, index) => {
+                  const mood = moodStyles[item.mood] || moodStyles.chill;
+                  return (
+                    <article
+                      className="daily-item fade-up"
+                      key={item.id}
+                      style={{ animationDelay: `${index * 80}ms` }}
+                    >
+                      <span className="daily-date">{item.date}</span>
+                      <div className="daily-card">
+                        <span
+                          className="daily-mood"
+                          style={{ background: mood.bg, color: mood.color }}
+                        >
+                          {item.moodLabel}
+                        </span>
+                        <p className="daily-text">{item.text}</p>
+
+                        {item.photos && item.photos.length > 0 && (
+                          <div
+                            className={clsx(
+                              "daily-photos",
+                              item.photos.length <= 2 ? "cols-2" : "cols-3"
+                            )}
+                          >
+                            {item.photos.map((photo) => (
+                              <div
+                                className={clsx("daily-photo", photo.span === "wide" && "wide", photo.span === "tall" && "tall")}
+                                key={photo.label}
+                              >
+                                <div
+                                  className="daily-photo-bg"
+                                  style={{ background: photo.gradient }}
+                                >
+                                  <span className="text-2xl">{photo.icon}</span>
+                                </div>
+                                <div className="daily-photo-overlay">{photo.label}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="daily-actions">
+                          <button
+                            className="daily-action"
+                            type="button"
+                            onClick={(e) => {
+                              const btn = e.currentTarget;
+                              btn.innerHTML = `❤️ ${(item.likes || 0) + 1}`;
+                              btn.style.color = "var(--rose)";
+                            }}
+                          >
+                            🤍 {item.likes || 0}
+                          </button>
+                          <span className="daily-action">💬 {item.comments || 0}</span>
+                          <button
+                            className="daily-action"
+                            type="button"
+                            onClick={() => showToast("链接已复制")}
+                          >
+                            ↗ 分享
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {section === "favorites" ? (
+            <section className="page active" aria-labelledby="fav-title">
+              <div className="page-head">
+                <h2 className="page-title" id="fav-title">
+                  收藏夹
+                </h2>
+                <p className="page-desc">{"// 收藏的文章、工具和资源"}</p>
+              </div>
+              <div className="filters" aria-label="收藏分类">
+                {favFilters.map((filter) => (
+                  <button
+                    className={clsx("filter-button", favCategory === filter.id && "active")}
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setFavCategory(filter.id)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              <div className="fav-grid">
+                {filteredFavorites.map((fav, index) => (
+                  <article
+                    className="fav-card fade-up"
+                    key={fav.id}
+                    style={{ animationDelay: `${index * 60}ms` }}
+                  >
+                    <div className={clsx("fav-icon", `accent-${fav.accent}`)}>
+                      {fav.icon}
                     </div>
+                    <div className="fav-body">
+                      <div className="fav-title">{fav.title}</div>
+                      <div className="fav-desc">{fav.description}</div>
+                      {fav.tags && fav.tags.length > 0 && (
+                        <div className="fav-tags">
+                          {fav.tags.map((tag) => (
+                            <span className="fav-tag" key={tag}>{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="fav-date">{fav.savedAt}</span>
                   </article>
                 ))}
               </div>
