@@ -24,11 +24,11 @@ tsconfig.tsbuildinfo
 .playwright-mcp/
 
 # 本地截图（开发过程中截的临时图）
+*.home-shot.png
+*.home-fold.png
+*.login.png
+*.post.png
 .admin-*.png
 .v2-*.png
 .editor-*.png
 home-*.png
-home-fold.png
-home-shot.png
-login.png
-post.png
