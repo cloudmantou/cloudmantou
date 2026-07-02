@@ -59,12 +59,13 @@ export async function getPostAccess(
     };
   }
 
-  // 检查 2: 该文章的 PAID_POST 权益
+  // 检查 2: 该文章的 PAID_POST 权益（有效期内）
   const postEntitlement = await prisma.entitlement.findFirst({
     where: {
       userId,
       type: "PAID_POST",
       postId,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
     select: { id: true },
   });

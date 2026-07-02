@@ -28,6 +28,8 @@ model User {
   orders       Order[]
   usedCards    Card[]        @relation("CardUser")
   entitlements Entitlement[]
+  dailyRecords DailyRecord[]
+  dailyRecordLikes DailyRecordLike[]
 
   @@map("users")
 }
@@ -116,6 +118,7 @@ model Tag {
   createdAt DateTime @default(now())
 
   posts PostTag[]
+  dailyRecords DailyRecordTag[]
 
   @@map("tags")
 }
@@ -221,6 +224,53 @@ model Card {
   @@index([batchNo])
   @@index([status])
   @@map("cards")
+}
+
+model DailyRecord {
+  id         String   @id @default(cuid())
+  authorId   String
+  content    String   @db.Text
+  photos     String?  @db.Text     // JSON array of image URLs
+  mood       String?
+  weather    String?
+  location   String?
+  visibility String   @default("public") // public, link, private, friends
+  isTop      Boolean  @default(false)
+  likeCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  author  User         @relation(fields: [authorId], references: [id])
+  tags    DailyRecordTag[]
+  likes   DailyRecordLike[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@map("daily_records")
+}
+
+model DailyRecordTag {
+  recordId String
+  tagId    String
+
+  record DailyRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  tag    Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recordId, tagId])
+  @@map("daily_record_tags")
+}
+
+model DailyRecordLike {
+  id        String   @id @default(cuid())
+  userId    String
+  recordId  String
+  createdAt DateTime @default(now())
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  record DailyRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recordId])
+  @@map("daily_record_likes")
 }
 
 model SiteSetting {

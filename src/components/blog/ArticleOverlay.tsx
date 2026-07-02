@@ -38,8 +38,8 @@ export function ArticleOverlay({ post, onClose }: ArticleOverlayProps) {
         </div>
         <h1>{post.title}</h1>
         <div className="article-content">
-          {post.content.map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
+          {post.content.split("\n\n").map((paragraph, i) => (
+            <p key={i}>{paragraph}</p>
           ))}
           {post.premium ? (
             <div className="paid-block">

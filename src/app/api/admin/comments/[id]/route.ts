@@ -12,8 +12,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);
@@ -32,6 +33,9 @@ export async function PUT(
 
     return ok({ id: id, status: parsed.data.status });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Update Comment Error]", error);
     return fail("更新评论状态失败", 50000, 500);
   }
@@ -41,8 +45,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);
@@ -57,6 +62,9 @@ export async function DELETE(
     await prisma.comment.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Delete Comment Error]", error);
     return fail("删除评论失败", 50000, 500);
   }

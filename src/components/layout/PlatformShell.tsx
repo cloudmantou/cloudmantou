@@ -79,6 +79,13 @@ export function PlatformShell() {
   const [categories, setCategories] = useState<Array<{ id: string; name: string; slug: string; postCount: number }>>([]);
   const [activeCategory, setActiveCategory] = useState<string>("");
 
+  // Daily records data
+  const [dailyRecords, setDailyRecords] = useState<any[]>([]);
+  const [dailyTotal, setDailyTotal] = useState(0);
+  const [dailyContent, setDailyContent] = useState("");
+  const [dailyMood, setDailyMood] = useState("");
+  const [dailyPublishing, setDailyPublishing] = useState(false);
+
   useEffect(() => {
     // Load categories
     fetch("/api/categories")
@@ -101,6 +108,18 @@ export function PlatformShell() {
       })
       .catch(() => {});
   }, [activeCategory, categories]);
+
+  // Load daily records
+  useEffect(() => {
+    if (section !== "daily") return;
+    fetch("/api/daily-records?pageSize=20")
+      .then((r) => r.json())
+      .then((d) => {
+        setDailyRecords(d.data || []);
+        setDailyTotal(d.pagination?.total || 0);
+      })
+      .catch(() => {});
+  }, [section]);
 
   const filteredProducts = useMemo(
     () => products.filter((product) => productCategory === "all" || product.category === productCategory),
@@ -486,45 +505,95 @@ export function PlatformShell() {
                 </h2>
                 <p className="page-desc">{"// 生活不止代码，还有诗和远方"}</p>
               </div>
+
+              {/* Composer */}
+              {session && (
+                <div className="mb-6 p-4 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                  <textarea
+                    value={dailyContent}
+                    onChange={(e) => setDailyContent(e.target.value)}
+                    placeholder="这一刻的想法..."
+                    rows={3}
+                    className="w-full px-0 py-1 text-sm outline-none resize-none bg-transparent"
+                    style={{ color: "var(--text)", lineHeight: 1.7 }}
+                  />
+                  <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
+                      {dailyContent.length} / 2000
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!dailyContent.trim()) return;
+                        setDailyPublishing(true);
+                        fetch("/api/daily-records", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ content: dailyContent.trim() }),
+                        })
+                          .then((r) => {
+                            if (r.ok) {
+                              setDailyContent("");
+                              return fetch("/api/daily-records?pageSize=20").then((r) => r.json());
+                            }
+                          })
+                          .then((d) => {
+                            if (d) {
+                              setDailyRecords(d.data || []);
+                              setDailyTotal(d.pagination?.total || 0);
+                            }
+                          })
+                          .catch(() => {})
+                          .finally(() => setDailyPublishing(false));
+                      }}
+                      disabled={dailyPublishing || !dailyContent.trim()}
+                      className="px-3 py-1 text-xs rounded-md transition-colors"
+                      style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: dailyPublishing || !dailyContent.trim() ? 0.5 : 1 }}
+                    >
+                      发布
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="daily-timeline">
-                {timeline.map((item, index) => {
-                  const mood = moodStyles[item.mood] || moodStyles.chill;
-                  return (
+                {dailyRecords.length === 0 ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>暂无记录</p>
+                ) : dailyRecords.map((item: any, index: number) => (
                     <article
                       className="daily-item fade-up"
                       key={item.id}
                       style={{ animationDelay: `${index * 80}ms` }}
                     >
-                      <span className="daily-date">{item.date}</span>
+                      <span className="daily-date">
+                        {new Date(item.createdAt).toLocaleDateString("zh-CN")}
+                        {item.weather ? ` · ${item.weather}` : ""}
+                        {item.location ? ` · 📍 ${item.location}` : ""}
+                      </span>
                       <div className="daily-card">
-                        <span
-                          className="daily-mood"
-                          style={{ background: mood.bg, color: mood.color }}
-                        >
-                          {item.moodLabel}
-                        </span>
-                        <p className="daily-text">{item.text}</p>
+                        {item.mood && (
+                          <span className="daily-mood" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                            {item.mood}
+                          </span>
+                        )}
+                        <p className="daily-text">{item.content}</p>
 
                         {item.photos && item.photos.length > 0 && (
-                          <div
-                            className={clsx(
-                              "daily-photos",
-                              item.photos.length <= 2 ? "cols-2" : "cols-3"
-                            )}
-                          >
-                            {item.photos.map((photo) => (
-                              <div
-                                className={clsx("daily-photo", photo.span === "wide" && "wide", photo.span === "tall" && "tall")}
-                                key={photo.label}
-                              >
-                                <div
-                                  className="daily-photo-bg"
-                                  style={{ background: photo.gradient }}
-                                >
-                                  <span className="text-2xl">{photo.icon}</span>
-                                </div>
-                                <div className="daily-photo-overlay">{photo.label}</div>
+                          <div className={clsx("daily-photos", item.photos.length <= 2 ? "cols-2" : "cols-3")}>
+                            {item.photos.map((photo: string, i: number) => (
+                              <div className="daily-photo" key={i}>
+                                <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                               </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {item.tagNames && item.tagNames.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {item.tagNames.map((t: string) => (
+                              <span key={t} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "var(--accent-dim)", color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>
+                                #{t}
+                              </span>
                             ))}
                           </div>
                         )}
@@ -534,14 +603,21 @@ export function PlatformShell() {
                             className="daily-action"
                             type="button"
                             onClick={(e) => {
-                              const btn = e.currentTarget;
-                              btn.innerHTML = `❤️ ${(item.likes || 0) + 1}`;
-                              btn.style.color = "var(--rose)";
+                              if (!session) return;
+                              fetch(`/api/daily-records/${item.id}/like`, { method: "POST" })
+                                .then((r) => r.json())
+                                .then((d) => {
+                                  if (d.data) {
+                                    const btn = e.currentTarget;
+                                    btn.innerHTML = `❤️ ${d.data.likeCount}`;
+                                    btn.style.color = "var(--rose)";
+                                  }
+                                })
+                                .catch(() => {});
                             }}
                           >
-                            🤍 {item.likes || 0}
+                            🤍 {item.likesCount || 0}
                           </button>
-                          <span className="daily-action">💬 {item.comments || 0}</span>
                           <button
                             className="daily-action"
                             type="button"
@@ -552,8 +628,7 @@ export function PlatformShell() {
                         </div>
                       </div>
                     </article>
-                  );
-                })}
+                  ))}
               </div>
             </section>
           ) : null}

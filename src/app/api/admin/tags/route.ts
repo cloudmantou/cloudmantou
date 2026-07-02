@@ -24,6 +24,9 @@ export async function GET() {
       postCount: t._count.posts,
     })));
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Tags List Error]", error);
     return fail("获取标签列表失败", 50000, 500);
   }
@@ -49,6 +52,9 @@ export async function POST(req: NextRequest) {
     const tag = await prisma.tag.create({ data });
     return ok({ id: tag.id });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Create Tag Error]", error);
     return fail("创建标签失败", 50000, 500);
   }

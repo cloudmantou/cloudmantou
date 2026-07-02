@@ -24,8 +24,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const post = await prisma.post.findUnique({
       where: { id: id },
       include: {
@@ -48,6 +49,9 @@ export async function GET(
         : null,
     });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Get Post Error]", error);
     return fail("获取文章失败", 50000, 500);
   }
@@ -57,8 +61,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const post = await prisma.post.findUnique({ where: { id: id } });
     if (!post) {
       return fail("文章不存在", 40400, 404);
@@ -129,6 +134,9 @@ export async function PUT(
 
     return ok({ id: id });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Update Post Error]", error);
     return fail("更新文章失败", 50000, 500);
   }
@@ -138,8 +146,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const post = await prisma.post.findUnique({ where: { id: id } });
     if (!post) {
       return fail("文章不存在", 40400, 404);
@@ -148,6 +157,9 @@ export async function DELETE(
     await prisma.post.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Delete Post Error]", error);
     return fail("删除文章失败", 50000, 500);
   }

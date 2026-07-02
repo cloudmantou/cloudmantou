@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const createCommentSchema = z.object({
@@ -109,6 +110,10 @@ export async function POST(
       return fail("请先登录", 40100, 401);
     }
 
+    // 速率限制：每用户每 10 分钟最多 10 条评论
+    const limited = checkRateLimit(req, RATE_LIMITS.COMMENT, session.user.id);
+    if (limited) return limited;
+
     const post = await prisma.post.findUnique({
       where: { slug },
       select: { id: true },
@@ -143,7 +148,8 @@ export async function POST(
         userId: session.user.id,
         parentId: parentId || null,
         content,
-        status: "APPROVED",
+        // 生产环境默认待审核，开发环境自动通过便于测试
+        status: process.env.NODE_ENV === "production" ? "PENDING" : "APPROVED",
       },
       include: {
         user: {

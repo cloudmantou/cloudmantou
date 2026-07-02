@@ -21,8 +21,8 @@ const createPostSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  await requireAdmin();
   try {
+    await requireAdmin();
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));

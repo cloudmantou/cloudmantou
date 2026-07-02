@@ -15,8 +15,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const category = await prisma.category.findUnique({ where: { id: id } });
     if (!category) {
       return fail("分类不存在", 40400, 404);
@@ -49,6 +50,9 @@ export async function PUT(
     await prisma.category.update({ where: { id: id }, data });
     return ok({ id: id });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Update Category Error]", error);
     return fail("更新分类失败", 50000, 500);
   }
@@ -58,8 +62,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const category = await prisma.category.findUnique({
       where: { id: id },
       include: { _count: { select: { posts: true } } },
@@ -74,6 +79,9 @@ export async function DELETE(
     await prisma.category.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Delete Category Error]", error);
     return fail("删除分类失败", 50000, 500);
   }

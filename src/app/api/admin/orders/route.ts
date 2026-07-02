@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
       { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     );
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Orders List Error]", error);
     return fail("获取订单列表失败", 50000, 500);
   }

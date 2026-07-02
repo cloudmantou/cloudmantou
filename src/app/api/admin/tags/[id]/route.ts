@@ -14,8 +14,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);
@@ -46,6 +47,9 @@ export async function PUT(
     await prisma.tag.update({ where: { id: id }, data });
     return ok({ id: id });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Update Tag Error]", error);
     return fail("更新标签失败", 50000, 500);
   }
@@ -55,8 +59,9 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);
@@ -65,6 +70,9 @@ export async function DELETE(
     await prisma.tag.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Delete Tag Error]", error);
     return fail("删除标签失败", 50000, 500);
   }

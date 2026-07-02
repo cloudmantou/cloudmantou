@@ -25,6 +25,9 @@ export async function GET() {
       postCount: c._count.posts,
     })));
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Categories List Error]", error);
     return fail("获取分类列表失败", 50000, 500);
   }
@@ -50,6 +53,9 @@ export async function POST(req: NextRequest) {
     const category = await prisma.category.create({ data });
     return ok({ id: category.id });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Create Category Error]", error);
     return fail("创建分类失败", 50000, 500);
   }

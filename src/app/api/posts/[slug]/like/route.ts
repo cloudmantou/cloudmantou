@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(
   _req: NextRequest,
@@ -13,6 +14,10 @@ export async function POST(
     if (!session?.user?.id) {
       return fail("未登录", 40100, 401);
     }
+
+    // 速率限制：每用户每分钟最多 30 次点赞
+    const limited = checkRateLimit(_req, RATE_LIMITS.LIKE, session.user.id);
+    if (limited) return limited;
 
     const post = await prisma.post.findUnique({
       where: { slug },

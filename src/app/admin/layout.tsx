@@ -10,6 +10,9 @@ import {
   Hash,
   KeyRound,
   ShoppingCart,
+  Users,
+  CreditCard,
+  Settings,
   ArrowLeft,
 } from "lucide-react";
 
@@ -21,6 +24,9 @@ const navItems = [
   { href: "/admin/tags", label: "标签", icon: Hash },
   { href: "/admin/cards", label: "卡密", icon: KeyRound },
   { href: "/admin/orders", label: "订单", icon: ShoppingCart },
+  { href: "/admin/users", label: "用户", icon: Users },
+  { href: "/admin/payments", label: "支付", icon: CreditCard },
+  { href: "/admin/settings", label: "设置", icon: Settings },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

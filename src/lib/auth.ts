@@ -1,8 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import type { Role } from "@prisma/client";
 import { prisma } from "./prisma";
+import { rateLimit, RATE_LIMITS } from "./rate-limit";
 
 export const {
   handlers,    // GET/POST handlers for /api/auth/*
@@ -10,7 +11,7 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // 不使用 PrismaAdapter — Credentials provider 用 JWT 策略，adapter 会冲突
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
@@ -27,8 +28,20 @@ export const {
           return null;
         }
 
+        const email = credentials.email as string;
+
+        // 速率限制：每邮箱每 15 分钟最多 10 次登录尝试（防暴力破解）
+        const rlResult = rateLimit(
+          `login:${email.toLowerCase()}`,
+          RATE_LIMITS.LOGIN.limit,
+          RATE_LIMITS.LOGIN.windowMs
+        );
+        if (!rlResult.success) {
+          throw new Error("登录尝试过于频繁，请稍后再试");
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
+          where: { email },
         });
 
         if (!user) return null;
@@ -45,6 +58,8 @@ export const {
           email: user.email,
           name: user.nickname || user.username,
           role: user.role,
+          nickname: user.nickname,
+          username: user.username,
         };
       },
     }),
@@ -52,15 +67,21 @@ export const {
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role;
+        token.role = user.role;
         token.id = user.id;
+        token.nickname = user.nickname ?? null;
+        token.username = user.username ?? null;
       }
       return token;
     },
     session({ session, token }) {
       if (session.user) {
+        // NextAuth v5 beta 的 JWT 索引签名 [key: string]: unknown 会导致
+        // 模块扩展中的具体类型被遮蔽，此处使用精确类型断言（非 as any）
         session.user.id = token.id as string;
-        (session.user as any).role = token.role as string;
+        session.user.role = token.role as Role;
+        session.user.nickname = (token.nickname as string | null | undefined) ?? null;
+        session.user.username = (token.username as string | null | undefined) ?? null;
       }
       return session;
     },

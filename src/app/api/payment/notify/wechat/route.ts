@@ -199,7 +199,7 @@ function decryptWechatV3Resource(resource: any, apiKey: string): Record<string, 
     const { ciphertext, nonce, associated_data } = resource;
     const decipher = crypto.createDecipheriv(
       "aes-256-gcm",
-      Buffer.from(apiKey, "utf8"),
+      Buffer.from(apiKey, "base64"),
       Buffer.from(nonce, "utf8")
     );
     decipher.setAAD(Buffer.from(associated_data, "utf8"));

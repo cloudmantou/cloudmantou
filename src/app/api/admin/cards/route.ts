@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       cardNos.add(cardNo);
 
       const secret = generateCardSecret();
-      const hash = hashCardSecret(secret);
+      const hash = await hashCardSecret(secret);
       cards.push({ cardNo, secret, hash });
     }
 

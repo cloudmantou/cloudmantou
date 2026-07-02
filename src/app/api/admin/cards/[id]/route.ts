@@ -12,8 +12,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-    const { id } = await params;
+  const { id } = await params;
   try {
+    await requireAdmin();
     const card = await prisma.card.findUnique({ where: { id: id } });
     if (!card) {
       return fail("卡密不存在", 40400, 404);
@@ -35,6 +36,9 @@ export async function PUT(
 
     return ok({ id: id, status: parsed.data.status });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
     console.error("[Admin Update Card Error]", error);
     return fail("更新卡密状态失败", 50000, 500);
   }

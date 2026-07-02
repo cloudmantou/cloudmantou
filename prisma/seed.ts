@@ -62,11 +62,15 @@ async function main() {
     },
   });
 
-  // 管理员账号
-  const adminPassword = await bcrypt.hash("admin123", 12);
+  // 管理员账号 — 密码从环境变量读取，缺失时使用开发默认值并打印警告
+  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD || "Adm1n!Cloud#2026";
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.warn("⚠️  SEED_ADMIN_PASSWORD 未设置，使用开发默认密码。生产环境请通过环境变量配置强密码。");
+  }
+  const adminPassword = await bcrypt.hash(seedAdminPassword, 12);
   await prisma.user.upsert({
     where: { email: "admin@cloudmantou.com" },
-    update: {},
+    update: { password: adminPassword },
     create: {
       email: "admin@cloudmantou.com",
       username: "admin",
@@ -76,11 +80,15 @@ async function main() {
     },
   });
 
-  // 测试用户
-  const userPassword = await bcrypt.hash("user123", 12);
+  // 测试用户 — 密码从环境变量读取，缺失时使用开发默认值并打印警告
+  const seedUserPassword = process.env.SEED_USER_PASSWORD || "T3stUser!Cloud#2026";
+  if (!process.env.SEED_USER_PASSWORD) {
+    console.warn("⚠️  SEED_USER_PASSWORD 未设置，使用开发默认密码。生产环境请通过环境变量配置强密码。");
+  }
+  const userPassword = await bcrypt.hash(seedUserPassword, 12);
   await prisma.user.upsert({
     where: { email: "test@cloudmantou.com" },
-    update: {},
+    update: { password: userPassword },
     create: {
       email: "test@cloudmantou.com",
       username: "testuser",

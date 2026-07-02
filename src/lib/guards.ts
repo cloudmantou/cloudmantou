@@ -22,7 +22,7 @@ export async function requireAdmin() {
     throw new ApiError("请先登录", 40100, 401);
   }
 
-  if ((session.user as any).role !== "ADMIN") {
+  if (session.user.role !== "ADMIN") {
     throw new ApiError("无权限，需要管理员身份", 40300, 403);
   }
 

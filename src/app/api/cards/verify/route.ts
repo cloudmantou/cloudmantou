@@ -3,13 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api-response";
 import { cardVerifySchema } from "@/lib/validators/card";
 import { auth } from "@/lib/auth";
-import { hashCardSecret } from "@/lib/card-crypto";
+import { verifyCardSecret, hashCardSecret, isLegacyHash } from "@/lib/card-crypto";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return fail("请先登录", 40100, 401);
   }
+
+  // 速率限制：每用户每 15 分钟最多 10 次卡密验证
+  const limited = checkRateLimit(req, RATE_LIMITS.CARD_VERIFY, session.user.id);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const parsed = cardVerifySchema.safeParse(body);
@@ -22,13 +27,19 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
 
   try {
-    // 用哈希比对，不在数据库存储明文卡密
-    const secretHash = hashCardSecret(cardSecret);
+    // bcrypt 哈希不可逆，不能在 DB 查询中直接比对。
+    // 先按 cardNo 查出卡密记录，再用 verifyCardSecret 比对哈希。
     const card = await prisma.card.findFirst({
-      where: { cardNo, cardSecretHash: secretHash },
+      where: { cardNo },
     });
 
     if (!card) {
+      return fail("卡密不存在或卡号卡密不匹配", 40400, 404);
+    }
+
+    // 使用 bcrypt（新卡密）或 SHA-256（存量旧卡密）验证
+    const isValid = await verifyCardSecret(cardSecret, card.cardSecretHash);
+    if (!isValid) {
       return fail("卡密不存在或卡号卡密不匹配", 40400, 404);
     }
 
@@ -67,6 +78,15 @@ export async function POST(req: NextRequest) {
       if (updateResult.count === 0) {
         // 并发竞争失败：其他请求已抢占此卡
         throw new Error("CONCURRENT_CONFLICT");
+      }
+
+      // 旧 SHA-256 哈希升级为 bcrypt（惰性迁移）
+      if (isLegacyHash(card.cardSecretHash)) {
+        const newHash = await hashCardSecret(cardSecret);
+        await tx.card.update({
+          where: { id: card.id },
+          data: { cardSecretHash: newHash },
+        });
       }
 
       // 根据卡密类型执行对应业务逻辑

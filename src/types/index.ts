@@ -20,7 +20,7 @@ export type BlogPost = {
   cover: string;
   icon: string;
   premium: boolean;
-  content: string[];
+  content: string;
   slug?: string;
 };
 
@@ -36,12 +36,39 @@ export type Product = {
   cover: string;
 };
 
+export type MoodType = "happy" | "productive" | "tired" | "excited" | "chill";
+
+export type DailyPhoto = {
+  gradient: string;
+  icon: string;
+  label: string;
+  span?: "wide" | "tall";
+};
+
 export type TimelineItem = {
   id: string;
   date: string;
-  mood: string;
+  mood: MoodType;
+  moodLabel: string;
   text: string;
   accent: Accent;
+  photos?: DailyPhoto[];
+  likes?: number;
+  comments?: number;
+};
+
+export type FavoriteCategory = "post" | "tool" | "resource" | "link";
+
+export type FavoriteItem = {
+  id: string;
+  category: FavoriteCategory;
+  title: string;
+  description: string;
+  icon: string;
+  accent: Accent;
+  url?: string;
+  tags?: string[];
+  savedAt: string;
 };
 
 export type DashboardMetric = {

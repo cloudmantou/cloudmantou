@@ -105,6 +105,24 @@ export function verifyAmount(
 
 // ===== 权益发放（统一逻辑） =====
 
+/**
+ * 计算 VIP 续费后的新到期时间
+ * 如果当前 VIP 尚未过期，从现有到期时间开始续期；否则从当前时间开始
+ */
+function calculateVipExpiry(
+  currentVipExpireAt: Date | null,
+  now: Date,
+  monthsToAdd: number
+): Date {
+  const baseDate =
+    currentVipExpireAt && currentVipExpireAt > now
+      ? new Date(currentVipExpireAt)
+      : new Date(now);
+  const expiresAt = new Date(baseDate);
+  expiresAt.setMonth(expiresAt.getMonth() + monthsToAdd);
+  return expiresAt;
+}
+
 export async function grantEntitlement(
   tx: any,
   order: { id: string; userId: string; productType: string; productId: string | null }
@@ -113,39 +131,39 @@ export async function grantEntitlement(
 
   switch (order.productType) {
     case "VIP_MONTH": {
-      const expiresAt = new Date(now);
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+      const user = await tx.user.findUnique({ where: { id: order.userId } });
+      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 1);
       await tx.entitlement.create({
         data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
       });
-      // 同步更新用户 VIP 等级
+      // 同步更新用户 VIP 等级和到期时间
       await tx.user.update({
         where: { id: order.userId },
-        data: { vipLevel: { set: 1 } },
+        data: { vipLevel: { set: 1 }, vipExpireAt: expiresAt },
       });
       break;
     }
     case "VIP_QUARTER": {
-      const expiresAt = new Date(now);
-      expiresAt.setMonth(expiresAt.getMonth() + 3);
+      const user = await tx.user.findUnique({ where: { id: order.userId } });
+      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 3);
       await tx.entitlement.create({
         data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
       });
       await tx.user.update({
         where: { id: order.userId },
-        data: { vipLevel: { set: 1 } },
+        data: { vipLevel: { set: 1 }, vipExpireAt: expiresAt },
       });
       break;
     }
     case "VIP_YEAR": {
-      const expiresAt = new Date(now);
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      const user = await tx.user.findUnique({ where: { id: order.userId } });
+      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 12);
       await tx.entitlement.create({
         data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
       });
       await tx.user.update({
         where: { id: order.userId },
-        data: { vipLevel: { set: 2 } },
+        data: { vipLevel: { set: 2 }, vipExpireAt: expiresAt },
       });
       break;
     }
@@ -157,6 +175,8 @@ export async function grantEntitlement(
             postId: order.productId,
             type: "PAID_POST",
             orderId: order.id,
+            // 付费文章权益有效期 1 年，避免永久访问
+            expiresAt: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
           },
         });
       }

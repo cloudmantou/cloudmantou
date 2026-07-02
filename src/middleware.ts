@@ -16,7 +16,7 @@ export default auth((req) => {
       }
       return NextResponse.redirect(new URL("/login", req.url));
     }
-    if ((session.user as any)?.role !== "ADMIN") {
+    if (session.user?.role !== "ADMIN") {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json(
           { code: 40300, message: "无访问权限" },
