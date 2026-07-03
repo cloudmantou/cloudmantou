@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
+  CalendarDays,
   PenLine,
   Settings,
   ShoppingCart,
@@ -45,6 +46,8 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/admin/posts/new", label: "发布文章", icon: PenLine },
       { href: "/admin/posts", label: "文章管理", icon: FileText },
+      { href: "/admin/daily-records/new", label: "发布日常", icon: PenLine },
+      { href: "/admin/daily-records", label: "日常记录", icon: CalendarDays },
       { href: "/admin/comments", label: "评论管理", icon: MessageSquare },
       { href: "/admin/categories", label: "分类标签", icon: FolderOpen },
       { href: "/admin/tags", label: "标签", icon: Hash },
@@ -74,6 +77,7 @@ const navGroups: NavGroup[] = [
 const pageTitles: Record<string, string> = {
   "/admin": "仪表盘",
   "/admin/posts": "文章管理",
+  "/admin/daily-records": "日常记录",
   "/admin/comments": "评论管理",
   "/admin/categories": "分类标签",
   "/admin/tags": "标签管理",
@@ -86,10 +90,15 @@ const pageTitles: Record<string, string> = {
 };
 
 function isEditorRoute(pathname: string) {
-  return pathname === "/admin/posts/new" || /\/admin\/posts\/[^/]+\/edit$/.test(pathname);
+  return (
+    pathname === "/admin/posts/new" ||
+    pathname === "/admin/daily-records/new" ||
+    /\/admin\/posts\/[^/]+\/edit$/.test(pathname)
+  );
 }
 
 function resolveTitle(pathname: string) {
+  if (pathname.includes("/admin/daily-records/new")) return "发布日常";
   if (pathname.includes("/admin/posts/new")) return "新建文章";
   if (pathname.includes("/admin/posts/") && pathname.endsWith("/edit")) return "编辑文章";
   const match = Object.keys(pageTitles)
