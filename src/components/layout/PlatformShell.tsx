@@ -13,6 +13,7 @@ import {
   LogIn,
   Mail,
   Menu,
+  UserRound,
   PenLine,
   Send,
   Settings,
@@ -279,6 +280,12 @@ export function PlatformShell() {
               <Link className="nav-item nav-link" href="/login?callbackUrl=/">
                 <LogIn size={16} aria-hidden="true" />
                 <span>登录</span>
+              </Link>
+            ) : null}
+            {session && !isAdmin ? (
+              <Link className="nav-item nav-link" href="/dashboard">
+                <UserRound size={16} aria-hidden="true" />
+                <span>会员中心</span>
               </Link>
             ) : null}
             {isAdmin ? (

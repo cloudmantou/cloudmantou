@@ -26,12 +26,29 @@ export async function PUT(
       return fail(parsed.error.errors[0].message, 42200, 422);
     }
 
-    await prisma.comment.update({
-      where: { id: id },
-      data: { status: parsed.data.status },
+    const previousStatus = comment.status;
+    const nextStatus = parsed.data.status;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.update({
+        where: { id },
+        data: { status: nextStatus },
+      });
+
+      if (previousStatus !== "APPROVED" && nextStatus === "APPROVED") {
+        await tx.post.update({
+          where: { id: comment.postId },
+          data: { commentCount: { increment: 1 } },
+        });
+      } else if (previousStatus === "APPROVED" && nextStatus === "REJECTED") {
+        await tx.post.update({
+          where: { id: comment.postId },
+          data: { commentCount: { decrement: 1 } },
+        });
+      }
     });
 
-    return ok({ id: id, status: parsed.data.status });
+    return ok({ id, status: nextStatus });
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);
@@ -53,13 +70,15 @@ export async function DELETE(
       return fail("评论不存在", 40400, 404);
     }
 
-    // Decrement comment count
-    await prisma.post.update({
-      where: { id: comment.postId },
-      data: { commentCount: { decrement: 1 } },
+    await prisma.$transaction(async (tx) => {
+      if (comment.status === "APPROVED") {
+        await tx.post.update({
+          where: { id: comment.postId },
+          data: { commentCount: { decrement: 1 } },
+        });
+      }
+      await tx.comment.delete({ where: { id } });
     });
-
-    await prisma.comment.delete({ where: { id: id } });
     return ok({ deleted: true });
   } catch (error) {
     if (error instanceof ApiError) {

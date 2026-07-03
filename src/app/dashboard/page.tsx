@@ -1,17 +1,16 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { isAdminRole } from "@/lib/roles";
+import type { Metadata } from "next";
+import { UserDashboard } from "@/components/dashboard/UserDashboard";
 
-export default async function DashboardPage() {
-  const session = await auth();
+export const metadata: Metadata = {
+  title: "会员中心",
+};
 
-  if (!session) {
-    redirect("/login?callbackUrl=/");
-  }
-
-  if (!isAdminRole(session.user?.role)) {
-    redirect("/");
-  }
-
-  redirect("/admin");
+export default function DashboardPage() {
+  return (
+    <div className="standalone-page">
+      <div className="standalone-shell">
+        <UserDashboard />
+      </div>
+    </div>
+  );
 }

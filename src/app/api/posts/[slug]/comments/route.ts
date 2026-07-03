@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getInitialCommentStatus } from "@/lib/site-settings";
 import { z } from "zod";
 
 const createCommentSchema = z.object({
@@ -147,14 +148,15 @@ export async function POST(
       }
     }
 
+    const initialStatus = await getInitialCommentStatus();
+
     const comment = await prisma.comment.create({
       data: {
         postId: post.id,
         userId: session.user.id,
         parentId: parentId || null,
         content,
-        // 生产环境默认待审核，开发环境自动通过便于测试
-        status: process.env.NODE_ENV === "production" ? "PENDING" : "APPROVED",
+        status: initialStatus,
       },
       include: {
         user: {
@@ -163,11 +165,12 @@ export async function POST(
       },
     });
 
-    // Increment comment count
-    await prisma.post.update({
-      where: { id: post.id },
-      data: { commentCount: { increment: 1 } },
-    });
+    if (initialStatus === "APPROVED") {
+      await prisma.post.update({
+        where: { id: post.id },
+        data: { commentCount: { increment: 1 } },
+      });
+    }
 
     return ok({
       id: comment.id,

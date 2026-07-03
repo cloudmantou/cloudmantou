@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getInitialCommentStatus } from "@/lib/site-settings";
 import { z } from "zod";
 
 const createCommentSchema = z.object({
@@ -112,13 +113,15 @@ export async function POST(
       }
     }
 
+    const initialStatus = await getInitialCommentStatus();
+
     const comment = await prisma.dailyRecordComment.create({
       data: {
         recordId: record.id,
         userId: session.user.id,
         parentId: parentId || null,
         content,
-        status: process.env.NODE_ENV === "production" ? "PENDING" : "APPROVED",
+        status: initialStatus,
       },
       include: {
         user: {
@@ -127,10 +130,12 @@ export async function POST(
       },
     });
 
-    await prisma.dailyRecord.update({
-      where: { id: record.id },
-      data: { commentCount: { increment: 1 } },
-    });
+    if (initialStatus === "APPROVED") {
+      await prisma.dailyRecord.update({
+        where: { id: record.id },
+        data: { commentCount: { increment: 1 } },
+      });
+    }
 
     return ok({
       id: comment.id,

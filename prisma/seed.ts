@@ -62,10 +62,15 @@ async function main() {
     },
   });
 
-  // 管理员账号 — 密码从环境变量读取，缺失时使用开发默认值并打印警告
+  // 管理员账号 — 生产环境必须显式设置强密码
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && !process.env.SEED_ADMIN_PASSWORD) {
+    console.error("生产环境必须设置 SEED_ADMIN_PASSWORD，拒绝使用默认密码初始化。");
+    process.exit(1);
+  }
   const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD || "admin123";
-  if (!process.env.SEED_ADMIN_PASSWORD) {
-    console.warn("⚠️  SEED_ADMIN_PASSWORD 未设置，使用开发默认密码。生产环境请通过环境变量配置强密码。");
+  if (!isProduction && !process.env.SEED_ADMIN_PASSWORD) {
+    console.warn("⚠️  SEED_ADMIN_PASSWORD 未设置，使用开发默认密码 admin123。");
   }
   const adminPassword = await bcrypt.hash(seedAdminPassword, 12);
   await prisma.user.upsert({

@@ -1,22 +1,32 @@
 import { prisma } from "@/lib/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
 
 export type PostAccessResult = {
   hasAccess: boolean;
-  reason: "published" | "vip_active" | "paid_post_entitled" | "no_access";
-  content: string | null; // null = locked
+  reason: "published" | "vip_active" | "paid_post_entitled" | "article_credit" | "no_access";
+  content: string | null;
 };
 
-/**
- * 统一文章访问权限判断
- * 被 SSR 页面和 API 路由共同调用，保证逻辑一致
- *
- * @param userId 当前用户 ID（null = 未登录）
- * @param postId 文章 ID
- * @param publicContent 公开部分内容
- * @param paidContent 付费部分内容
- * @param status 文章状态
- */
+async function consumeArticleCredit(userId: string, postId: string, now: Date) {
+  const credit = await prisma.entitlement.findFirst({
+    where: {
+      userId,
+      type: "PAID_POST",
+      postId: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+
+  if (!credit) return false;
+
+  await prisma.entitlement.update({
+    where: { id: credit.id },
+    data: { postId },
+  });
+  return true;
+}
+
 export async function getPostAccess(
   userId: string | null,
   postId: string,
@@ -24,24 +34,21 @@ export async function getPostAccess(
   paidContent: string | null,
   status: string
 ): Promise<PostAccessResult> {
-  // PUBLISHED 文章：所有人可访问
   if (status === "PUBLISHED") {
     return { hasAccess: true, reason: "published", content: publicContent };
   }
 
-  // PAID_ONLY 文章：需要权益
   if (status !== "PAID_ONLY") {
     return { hasAccess: false, reason: "no_access", content: null };
   }
 
-  // 未登录：无法解锁
   if (!userId) {
     return { hasAccess: false, reason: "no_access", content: null };
   }
 
   const now = new Date();
+  const fullContent = publicContent + "\n\n" + (paidContent || "");
 
-  // 检查 1: VIP 权益（有效期内）
   const vipEntitlement = await prisma.entitlement.findFirst({
     where: {
       userId,
@@ -52,14 +59,9 @@ export async function getPostAccess(
   });
 
   if (vipEntitlement) {
-    return {
-      hasAccess: true,
-      reason: "vip_active",
-      content: publicContent + "\n\n" + (paidContent || ""),
-    };
+    return { hasAccess: true, reason: "vip_active", content: fullContent };
   }
 
-  // 检查 2: 该文章的 PAID_POST 权益（有效期内）
   const postEntitlement = await prisma.entitlement.findFirst({
     where: {
       userId,
@@ -71,19 +73,17 @@ export async function getPostAccess(
   });
 
   if (postEntitlement) {
-    return {
-      hasAccess: true,
-      reason: "paid_post_entitled",
-      content: publicContent + "\n\n" + (paidContent || ""),
-    };
+    return { hasAccess: true, reason: "paid_post_entitled", content: fullContent };
+  }
+
+  const consumed = await consumeArticleCredit(userId, postId, now);
+  if (consumed) {
+    return { hasAccess: true, reason: "article_credit", content: fullContent };
   }
 
   return { hasAccess: false, reason: "no_access", content: null };
 }
 
-/**
- * 获取付费文章的价格信息
- */
 export async function getPostPrice(postId: string): Promise<{
   price: number | null;
   currency: string;
@@ -99,4 +99,16 @@ export async function getPostPrice(postId: string): Promise<{
     price: Number(paidContent.price),
     currency: "CNY",
   };
+}
+
+export async function countArticleCredits(userId: string): Promise<number> {
+  const now = new Date();
+  return prisma.entitlement.count({
+    where: {
+      userId,
+      type: "PAID_POST",
+      postId: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+  });
 }

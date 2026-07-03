@@ -2,6 +2,8 @@
 
 个人博客 + 会员付费内容 + 自动卡密交付 + 运营后台一体化平台。
 
+> **当前阶段：MVP / 内测版** — 核心链路可跑通，但尚未达到生产级安全与运维标准。部署前请阅读下方「功能成熟度」与「已知限制」。
+
 ## 技术栈
 
 - **框架**: Next.js 15 App Router
@@ -13,34 +15,23 @@
 - **编辑器**: @uiw/react-md-editor
 - **测试**: Vitest
 
-## 功能
+## 功能成熟度
 
-### 博客前台
-- 文章详情页 (`/post/[slug]`) — Markdown 渲染 + 代码高亮 + 纸质感阅读
-- 分类页 (`/category/[slug]`)
-- 评论系统 (嵌套回复, 默认通过)
-- 点赞功能 (乐观更新)
-- 搜索 (Cmd+K 弹窗, 全文搜索)
-- 深浅色模式 (系统跟随)
-
-### 后台管理 (`/admin`)
-- 文章 CRUD + Markdown 编辑器 (实时预览)
-- 分类 / 标签管理
-- 评论审核 (通过/拒绝/删除)
-- 卡密管理 (批量生成, CSV 导出, 启用/禁用)
-- 订单管理 (支付状态, 用户信息)
-- 仪表盘 (真实统计数据)
-
-### 会员系统
-- 注册 / 登录 (JWT)
-- 角色权限 (USER / EDITOR / ADMIN)
-- 会员中心 (卡密兑换, 订单历史)
-- 付费内容 (部分内容预览 + 价格)
-
-### 支付系统
-- 订单状态机 (PENDING → PAID / CANCELLED / EXPIRED / REFUNDED)
-- 支付回调接口 (幂等处理, 自动发放权益)
-- 支持支付宝 / 微信 / 卡密三种渠道
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 博客前台 | ✅ 可用 | 文章、分类、评论、点赞、Cmd+K 搜索 |
+| 会员中心 `/dashboard` | ✅ 可用 | 会员状态、卡密兑换、订单历史、文章券额度 |
+| 支付（支付宝 / 微信） | ⚠️ 基础可用 | PC/H5 下单与回调；生产前需验证 CSP、证书轮换 |
+| 卡密兑换 | ✅ 可用 | VIP 天数、文章券额度、余额充值 |
+| PAID_ARTICLE 文章券 | ✅ 已修复 | 兑换获得额度，首次阅读付费文章时自动绑定 |
+| 后台管理 | ✅ 可用 | 文章、评论、卡密、订单、设置 |
+| 站点设置联动 | ⚠️ 部分 | `openRegistration`、`commentReview`、`maintenanceMode` 已接入 |
+| 卡密套餐在线购买 | ❌ 未开放 | `CARD_PACKAGE` 下单返回暂未开放 |
+| Stripe / USDT / 易支付 | ❌ 未实现 | 后台字段预留，无运行时实现 |
+| Redis 限流 | ❌ 未接入 | 当前为进程内内存 Map |
+| 对象存储上传 | ❌ 未接入 | 图片仍写入本地 `public/uploads` |
+| 全文搜索引擎 | ❌ 未接入 | 当前为 Prisma `contains` 标题/摘要/正文 |
+| EDITOR 角色 | ❌ 未落地 | 枚举存在，发布权限仍仅 ADMIN |
 
 ## 项目结构
 
@@ -56,13 +47,14 @@ src/
   components/
     admin/            # 后台组件
     blog/             # 博客组件
+    dashboard/        # 会员中心组件
     layout/           # 布局组件
     shop/             # 商城组件
     ui/               # UI 基础组件
   lib/                # 工具函数
   types/              # TypeScript 类型
 prisma/
-  schema.prisma       # 数据模型 (13 个模型)
+  schema.prisma       # 数据模型
   seed.ts             # 种子数据
 ```
 
@@ -78,7 +70,7 @@ docker-compose up -d mysql redis
 # 运行迁移
 pnpm prisma migrate dev
 
-# 填充种子数据
+# 填充种子数据（开发环境默认管理员 admin / admin123）
 pnpm prisma db seed
 
 # 启动开发服务器
@@ -87,11 +79,30 @@ pnpm dev
 
 ## 环境变量
 
+以 `.env.example` 为准（**不要**使用已废弃的 `NEXTAUTH_SECRET` / `NEXT_PUBLIC_SITE_URL`）：
+
 ```env
-DATABASE_URL=mysql://root:dbpass@localhost:3306/starblog
-NEXTAUTH_SECRET=your-secret
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+DATABASE_URL=mysql://root:password@localhost:3306/cloudmantou
+
+# 认证（NextAuth v5）
+AUTH_SECRET=replace-with-a-32-character-random-secret
+AUTH_URL=http://localhost:3000
+
+# 站点（支付回调、外链生成）
+SITE_URL=http://localhost:3000
+SITE_NAME=CloudMantou
+
+# 卡密哈希盐（必填）
+CARD_SECRET_SALT=replace-with-a-random-64-char-hex-string
+
+# 种子数据（生产环境必填强密码）
+SEED_ADMIN_PASSWORD=your-strong-password
+
+# 可选
+REDIS_URL=redis://localhost:6379
 ```
+
+支付相关变量见 `.env.example` 中的 `ALIPAY_*`、`WECHAT_*`。
 
 ## 测试
 
@@ -101,6 +112,47 @@ pnpm test
 
 ## 部署
 
+### Docker Compose（推荐）
+
+1. 复制并填写环境变量（至少 `AUTH_SECRET`、`CARD_SECRET_SALT`、`DB_ROOT_PASSWORD`）：
+
 ```bash
-docker-compose up -d
+cp .env.example .env
+# 编辑 .env，设置生产用密钥
 ```
+
+2. 启动全部服务（应用容器启动时会自动执行 `prisma migrate deploy`）：
+
+```bash
+docker-compose up -d --build
+```
+
+3. **首次部署**初始化数据（生产环境必须设置 `SEED_ADMIN_PASSWORD`）：
+
+```bash
+docker-compose exec app npx prisma db seed
+```
+
+### 手动部署要点
+
+- 构建前：`pnpm prisma generate`
+- 启动前：`pnpm prisma migrate deploy`
+- 生产环境：`NODE_ENV=production` 且必须配置 `SEED_ADMIN_PASSWORD`
+- 反代需正确传递真实客户端 IP，并配置 `AUTH_URL`、`SITE_URL` 为公网地址
+
+## 默认账号（仅开发）
+
+| 角色 | 用户名 | 密码 |
+|------|--------|------|
+| 管理员 | admin | admin123 |
+
+生产环境请勿使用默认密码；未设置 `SEED_ADMIN_PASSWORD` 时 seed 脚本会拒绝执行。
+
+## 已知限制（生产前待办）
+
+- 限流迁移至 Redis，并仅信任可信反代 IP
+- 支付密钥加密存储与变更审计
+- 微信 V3 平台证书序列号、时间戳重放校验
+- 支付宝 form 提交与 CSP `form-action` 兼容性验证
+- 上传迁移至 OSS/S3，增加魔数校验与重编码
+- API 集成测试与 Playwright E2E 覆盖购买/兑换闭环

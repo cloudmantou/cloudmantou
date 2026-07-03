@@ -96,11 +96,11 @@ export function verifyAmount(
   orderAmount: Decimal,
   paidAmountStr: string
 ): boolean {
-  const orderNum = Number(orderAmount);
+  const orderCents = Math.round(Number(orderAmount) * 100);
   const paidNum = parseFloat(paidAmountStr);
   if (isNaN(paidNum)) return false;
-  // 支付宝金额单位是元，精确到分
-  return Math.abs(orderNum - paidNum) < 0.01;
+  const paidCents = Math.round(paidNum * 100);
+  return orderCents === paidCents;
 }
 
 // ===== 权益发放（统一逻辑） =====

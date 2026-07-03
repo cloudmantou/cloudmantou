@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getSiteSettings } from "@/lib/site-settings";
 
 const registerSchema = z.object({
   email: z.string().email("邮箱格式不正确"),
@@ -21,6 +22,11 @@ export async function POST(req: Request) {
     // 速率限制：每 IP 每小时最多 5 次注册
     const limited = checkRateLimit(req, RATE_LIMITS.REGISTER);
     if (limited) return limited;
+
+    const settings = await getSiteSettings();
+    if (!settings.openRegistration) {
+      return fail("当前已关闭新用户注册", 40300, 403);
+    }
 
     const body = await req.json();
     const parsed = registerSchema.safeParse(body);

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
+import { invalidateSiteSettingsCache } from "@/lib/site-settings";
 
 const SETTING_KEYS = [
   "siteName",
@@ -85,6 +86,7 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    invalidateSiteSettingsCache();
     return ok({ saved: true, count: entries.length });
   } catch (error) {
     if (error instanceof ApiError) {

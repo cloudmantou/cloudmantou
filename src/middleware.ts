@@ -1,11 +1,45 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+async function fetchMaintenanceMode(origin: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${origin}/api/site/settings/public`, {
+      headers: { "x-middleware-prefetch": "1" },
+      next: { revalidate: 0 },
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    return Boolean(json?.data?.maintenanceMode);
+  } catch {
+    return false;
+  }
+}
+
+export default auth(async (req) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
+  const isAdmin = session?.user?.role === "ADMIN";
 
-  // 后台管理：必须 ADMIN
+  if (
+    !pathname.startsWith("/admin") &&
+    !pathname.startsWith("/api/admin") &&
+    !pathname.startsWith("/api/site/settings/public") &&
+    !pathname.startsWith("/api/payment/notify") &&
+    !pathname.startsWith("/api/auth") &&
+    pathname !== "/maintenance"
+  ) {
+    const maintenance = await fetchMaintenanceMode(req.nextUrl.origin);
+    if (maintenance && !isAdmin) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { code: 50300, message: "站点维护中，请稍后再试" },
+          { status: 503 }
+        );
+      }
+      return NextResponse.rewrite(new URL("/maintenance", req.url));
+    }
+  }
+
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (!session) {
       if (pathname.startsWith("/api/")) {
@@ -16,7 +50,7 @@ export default auth((req) => {
       }
       return NextResponse.redirect(new URL("/login", req.url));
     }
-    if (session.user?.role !== "ADMIN") {
+    if (!isAdmin) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json(
           { code: 40300, message: "无访问权限" },
@@ -27,22 +61,21 @@ export default auth((req) => {
     }
   }
 
-  // 用户中心：仅管理员可访问，普通会员在首页完成登录/购买/评论
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
-      return NextResponse.redirect(new URL("/login?callbackUrl=/", req.url));
+      return NextResponse.redirect(new URL("/login?callbackUrl=/dashboard", req.url));
     }
-    if (session.user?.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/", req.url));
+    if (isAdmin) {
+      return NextResponse.redirect(new URL("/admin", req.url));
     }
   }
 
-  // 写操作 API：必须登录（排除 auth 和 payment 回调）
   if (
     pathname.startsWith("/api/") &&
     ["POST", "PUT", "DELETE", "PATCH"].includes(req.method || "") &&
     !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/api/payment/notify")
+    !pathname.startsWith("/api/payment/notify") &&
+    !pathname.startsWith("/api/site/settings/public")
   ) {
     if (!session) {
       return NextResponse.json(
@@ -56,5 +89,11 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*", "/api/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/dashboard/:path*",
+    "/api/:path*",
+    "/maintenance",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

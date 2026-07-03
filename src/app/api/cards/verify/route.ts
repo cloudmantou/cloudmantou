@@ -117,19 +117,19 @@ export async function POST(req: NextRequest) {
           message: `会员已延长 ${card.value} 天，新到期时间：${newExpire.toLocaleDateString("zh-CN")}`,
         };
       } else if (card.type === "PAID_ARTICLE") {
-        // 创建 PAID_POST 权益记录，value 作为可解锁的文章数量
-        // 这里创建一条通用付费文章额度，具体使用时扣减
-        await tx.entitlement.create({
-          data: {
-            userId,
-            type: "PAID_POST",
-            // 不绑定 postId → 通用额度
-          },
-        });
+        const credits = Math.max(1, card.value);
+        for (let i = 0; i < credits; i += 1) {
+          await tx.entitlement.create({
+            data: {
+              userId,
+              type: "PAID_POST",
+            },
+          });
+        }
 
         benefit = {
           type: "PAID_ARTICLE",
-          message: `已获得付费文章阅读额度 ${card.value} 篇`,
+          message: `已获得付费文章阅读额度 ${credits} 篇（首次阅读时自动绑定文章）`,
         };
       } else if (card.type === "BALANCE") {
         // 余额充值：更新用户余额

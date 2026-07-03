@@ -8,6 +8,8 @@ services:
       DATABASE_URL: mysql://root:${DB_ROOT_PASSWORD:-cm_strong_db_2026}@mysql:3306/cloudmantou
       REDIS_URL: redis://redis:6379
       AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      SITE_URL: ${SITE_URL:-http://localhost:3000}
       CARD_SECRET_SALT: ${CARD_SECRET_SALT}
       NODE_ENV: production
     depends_on:
