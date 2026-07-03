@@ -33,7 +33,7 @@ import { TypingEffect } from "@/components/ui/TypingEffect";
 import { SearchDialog } from "@/components/layout/SearchDialog";
 import { DailyCommentSection } from "@/components/daily/DailyCommentSection";
 import { PaymentCheckout, type CheckoutOrder } from "@/components/payment/PaymentCheckout";
-import { favorites, products, stats, timeline } from "@/data/mock";
+import { favorites, stats, timeline } from "@/data/mock";
 import { siteConfig } from "@/config/site";
 import { isAdminRole } from "@/lib/roles";
 import type { BlogCategory, BlogPost, FavoriteCategory, Product, ProductCategory } from "@/types";
@@ -58,7 +58,7 @@ type ApiPost = {
 const sections: Array<{ id: Section; label: string; icon: typeof Home; badge?: string }> = [
   { id: "home", label: "首页", icon: Home },
   { id: "blog", label: "技术博客", icon: PenLine },
-  { id: "shop", label: "会员与卡密", icon: KeyRound, badge: String(products.length) },
+  { id: "shop", label: "会员与卡密", icon: KeyRound },
   { id: "daily", label: "日常记录", icon: CalendarDays },
   { id: "favorites", label: "收藏夹", icon: Bookmark }
 ];
@@ -95,6 +95,7 @@ export function PlatformShell() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
+  const [shopProducts, setShopProducts] = useState<Product[]>([]);
 
   const openPostOverlay = (post: ApiPost) => {
     const accentColors = ["gold", "teal", "rose", "blue", "orange"] as const;
@@ -146,6 +147,15 @@ export function PlatformShell() {
 
   // Load daily records
   useEffect(() => {
+    fetch("/api/products")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.data)) setShopProducts(d.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (section !== "daily") return;
     fetch("/api/daily-records?pageSize=20")
       .then((r) => r.json())
@@ -157,8 +167,11 @@ export function PlatformShell() {
   }, [section]);
 
   const filteredProducts = useMemo(
-    () => products.filter((product) => productCategory === "all" || product.category === productCategory),
-    [productCategory]
+    () =>
+      shopProducts.filter(
+        (product) => productCategory === "all" || product.category === productCategory
+      ),
+    [productCategory, shopProducts]
   );
 
   const filteredFavorites = useMemo(
@@ -204,7 +217,12 @@ export function PlatformShell() {
     fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productType: product.productType }),
+      body: JSON.stringify({
+        productType: product.productType,
+        productId: product.productType === "CARD_PACKAGE" || product.productType === "PAID_POST"
+          ? product.id
+          : undefined,
+      }),
     })
       .then(async (r) => {
         const data = await r.json();

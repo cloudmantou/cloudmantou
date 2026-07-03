@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { Copy, Download, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CardPackageEditor, type CardPackageRecord } from "@/components/admin/CardPackageEditor";
 
 type Card = {
   id: string;
@@ -44,14 +45,6 @@ const STATUS_LABELS: Record<string, string> = {
   EXPIRED: "已过期",
 };
 
-const PRODUCT_PRESETS = [
-  { id: "vip30", type: "VIP_DAYS", value: 30, name: "VIP 月卡", price: 29.9 },
-  { id: "vip90", type: "VIP_DAYS", value: 90, name: "VIP 季卡", price: 79.9 },
-  { id: "vip365", type: "VIP_DAYS", value: 365, name: "VIP 年卡", price: 268 },
-  { id: "article1", type: "PAID_ARTICLE", value: 1, name: "付费文章券", price: 9.9 },
-  { id: "balance100", type: "BALANCE", value: 100, name: "余额卡", price: 100 },
-];
-
 type TabId = "generate" | "inventory" | "products" | "logs";
 
 export default function AdminCardsPage() {
@@ -78,10 +71,35 @@ export default function AdminCardsPage() {
   const [genRemark, setGenRemark] = useState("");
   const [genImport, setGenImport] = useState("");
   const [autoActivate, setAutoActivate] = useState(true);
-  const [selectedPreset, setSelectedPreset] = useState(PRODUCT_PRESETS[0].id);
+  const [cardPackages, setCardPackages] = useState<CardPackageRecord[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [editingPackage, setEditingPackage] = useState<CardPackageRecord | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [genResult, setGenResult] = useState<{ batchNo: string; count: number; cards: Array<{ cardNo: string; cardSecret: string }> } | null>(null);
   const [genError, setGenError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const loadCardPackages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/card-packages");
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = (data.data || []) as CardPackageRecord[];
+      setCardPackages(list);
+      setSelectedPackageId((prev) => {
+        if (prev && list.some((item) => item.id === prev)) return prev;
+        const first = list[0];
+        if (first) {
+          setGenType(first.cardType);
+          setGenValue(String(first.cardValue));
+          return first.id;
+        }
+        return prev;
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const loadStats = useCallback(async () => {
     try {
@@ -118,18 +136,47 @@ export default function AdminCardsPage() {
 
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    loadCardPackages();
+  }, [loadStats, loadCardPackages]);
 
   useEffect(() => {
     if (tab === "inventory" || tab === "logs") load(page);
   }, [page, load, tab]);
 
-  const applyPreset = (presetId: string) => {
-    const preset = PRODUCT_PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
-    setSelectedPreset(presetId);
-    setGenType(preset.type);
-    setGenValue(String(preset.value));
+  const applyPackage = (pkg: CardPackageRecord) => {
+    setSelectedPackageId(pkg.id);
+    setGenType(pkg.cardType);
+    setGenValue(String(pkg.cardValue));
+  };
+
+  const savePackage = (payload: {
+    name: string;
+    description: string;
+    intro: string | null;
+    highlights: string[];
+    usageSteps: string[];
+    price: number;
+    badge: string;
+    accent: string;
+    cover: string | null;
+    published: boolean;
+  }) => {
+    if (!editingPackage) return;
+    startTransition(async () => {
+      const res = await fetch(`/api/admin/card-packages/${editingPackage.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "保存失败");
+        return;
+      }
+      setEditorOpen(false);
+      setEditingPackage(null);
+      await loadCardPackages();
+    });
   };
 
   const handleGenerate = () => {
@@ -305,15 +352,23 @@ export default function AdminCardsPage() {
                 <label className="admin-form-label">关联商品</label>
                 <select
                   className="admin-form-select"
-                  value={selectedPreset}
-                  onChange={(e) => applyPreset(e.target.value)}
+                  value={selectedPackageId}
+                  onChange={(e) => {
+                    const pkg = cardPackages.find((p) => p.id === e.target.value);
+                    if (pkg) applyPackage(pkg);
+                  }}
                 >
-                  {PRODUCT_PRESETS.map((p) => (
+                  {cardPackages.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} (¥{p.price})
+                      {p.name} (¥{p.price}){p.published ? " · 已发布" : ""}
                     </option>
                   ))}
                 </select>
+                {cardPackages.find((p) => p.id === selectedPackageId)?.description ? (
+                  <div className="admin-form-hint" style={{ marginTop: 6 }}>
+                    {cardPackages.find((p) => p.id === selectedPackageId)?.description}
+                  </div>
+                ) : null}
               </div>
               <div className="admin-form-group">
                 <label className="admin-form-label">生成数量</label>
@@ -629,56 +684,57 @@ export default function AdminCardsPage() {
         </>
       )}
 
-      {tab === "products" && stats && (
+      {tab === "products" && (
         <>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 18 }}>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>管理您的卡密商品和定价方案</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              配置卡密商品介绍，发布后前台商店会展示详情弹窗
+            </div>
           </div>
           <div className="admin-product-grid">
-            {stats.products.map((p) => {
-              const preset = PRODUCT_PRESETS.find((x) => x.type === p.type && x.value === p.value);
-              return (
-                <div
-                  key={`${p.type}-${p.value}`}
-                  className={`admin-product-card${selectedPreset === preset?.id ? " selected" : ""}`}
-                  onClick={() => {
-                    if (preset) {
-                      applyPreset(preset.id);
+            {cardPackages.map((pkg) => (
+              <div
+                key={pkg.id}
+                className={`admin-product-card${selectedPackageId === pkg.id ? " selected" : ""}`}
+              >
+                <div className="admin-product-name">{pkg.name}</div>
+                <div className="admin-product-price">¥{pkg.price}</div>
+                <p className="admin-product-desc">{pkg.description}</p>
+                <div className="admin-product-meta">
+                  <span>📦 库存 {pkg.stock ?? 0}</span>
+                  <span className={pkg.published ? "admin-stat-up" : ""}>
+                    {pkg.published ? "✅ 已发布" : "📝 草稿"}
+                  </span>
+                </div>
+                <div className="admin-product-card-actions">
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-ghost admin-btn-sm"
+                    onClick={() => {
+                      setEditingPackage(pkg);
+                      setEditorOpen(true);
+                    }}
+                  >
+                    编辑介绍
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-accent admin-btn-sm"
+                    onClick={() => {
+                      applyPackage(pkg);
                       setTab("generate");
-                    }
-                  }}
-                >
-                  <div className="admin-product-name">
-                    {preset?.name || `${TYPE_LABELS[p.type]} · ${p.value}`}
-                  </div>
-                  <div className="admin-product-price">
-                    {formatPrice(p.type, p.value)}
-                  </div>
-                  <div className="admin-product-meta">
-                    <span>📦 库存 {p.active}</span>
-                    <span>✅ 已售 {p.used}</span>
-                  </div>
+                    }}
+                  >
+                    去生成卡密
+                  </button>
                 </div>
-              );
-            })}
-            {stats.products.length === 0 &&
-              PRODUCT_PRESETS.map((p) => (
-                <div
-                  key={p.id}
-                  className="admin-product-card"
-                  onClick={() => {
-                    applyPreset(p.id);
-                    setTab("generate");
-                  }}
-                >
-                  <div className="admin-product-name">{p.name}</div>
-                  <div className="admin-product-price">¥{p.price}</div>
-                  <div className="admin-product-meta">
-                    <span>📦 库存 0</span>
-                    <span>点击生成</span>
-                  </div>
-                </div>
-              ))}
+              </div>
+            ))}
+            {cardPackages.length === 0 && (
+              <div style={{ gridColumn: "1 / -1", padding: 24 }}>
+                <EmptyState title="暂无卡密商品" description="正在初始化默认商品模板，请刷新页面。" />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -721,6 +777,16 @@ export default function AdminCardsPage() {
           </table>
         </div>
       )}
+      <CardPackageEditor
+        pkg={editingPackage}
+        open={editorOpen}
+        saving={isPending}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingPackage(null);
+        }}
+        onSave={savePackage}
+      />
     </div>
   );
 }

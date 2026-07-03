@@ -5122,3 +5122,44 @@ body.editor-focus-mode .editor-layout {
   min-width: 140px;
 }
 
+.card-package-editor {
+  width: min(640px, 100%);
+}
+
+.card-package-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.card-package-publish-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.admin-product-desc {
+  margin: 8px 0 10px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-product-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+

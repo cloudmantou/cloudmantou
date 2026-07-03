@@ -227,6 +227,31 @@ model Card {
   @@map("cards")
 }
 
+model CardPackage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @db.VarChar(500)
+  intro       String?  @db.Text
+  highlights  Json?
+  usageSteps  Json?
+  cardType    CardType
+  cardValue   Int
+  price       Decimal  @db.Decimal(10, 2)
+  badge       String   @default("NEW")
+  accent      String   @default("gold")
+  cover       String?  @db.Text
+  enabled     Boolean  @default(true)
+  published   Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([cardType, cardValue])
+  @@index([published, enabled])
+  @@map("card_packages")
+}
+
 model DailyRecord {
   id         String   @id @default(cuid())
   authorId   String

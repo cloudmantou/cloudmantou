@@ -104,8 +104,24 @@ export async function POST(req: NextRequest) {
       if (!productId) {
         return fail("卡密套餐需要指定套餐 ID", 40000, 400);
       }
-      // 卡密套餐由后台定义，这里简单用 productId 查找
-      return fail("卡密套餐暂未开放", 40000, 400);
+      const cardPackage = await prisma.cardPackage.findFirst({
+        where: { id: productId, published: true, enabled: true },
+      });
+      if (!cardPackage) {
+        return fail("卡密商品不存在或未发布", 40400, 404);
+      }
+      const stock = await prisma.card.count({
+        where: {
+          type: cardPackage.cardType,
+          value: cardPackage.cardValue,
+          status: "ACTIVE",
+        },
+      });
+      if (stock <= 0) {
+        return fail("该卡密商品库存不足", 40000, 400);
+      }
+      title = cardPackage.name;
+      amount = Number(cardPackage.price);
     } else {
       const catalog = PRODUCT_CATALOG[productType];
       if (!catalog) {
