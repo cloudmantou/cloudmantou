@@ -251,7 +251,7 @@ export function UserDashboard() {
                   </p>
                 ) : (
                   <p className="text-sm" style={{ color: "var(--text-muted)", margin: 0 }}>
-                    文章券卡密兑换后，首次打开付费文章时会自动绑定并扣减额度。
+                    文章券兑换后，在付费文章页点击「使用文章券解锁」才会扣减额度。
                   </p>
                 )}
               </div>
@@ -342,7 +342,7 @@ export function UserDashboard() {
                 · 会员订阅：支付成功后自动延长 VIP 有效期，可阅读全部会员文章。
               </p>
               <p style={{ margin: "0 0 8px" }}>
-                · 文章券：兑换后获得 {profile.articleCredits} 篇待使用额度，打开付费文章时自动绑定。
+                · 文章券：兑换后获得 {profile.articleCredits} 篇待使用额度，需在文章页手动解锁。
               </p>
               <p style={{ margin: 0 }}>
                 · 已解锁 {profile.unlockedPosts} 篇付费文章，注册于 {formatDate(profile.createdAt)}。

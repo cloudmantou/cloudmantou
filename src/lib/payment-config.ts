@@ -57,6 +57,12 @@ export function getAlipayGatewayUrl(env: "sandbox" | "production") {
   return ALIPAY_GATEWAYS[env];
 }
 
+export function normalizeAlipayEnv(raw: unknown): "sandbox" | "production" {
+  const value = String(raw || "").trim();
+  if (value === "sandbox" || value === "沙箱环境") return "sandbox";
+  return "production";
+}
+
 export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
   const [gateways, testModeRow, siteUrlRow] = await Promise.all([
     readGatewaySettings(),
@@ -98,7 +104,7 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
     alipayEnabled && alipayAppId && alipayPrivateKey && alipayPublicKey
       ? {
           enabled: true,
-          env: alipayDb.env === "sandbox" ? "sandbox" : "production",
+          env: normalizeAlipayEnv(alipayDb.env),
           appId: alipayAppId,
           privateKey: normalizePem(alipayPrivateKey, "private"),
           publicKey: normalizePem(alipayPublicKey, "public"),

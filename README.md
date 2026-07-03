@@ -127,7 +127,7 @@ cp .env.example .env
 # 编辑 .env，设置生产用密钥
 ```
 
-2. 启动全部服务（应用容器启动时会自动执行 `prisma migrate deploy`）：
+2. 启动全部服务（应用容器启动时会自动执行 `prisma migrate deploy`，仓库已包含 `prisma/migrations` 初始迁移）：
 
 ```bash
 docker-compose up -d --build

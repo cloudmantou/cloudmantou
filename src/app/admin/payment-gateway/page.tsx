@@ -187,10 +187,32 @@ export default function PaymentGatewayPage() {
   const gatewayStatus = (id: GatewayId) => {
     const g = gateways[id];
     if (!g?.enabled) return { dot: "yellow", text: "未启用", color: "var(--orange)" };
-    if (id === "usdt" && !g.walletAddress) return { dot: "yellow", text: "未配置 · 请填写钱包地址", color: "var(--orange)" };
-    if (id === "epay" && !g.apiUrl) return { dot: "red", text: "已断开 · 接口未配置", color: "var(--rose)" };
-    if (id === "vpay" && !g.apiUrl) return { dot: "yellow", text: "未配置", color: "var(--orange)" };
-    return { dot: "green", text: "已连接 · 正常运行", color: "var(--teal)" };
+
+    if (id === "alipay") {
+      const ready = Boolean(g.appId && (g.privateKey || g.hasPrivateKey) && (g.publicKey || g.hasPublicKey));
+      if (!ready) return { dot: "yellow", text: "未配置 · 缺少 AppID/密钥", color: "var(--orange)" };
+      return { dot: "green", text: "凭证齐全 · 可发起支付", color: "var(--teal)" };
+    }
+
+    if (id === "wechat") {
+      const ready = Boolean(g.appId && g.mchId && (g.apiV3Key || g.hasApiV3Key));
+      if (!ready) return { dot: "yellow", text: "未配置 · 缺少商户号/密钥", color: "var(--orange)" };
+      return { dot: "green", text: "凭证齐全 · 可发起支付", color: "var(--teal)" };
+    }
+
+    if (id === "stripe") {
+      return { dot: "yellow", text: "未实现 · 仅预留配置", color: "var(--orange)" };
+    }
+    if (id === "usdt") {
+      if (!g.walletAddress) return { dot: "yellow", text: "未实现 · 请填写钱包地址", color: "var(--orange)" };
+      return { dot: "yellow", text: "未实现 · 仅预留配置", color: "var(--orange)" };
+    }
+    if (id === "epay" || id === "vpay") {
+      if (!g.apiUrl) return { dot: "yellow", text: "未实现 · 接口未配置", color: "var(--orange)" };
+      return { dot: "yellow", text: "未实现 · 仅预留配置", color: "var(--orange)" };
+    }
+
+    return { dot: "yellow", text: "未实现", color: "var(--orange)" };
   };
 
   if (loading) {
@@ -366,9 +388,13 @@ export default function PaymentGatewayPage() {
               </div>
               <div className="admin-form-group">
                 <label className="admin-form-label">环境</label>
-                <select className="admin-form-select" value={gateways.alipay?.env || "正式环境"} onChange={(e) => updateGateway("alipay", { env: e.target.value })}>
-                  <option>正式环境</option>
-                  <option>沙箱环境</option>
+                <select
+                  className="admin-form-select"
+                  value={gateways.alipay?.env === "sandbox" ? "sandbox" : "production"}
+                  onChange={(e) => updateGateway("alipay", { env: e.target.value })}
+                >
+                  <option value="production">正式环境</option>
+                  <option value="sandbox">沙箱环境</option>
                 </select>
               </div>
               <div className="admin-form-group full">

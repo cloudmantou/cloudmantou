@@ -88,6 +88,7 @@ export async function GET(
         : null,
       isLiked,
       accessReason: access.reason,
+      articleCreditsAvailable: access.articleCreditsAvailable ?? 0,
     });
   } catch (error) {
     console.error("[Post Detail API Error]", error);

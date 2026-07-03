@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { decryptGatewaySecrets, encryptGatewaySecrets } from "@/lib/secret-crypto";
+import { normalizeAlipayEnv } from "@/lib/payment-config";
 import { z } from "zod";
 
 const GATEWAY_IDS = ["alipay", "wechat", "stripe", "usdt", "epay", "vpay"] as const;
@@ -10,7 +11,7 @@ const GATEWAY_IDS = ["alipay", "wechat", "stripe", "usdt", "epay", "vpay"] as co
 const gatewaySchema = z.object({
   enabled: z.boolean().optional(),
   mode: z.string().optional(),
-  env: z.string().optional(),
+  env: z.enum(["production", "sandbox"]).optional(),
   appId: z.string().optional(),
   privateKey: z.string().optional(),
   publicKey: z.string().optional(),
@@ -128,10 +129,15 @@ export async function GET() {
     const maskedGateways = Object.fromEntries(
       Object.entries(gateways).map(([id, cfg]) => {
         const c = cfg as Record<string, string | boolean>;
+        const normalized = { ...c } as Record<string, string | boolean>;
+        if (id === "alipay") {
+          normalized.env = normalizeAlipayEnv(c.env);
+        }
+
         return [
           id,
           {
-            ...c,
+            ...normalized,
             privateKey: c.privateKey ? maskSecret(String(c.privateKey)) : "",
             publicKey: c.publicKey ? maskSecret(String(c.publicKey)) : "",
             apiV3Key: c.apiV3Key ? maskSecret(String(c.apiV3Key)) : "",
@@ -215,9 +221,16 @@ export async function PUT(req: NextRequest) {
       for (const [id, patch] of Object.entries(parsed.data.gateways)) {
         const prev = (merged[id] || {}) as Record<string, unknown>;
         const next: Record<string, unknown> = { ...prev, ...patch };
+        if (id === "alipay" && patch.env !== undefined) {
+          next.env = normalizeAlipayEnv(patch.env);
+        }
         for (const [k, v] of Object.entries(patch)) {
           if (typeof v === "string" && v.includes("••••")) {
-            delete next[k];
+            if (prev[k] !== undefined) {
+              next[k] = prev[k];
+            } else {
+              delete next[k];
+            }
           }
         }
         merged[id] = next;

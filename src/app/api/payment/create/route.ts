@@ -69,7 +69,8 @@ export async function POST(req: NextRequest) {
     const notifyUrl = `${config.siteUrl}/api/payment/notify/${channel === "ALIPAY" ? "alipay" : "wechat"}`;
     const returnUrl = `${config.siteUrl}/payment/result?orderNo=${encodeURIComponent(order.orderNo)}`;
 
-    if (config.testMode && !config.alipay && !config.wechat) {
+    // 测试模式：无论真实网关是否配置，一律走模拟支付
+    if (config.testMode) {
       await prisma.payment.upsert({
         where: { orderId: order.id },
         create: {

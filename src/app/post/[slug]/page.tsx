@@ -167,6 +167,8 @@ export default async function PostPage({ params }: PageProps) {
                 : null,
               isLiked,
             }}
+            accessReason={access.reason}
+            articleCreditsAvailable={access.articleCreditsAvailable ?? 0}
             commentsData={commentsData}
           />
         </div>

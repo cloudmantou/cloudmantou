@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Crown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Crown, Ticket } from "lucide-react";
+import type { PostAccessReason } from "@/lib/post-access";
 import Link from "next/link";
 import { MarkdownRenderer } from "@/components/blog/MarkdownRenderer";
 import { PostMeta, estimateReadTime } from "@/components/blog/PostMeta";
@@ -54,11 +56,39 @@ type CommentsData = {
 type PostContentProps = {
   post: PostData;
   commentsData: CommentsData;
+  accessReason?: PostAccessReason;
+  articleCreditsAvailable?: number;
 };
 
-export function PostContent({ post, commentsData }: PostContentProps) {
+export function PostContent({
+  post,
+  commentsData,
+  accessReason = "no_access",
+  articleCreditsAvailable = 0,
+}: PostContentProps) {
+  const router = useRouter();
   const [progress, setProgress] = useState(0);
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState<string | null>(null);
   const isPaidOnly = post.status === "PAID_ONLY";
+  const canUseArticleCredit = accessReason === "article_credit_available" && articleCreditsAvailable > 0;
+
+  const handleUnlockWithCredit = async () => {
+    setUnlockError(null);
+    setUnlocking(true);
+    try {
+      const res = await fetch(`/api/posts/${post.slug}/unlock`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "解锁失败");
+      }
+      router.refresh();
+    } catch (error) {
+      setUnlockError(error instanceof Error ? error.message : "解锁失败");
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   // Reading progress bar
   useEffect(() => {
@@ -146,10 +176,31 @@ export function PostContent({ post, commentsData }: PostContentProps) {
               <div className="paid-cta">
                 <Crown size={24} style={{ color: "var(--accent)", margin: "0 auto 12px" }} aria-hidden="true" />
                 <h3>会员专属内容</h3>
-                <p>购买后即可阅读全文</p>
-                {post.paidContent && (
+                <p>{canUseArticleCredit ? "可使用文章券解锁全文" : "购买后即可阅读全文"}</p>
+                {post.paidContent && !canUseArticleCredit ? (
                   <div className="paid-price">¥{post.paidContent.price.toFixed(2)}</div>
-                )}
+                ) : null}
+                {canUseArticleCredit ? (
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      type="button"
+                      className="quick-btn primary"
+                      disabled={unlocking}
+                      onClick={handleUnlockWithCredit}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                    >
+                      <Ticket size={15} aria-hidden="true" />
+                      {unlocking
+                        ? "解锁中…"
+                        : `使用文章券解锁（剩余 ${articleCreditsAvailable} 篇）`}
+                    </button>
+                    {unlockError ? (
+                      <p className="text-sm" style={{ color: "var(--rose)", marginTop: 10 }}>
+                        {unlockError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
