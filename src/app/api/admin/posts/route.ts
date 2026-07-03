@@ -3,13 +3,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
+import { coverImageSchema, postSlugSchema } from "@/lib/post-schema";
 
 const createPostSchema = z.object({
   title: z.string().min(1, "标题不能为空").max(200),
-  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/, "slug 只允许小写字母、数字和横线"),
-  excerpt: z.string().max(500).optional(),
+  slug: postSlugSchema,
+  excerpt: z.string().max(500).optional().nullable(),
   content: z.string().min(1, "内容不能为空"),
-  coverImage: z.string().url().optional().nullable(),
+  coverImage: coverImageSchema,
   categoryId: z.string().optional().nullable(),
   tagIds: z.array(z.string()).optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "PAID_ONLY"]).default("DRAFT"),

@@ -79,6 +79,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [previewHost, setPreviewHost] = useState("");
 
   const insertText = useCallback((text: string, at?: { start: number; end: number }) => {
     const pos = at ?? selection;
@@ -156,6 +157,10 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     setContent(trimmed + insert);
     setSlashOpen(false);
   };
+
+  useEffect(() => {
+    setPreviewHost(window.location.host);
+  }, []);
 
   // Load categories and tags
   useEffect(() => {
@@ -492,7 +497,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           <div className="publish-box">
             <h4>封面图</h4>
             <div
-              className={`cover-upload cover-upload-wide${coverImage ? " has-image" : ""}`}
+              className={`cover-upload cover-upload-wide${coverImage.trim() ? " has-image" : ""}`}
               onClick={() => coverInputRef.current?.click()}
             >
               <input
@@ -505,10 +510,10 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                   e.target.value = "";
                 }}
               />
-              {coverImage ? (
+              {coverImage.trim() ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={coverImage} alt="cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  <img src={coverImage.trim()} alt="cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                   <div className="cover-overlay">
                     <button
                       type="button"
@@ -613,8 +618,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             <div className="seo-preview">
               <div className="seo-preview-title">{seoTitle || "文章标题"}</div>
               <div className="seo-preview-url">
-                https://{typeof window !== "undefined" ? window.location.host : "site"}
-                /post/{slug || "url-slug"}
+                https://{previewHost || "your-domain"}/post/{slug || "url-slug"}
               </div>
               <div className="seo-preview-desc">{seoDesc || excerpt || "文章摘要会显示在搜索结果中…"}</div>
             </div>

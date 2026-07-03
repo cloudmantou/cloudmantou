@@ -3,13 +3,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
+import { coverImageSchema, postSlugSchema } from "@/lib/post-schema";
 
 const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/).optional(),
+  slug: postSlugSchema.optional(),
   excerpt: z.string().max(500).optional().nullable(),
   content: z.string().min(1).optional(),
-  coverImage: z.string().url().optional().nullable(),
+  coverImage: coverImageSchema,
   categoryId: z.string().optional().nullable(),
   tagIds: z.array(z.string()).optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "PAID_ONLY"]).optional(),
