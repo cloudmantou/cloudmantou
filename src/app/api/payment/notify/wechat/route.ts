@@ -1,16 +1,16 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
-import { verifyWechatSign, verifyWechatV3Sign, verifyAmount, grantEntitlement } from "@/lib/payment";
+import {
+  verifyWechatSign,
+  verifyWechatV3Sign,
+  verifyAmount,
+  grantEntitlement,
+  decryptWechatV3Resource,
+} from "@/lib/payment";
 
 /**
- * 微信支付异步通知回调
- *
- * 微信支付 v2: XML 或 JSON 格式，MD5 签名
- * 微信支付 v3: JSON 格式，SHA256-RSA2048 签名，请求头包含签名信息
- *
- * 本接口同时兼容 v2 和 v3 格式。
- * 返回 XML: <xml><return_code><![CDATA[SUCCESS]]></return_code></xml>
+ * 微信支付异步通知回调（兼容 V2 XML 与 V3 JSON）
  */
 export async function POST(req: NextRequest) {
   let rawBody = "";
@@ -21,11 +21,9 @@ export async function POST(req: NextRequest) {
     let body: Record<string, any>;
     let isV3 = false;
 
-    // 判断 v2 还是 v3
     const contentType = req.headers.get("content-type") || "";
 
     if (req.headers.get("wechatpay-signature")) {
-      // ===== 微信支付 v3 =====
       isV3 = true;
       try {
         body = JSON.parse(rawBody);
@@ -33,13 +31,13 @@ export async function POST(req: NextRequest) {
         return wechatV2Response("FAIL", "无效的请求格式");
       }
 
-      // v3 签名验证
       const timestamp = req.headers.get("wechatpay-timestamp") || "";
       const nonce = req.headers.get("wechatpay-nonce") || "";
       const signature = req.headers.get("wechatpay-signature") || "";
       const serial = req.headers.get("wechatpay-serial") || "";
 
-      const wechatPublicKey = paymentConfig.wechat?.publicKey || process.env.WECHAT_V3_PUBLIC_KEY;
+      const wechatPublicKey =
+        paymentConfig.wechat?.publicKey || process.env.WECHAT_V3_PUBLIC_KEY;
       if (!wechatPublicKey) {
         console.error("[WeChat] WECHAT_V3_PUBLIC_KEY not configured");
         return wechatV2Response("FAIL", "配置错误");
@@ -55,16 +53,20 @@ export async function POST(req: NextRequest) {
         return wechatV2Response("FAIL", "签名验证失败");
       }
 
-      // v3 解密 resource
       if (body.resource) {
-        const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
-        if (!apiKey) {
+        const apiV3Key =
+          paymentConfig.wechat?.apiV3Key || process.env.WECHAT_API_V3_KEY || "";
+        if (!apiV3Key) {
           return wechatV2Response("FAIL", "配置错误");
         }
-        body = decryptWechatV3Resource(body.resource, apiKey);
+        try {
+          body = decryptWechatV3Resource(body.resource, apiV3Key);
+        } catch (err) {
+          console.error("[WeChat v3 Decrypt Error]", err);
+          return wechatV2Response("FAIL", "解密失败");
+        }
       }
     } else {
-      // ===== 微信支付 v2 =====
       if (contentType.includes("xml")) {
         body = parseXmlBody(rawBody);
       } else {
@@ -75,7 +77,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // v2 签名验证
       const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
       if (!apiKey) {
         console.error("[WeChat] WECHAT_API_KEY not configured");
@@ -88,18 +89,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ===== 通用字段提取 =====
     const out_trade_no = body.out_trade_no;
     const transaction_id = body.transaction_id;
     const trade_state = body.trade_state || body.result_code;
-    const total_fee = body.total_fee; // v2: 分
-    const amount_total = body.amount?.total; // v3: 分
+    const total_fee = body.total_fee;
+    const amount_total = body.amount?.total;
 
     if (!out_trade_no || !transaction_id) {
       return wechatV2Response("FAIL", "参数不完整");
     }
 
-    // ===== 查找订单 =====
     const order = await prisma.order.findUnique({
       where: { orderNo: out_trade_no },
       include: { payment: true },
@@ -110,7 +109,6 @@ export async function POST(req: NextRequest) {
       return wechatV2Response("FAIL", "订单不存在");
     }
 
-    // 幂等
     if (order.status === "PAID") {
       return wechatV2Response("SUCCESS");
     }
@@ -119,9 +117,6 @@ export async function POST(req: NextRequest) {
       return wechatV2Response("FAIL", "订单状态异常");
     }
 
-    // ===== 金额校验 =====
-    // v2: total_fee 单位是分，需要除以 100
-    // v3: amount.total 单位是分
     const paidAmountYuan = isV3
       ? (parseInt(amount_total) / 100).toFixed(2)
       : (parseInt(total_fee) / 100).toFixed(2);
@@ -135,9 +130,6 @@ export async function POST(req: NextRequest) {
       return wechatV2Response("FAIL", "金额不匹配");
     }
 
-    // ===== 检查支付状态 =====
-    // v2: result_code=SUCCESS 且 trade_state=SUCCESS
-    // v3: trade_state=SUCCESS
     const isPaid =
       (isV3 && trade_state === "SUCCESS") ||
       (!isV3 && body.result_code === "SUCCESS" && body.return_code === "SUCCESS");
@@ -146,7 +138,6 @@ export async function POST(req: NextRequest) {
       return wechatV2Response("SUCCESS");
     }
 
-    // ===== 事务处理 =====
     await prisma.$transaction(async (tx) => {
       const updated = await tx.order.updateMany({
         where: { id: order.id, status: "PENDING" },
@@ -180,8 +171,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ===== 辅助函数 =====
-
 function wechatV2Response(returnCode: string, returnMsg?: string): Response {
   const msg = returnMsg || "";
   const xml = `<xml><return_code><![CDATA[${returnCode}]]></return_code><return_msg><![CDATA[${msg}]]></return_msg></xml>`;
@@ -200,27 +189,3 @@ function parseXmlBody(xml: string): Record<string, any> {
   }
   return result;
 }
-
-function decryptWechatV3Resource(resource: any, apiKey: string): Record<string, any> {
-  try {
-    const { ciphertext, nonce, associated_data } = resource;
-    const decipher = crypto.createDecipheriv(
-      "aes-256-gcm",
-      Buffer.from(apiKey, "base64"),
-      Buffer.from(nonce, "utf8")
-    );
-    decipher.setAAD(Buffer.from(associated_data, "utf8"));
-
-    const tag = Buffer.from(ciphertext, "base64").slice(-16);
-    const data = Buffer.from(ciphertext, "base64").slice(0, -16);
-
-    decipher.setAuthTag(tag);
-    const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
-    return JSON.parse(decrypted.toString("utf8"));
-  } catch (err) {
-    console.error("[WeChat v3 Decrypt Error]", err);
-    return {};
-  }
-}
-
-import crypto from "crypto";

@@ -14,7 +14,10 @@ type GatewayData = {
   privateKey?: string;
   publicKey?: string;
   mchId?: string;
+  apiKey?: string;
   apiV3Key?: string;
+  platformSerial?: string;
+  sellerId?: string;
   publishableKey?: string;
   secretKey?: string;
   webhookSecret?: string;
@@ -30,6 +33,7 @@ type GatewayData = {
   apiUrl?: string;
   hasPrivateKey?: boolean;
   hasPublicKey?: boolean;
+  hasApiKey?: boolean;
   hasApiV3Key?: boolean;
   hasSecretKey?: boolean;
 };
@@ -195,7 +199,8 @@ export default function PaymentGatewayPage() {
     }
 
     if (id === "wechat") {
-      const ready = Boolean(g.appId && g.mchId && (g.apiV3Key || g.hasApiV3Key));
+      const hasV2Key = Boolean(g.apiKey || g.hasApiKey || g.apiV3Key || g.hasApiV3Key);
+      const ready = Boolean(g.appId && g.mchId && hasV2Key);
       if (!ready) return { dot: "yellow", text: "未配置 · 缺少商户号/密钥", color: "var(--orange)" };
       return { dot: "green", text: "凭证齐全 · 可发起支付", color: "var(--teal)" };
     }
@@ -450,8 +455,37 @@ export default function PaymentGatewayPage() {
                 <input className="admin-form-input mono" value={gateways.wechat?.appId || ""} onChange={(e) => updateGateway("wechat", { appId: e.target.value })} />
               </div>
               <div className="admin-form-group full">
+                <label className="admin-form-label">V2 商户 API 密钥</label>
+                <SecretInput
+                  value={gateways.wechat?.apiKey || ""}
+                  onChange={(v) => updateGateway("wechat", { apiKey: v })}
+                  placeholder="32 位密钥，用于统一下单签名与 V2 回调验签"
+                />
+              </div>
+              <div className="admin-form-group full">
                 <label className="admin-form-label">API v3 密钥</label>
-                <SecretInput value={gateways.wechat?.apiV3Key || ""} onChange={(v) => updateGateway("wechat", { apiV3Key: v })} />
+                <SecretInput
+                  value={gateways.wechat?.apiV3Key || ""}
+                  onChange={(v) => updateGateway("wechat", { apiV3Key: v })}
+                  placeholder="32 位明文，用于 V3 回调解密"
+                />
+              </div>
+              <div className="admin-form-group full">
+                <label className="admin-form-label">微信支付公钥 / 平台证书公钥</label>
+                <SecretInput
+                  value={gateways.wechat?.publicKey || ""}
+                  onChange={(v) => updateGateway("wechat", { publicKey: v })}
+                  placeholder="V3 回调验签用 PEM 公钥"
+                />
+              </div>
+              <div className="admin-form-group">
+                <label className="admin-form-label">平台证书序列号</label>
+                <input
+                  className="admin-form-input mono"
+                  value={gateways.wechat?.platformSerial || ""}
+                  onChange={(e) => updateGateway("wechat", { platformSerial: e.target.value })}
+                  placeholder="Wechatpay-Serial"
+                />
               </div>
               <div className="admin-form-group full">
                 <label className="admin-form-label">支付通知地址</label>

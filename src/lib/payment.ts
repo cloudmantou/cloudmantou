@@ -113,6 +113,38 @@ export function verifyWechatV3Sign(
   }
 }
 
+// ===== 微信支付 v3 回调解密 (AEAD_AES_256_GCM) =====
+
+export function decryptWechatV3Resource(
+  resource: {
+    ciphertext: string;
+    nonce: string;
+    associated_data?: string;
+  },
+  apiV3Key: string
+): Record<string, unknown> {
+  const keyBytes = Buffer.from(apiV3Key, "utf8");
+  if (keyBytes.length !== 32) {
+    throw new Error("Invalid ApiV3Key: length must be 32 bytes");
+  }
+
+  const { ciphertext, nonce, associated_data = "" } = resource;
+  const ciphertextBuffer = Buffer.from(ciphertext, "base64");
+  if (ciphertextBuffer.length <= 16) {
+    throw new Error("Invalid ciphertext");
+  }
+
+  const authTag = ciphertextBuffer.subarray(ciphertextBuffer.length - 16);
+  const data = ciphertextBuffer.subarray(0, ciphertextBuffer.length - 16);
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", keyBytes, Buffer.from(nonce, "utf8"));
+  decipher.setAAD(Buffer.from(associated_data, "utf8"));
+  decipher.setAuthTag(authTag);
+
+  const decrypted = Buffer.concat([decipher.update(data), decipher.final()]);
+  return JSON.parse(decrypted.toString("utf8")) as Record<string, unknown>;
+}
+
 // ===== 金额校验 =====
 
 export function verifyAmount(

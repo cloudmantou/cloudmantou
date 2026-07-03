@@ -22,6 +22,7 @@ describe("payment scene", () => {
     expect(resolveAlipayMode("pc")).toBe("page");
     expect(resolveAlipayMode("h5")).toBe("wap");
     expect(resolveWechatMode("pc")).toBe("native");
-    expect(resolveWechatMode("wechat_inapp")).toBe("mweb");
+    expect(resolveWechatMode("h5")).toBe("mweb");
+    expect(resolveWechatMode("wechat_inapp")).toBeNull();
   });
 });

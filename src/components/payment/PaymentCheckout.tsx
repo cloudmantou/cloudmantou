@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, Smartphone, Monitor, X } from "lucide-react";
 import clsx from "clsx";
+import QRCode from "qrcode";
 
 export type CheckoutOrder = {
   id: string;
@@ -30,7 +31,7 @@ function detectScene(): PaymentScene {
 
 function sceneText(scene: PaymentScene) {
   if (scene === "pc") return "电脑网站支付 / 微信扫码";
-  if (scene === "wechat_inapp") return "微信内 H5 支付";
+  if (scene === "wechat_inapp") return "微信内 · 仅支持支付宝";
   return "手机 H5 支付";
 }
 
@@ -39,6 +40,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   const [loading, setLoading] = useState<"ALIPAY" | "WECHAT" | null>(null);
   const [error, setError] = useState("");
   const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrImage, setQrImage] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
 
   useEffect(() => {
@@ -46,10 +48,29 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
       setScene(detectScene());
       setError("");
       setQrUrl(null);
+      setQrImage(null);
       setPolling(false);
       setLoading(null);
     }
   }, [open, order?.id]);
+
+  useEffect(() => {
+    if (!qrUrl) {
+      setQrImage(null);
+      return;
+    }
+    let cancelled = false;
+    QRCode.toDataURL(qrUrl, { width: 220, margin: 1 })
+      .then((url) => {
+        if (!cancelled) setQrImage(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrImage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrUrl]);
 
   const pollStatus = useCallback(async (orderNo: string) => {
     setPolling(true);
@@ -142,10 +163,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     }
   };
 
-  const qrImage = useMemo(() => {
-    if (!qrUrl) return null;
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}`;
-  }, [qrUrl]);
+  const wechatDisabled = scene === "wechat_inapp";
 
   if (!open || !order) return null;
 
@@ -219,12 +237,13 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             <button
               type="button"
               className="payment-channel-btn wechat"
-              disabled={!!loading}
+              disabled={!!loading || wechatDisabled}
+              title={wechatDisabled ? "微信内需 JSAPI，请使用支付宝" : undefined}
               onClick={() => launchPay("WECHAT")}
             >
               {loading === "WECHAT" ? <Loader2 size={16} className="animate-spin" /> : <span>微</span>}
               微信支付
-              <small>{scene === "pc" ? "扫码" : "H5"}</small>
+              <small>{wechatDisabled ? "不可用" : scene === "pc" ? "扫码" : "H5"}</small>
             </button>
           </div>
         )}

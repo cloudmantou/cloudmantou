@@ -116,6 +116,9 @@ export async function POST(req: NextRequest) {
         return fail("微信支付未配置或未启用", 40000, 400);
       }
       const mode = resolveWechatMode(scene);
+      if (!mode) {
+        return fail("微信内支付需 JSAPI（openid），当前请使用支付宝或在外部浏览器打开", 40000, 400);
+      }
       launch = await createWechatPayment({
         config: config.wechat,
         mode,

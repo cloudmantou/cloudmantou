@@ -14,7 +14,10 @@ export type WechatGatewayConfig = {
   enabled: boolean;
   appId: string;
   mchId: string;
+  /** V2 商户 API 密钥：统一下单签名、V2 回调验签 */
   apiKey: string;
+  /** V3 API 密钥：V3 回调报文解密（32 字节明文） */
+  apiV3Key?: string;
   publicKey?: string;
   platformSerial?: string;
 };
@@ -92,7 +95,12 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
 
   const wechatAppId = String(wechatDb.appId || process.env.WECHAT_APP_ID || "").trim();
   const wechatMchId = String(wechatDb.mchId || process.env.WECHAT_MCH_ID || "").trim();
-  const wechatApiKey = String(wechatDb.apiV3Key || wechatDb.apiKey || process.env.WECHAT_API_KEY || "").trim();
+  const wechatApiKeyV2 = String(wechatDb.apiKey || process.env.WECHAT_API_KEY || "").trim();
+  const wechatApiV3Key = String(
+    wechatDb.apiV3Key || process.env.WECHAT_API_V3_KEY || ""
+  ).trim();
+  // 兼容旧配置：后台曾只填 apiV3Key，回退用于 V2 签名
+  const wechatApiKey = wechatApiKeyV2 || wechatApiV3Key;
   const wechatPublicKey = String(
     wechatDb.publicKey || process.env.WECHAT_V3_PUBLIC_KEY || ""
   ).trim();
@@ -108,7 +116,7 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
           appId: alipayAppId,
           privateKey: normalizePem(alipayPrivateKey, "private"),
           publicKey: normalizePem(alipayPublicKey, "public"),
-          sellerId: String(process.env.ALIPAY_SELLER_ID || "").trim() || undefined,
+          sellerId: String(alipayDb.sellerId || process.env.ALIPAY_SELLER_ID || "").trim() || undefined,
         }
       : null;
 
@@ -119,6 +127,7 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
           appId: wechatAppId,
           mchId: wechatMchId,
           apiKey: wechatApiKey,
+          apiV3Key: wechatApiV3Key || undefined,
           publicKey: wechatPublicKey || undefined,
           platformSerial: wechatPlatformSerial || undefined,
         }

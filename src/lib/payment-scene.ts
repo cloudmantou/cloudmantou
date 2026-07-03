@@ -16,7 +16,9 @@ export function resolveAlipayMode(scene: PaymentScene): AlipayPayMode {
   return scene === "pc" ? "page" : "wap";
 }
 
-export function resolveWechatMode(scene: PaymentScene): WechatPayMode {
+/** 微信内浏览器需 JSAPI（openid），当前未实现则返回 null */
+export function resolveWechatMode(scene: PaymentScene): WechatPayMode | null {
+  if (scene === "wechat_inapp") return null;
   return scene === "pc" ? "native" : "mweb";
 }
 

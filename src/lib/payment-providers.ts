@@ -129,11 +129,12 @@ export async function createWechatPayment(input: {
     trade_type: input.mode === "native" ? "NATIVE" : "MWEB",
   };
 
-  if (input.mode === "mweb" && input.returnUrl) {
+  if (input.mode === "mweb") {
     params.scene_info = JSON.stringify({
+      payer_client_ip: input.clientIp || "127.0.0.1",
       h5_info: {
         type: "Wap",
-        wap_url: input.returnUrl,
+        wap_url: input.returnUrl || input.notifyUrl.replace(/\/api\/payment\/notify\/wechat$/, ""),
         wap_name: "CloudMantou",
       },
     });
