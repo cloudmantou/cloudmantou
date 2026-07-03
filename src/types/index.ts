@@ -30,6 +30,11 @@ export type Product = {
   category: Exclude<ProductCategory, "all">;
   name: string;
   description: string;
+  /** 详情页长介绍，支持段落（\n\n 分隔） */
+  intro?: string;
+  highlights?: string[];
+  /** 卡密类商品的使用步骤 */
+  usageSteps?: string[];
   price: string;
   stock: number;
   badge: string;

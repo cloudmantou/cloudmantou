@@ -25,7 +25,9 @@ import {
 import clsx from "clsx";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { ArticleOverlay } from "@/components/blog/ArticleOverlay";
+import { HomeBackdrop } from "@/components/home/HomeBackdrop";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { ProductDetailModal } from "@/components/shop/ProductDetailModal";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { TypingEffect } from "@/components/ui/TypingEffect";
 import { SearchDialog } from "@/components/layout/SearchDialog";
@@ -91,6 +93,8 @@ export function PlatformShell() {
   const [dailyTotal, setDailyTotal] = useState(0);
   const [checkoutOrder, setCheckoutOrder] = useState<CheckoutOrder | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [productDetailOpen, setProductDetailOpen] = useState(false);
 
   const openPostOverlay = (post: ApiPost) => {
     const accentColors = ["gold", "teal", "rose", "blue", "orange"] as const;
@@ -181,6 +185,11 @@ export function PlatformShell() {
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 2200);
+  };
+
+  const openProductDetail = (product: Product) => {
+    setSelectedProduct(product);
+    setProductDetailOpen(true);
   };
 
   const handleBuyProduct = (product: Product) => {
@@ -342,7 +351,10 @@ export function PlatformShell() {
 
         <main className="main">
           {section === "home" ? (
+            <>
+            <HomeBackdrop />
             <section className="page active home-hero" aria-labelledby="home-title">
+              <div className="home-hero-content">
               <div className="home-greeting" aria-hidden="true">
                 <span className="greeting-diamond" /> CLOUDMANTOU · BLOG &amp; MEMBERSHIP
               </div>
@@ -466,7 +478,9 @@ export function PlatformShell() {
                   </div>
                 </section>
               )}
+              </div>
             </section>
+            </>
           ) : null}
 
           {section === "blog" ? (
@@ -570,6 +584,7 @@ export function PlatformShell() {
                     key={product.id}
                     product={product}
                     onBuy={handleBuyProduct}
+                    onSelect={openProductDetail}
                   />
                 ))}
               </div>
@@ -770,6 +785,19 @@ export function PlatformShell() {
       </nav>
 
       <ArticleOverlay post={selectedPost} onClose={() => setSelectedPost(null)} />
+
+      <ProductDetailModal
+        product={selectedProduct}
+        open={productDetailOpen}
+        onClose={() => {
+          setProductDetailOpen(false);
+          setSelectedProduct(null);
+        }}
+        onBuy={(product) => {
+          setProductDetailOpen(false);
+          handleBuyProduct(product);
+        }}
+      />
 
       <PaymentCheckout
         order={checkoutOrder}

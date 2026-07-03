@@ -94,6 +94,9 @@ export const products: Product[] = [
     category: "membership",
     name: "月度会员",
     description: "解锁所有会员文章、下载附件和会员评论标识。",
+    intro:
+      "适合想先体验一个月会员内容的读者。开通后可阅读全站会员文章、显示会员标识，并下载文章附件。\n\n到期前可续费，未过期续费会从当前到期日顺延。",
+    highlights: ["全站会员文章", "附件下载", "会员评论标识", "随时可续费"],
     price: "¥29",
     stock: 999,
     badge: "HOT",
@@ -107,6 +110,9 @@ export const products: Product[] = [
     category: "membership",
     name: "年度会员",
     description: "适合长期订阅，包含后续新增会员专栏。",
+    intro:
+      "为长期读者准备的优惠套餐。一次订阅全年有效，后续新增的会员专栏也会自动纳入权益范围。\n\n相比按月购买可节省约 40%，适合深度用户与团队学习账号。",
+    highlights: ["全年会员权益", "新增专栏自动解锁", "性价比更高", "支持叠加续期"],
     price: "¥199",
     stock: 999,
     badge: "SAVE",
@@ -120,6 +126,13 @@ export const products: Product[] = [
     category: "paid-post",
     name: "付费文章兑换券",
     description: "用于单篇深度文章解锁，可批量赠送。",
+    intro:
+      "适合只想阅读某一篇深度技术文章的用户，也适合作者做活动赠送。\n\n兑换后可在会员中心输入卡号卡密，立即解锁对应付费章节，无需订阅整站会员。",
+    highlights: [
+      "单篇解锁，不必买整月会员",
+      "卡密可转赠，适合社群活动",
+      "兑换记录可在个人中心查看",
+    ],
     price: "¥9.9",
     stock: 84,
     badge: "NEW",
@@ -128,14 +141,83 @@ export const products: Product[] = [
       "linear-gradient(135deg, rgba(107,154,255,0.28), rgba(107,154,255,0.04)), url('https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=800&q=80')"
   },
   {
+    id: "card-vip-30",
+    category: "card",
+    name: "VIP 30 天卡密",
+    description: "一次性卡密，兑换后自动延长 30 天会员权益。",
+    intro:
+      "面向不方便在线支付、或需要通过社群/代理分发的场景。每张卡密绑定固定权益时长，兑换成功后立即写入账户。\n\n适合个人站长做团购、抽奖、合作推广；后台可按批次生成、导出 CSV，并追踪使用状态。",
+    highlights: [
+      "兑换即开通，无需等待人工审核",
+      "支持未过期会员叠加续期",
+      "批次号可追溯，防止重复发放",
+      "库存实时同步，低库存自动提醒",
+    ],
+    usageSteps: [
+      "购买后在订单页或邮件中获取卡号与卡密",
+      "进入「个人中心 → 卡密兑换」填写信息",
+      "提交后系统自动验签并发放 VIP 权益",
+      "刷新页面即可阅读会员文章与下载附件",
+    ],
+    price: "¥25",
+    stock: 120,
+    badge: "HOT",
+    accent: "gold",
+    productType: "CARD_PACKAGE",
+    cover:
+      "linear-gradient(135deg, rgba(232,185,100,0.32), rgba(232,185,100,0.06)), url('https://images.unsplash.com/photo-1556740758-90de374c12bac?auto=format&fit=crop&w=800&q=80')"
+  },
+  {
+    id: "card-paid-article",
+    category: "card",
+    name: "付费文章解锁卡",
+    description: "兑换后解锁一篇指定付费文章，适合单篇分销。",
+    intro:
+      "当你只想售卖某一门课程式长文、源码解读或付费专栏中的单篇内容时，用这张卡密比整站会员更精准。\n\n卡密类型为 PAID_ARTICLE，兑换后与订单购买享有相同阅读权限，默认有效期 1 年。",
+    highlights: [
+      "按篇售卖，转化路径更短",
+      "可绑定具体文章 ID，避免误兑",
+      "适合知识星球、社群福利发放",
+      "支持导出未使用卡密做二次分发",
+    ],
+    usageSteps: [
+      "确认卡密对应的文章标题与价格",
+      "登录后在卡密兑换页输入卡号卡密",
+      "系统校验通过后解锁该篇文章全文",
+      "可在收藏夹或文章页继续阅读",
+    ],
+    price: "¥8",
+    stock: 56,
+    badge: "NEW",
+    accent: "blue",
+    productType: "CARD_PACKAGE",
+    cover:
+      "linear-gradient(135deg, rgba(107,154,255,0.3), rgba(107,154,255,0.05)), url('https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=800&q=80')"
+  },
+  {
     id: "card-batch",
     category: "card",
-    name: "卡密批量包",
-    description: "面向社群分发，支持批次管理和 CSV 导出。",
+    name: "卡密批量包（10 张）",
+    description: "面向社群分发，含 10 张 VIP 卡密与批次管理权限。",
+    intro:
+      "为社群主、代理商、活动运营准备的标准化卡密包。一次购买获得固定数量未激活卡密，可在后台按批次导出、标记渠道来源。\n\n相比单张购买，批量包单价更低，并附带 CSV 导出与库存锁定能力，避免支付成功但库存不足导致的发放失败。",
+    highlights: [
+      "10 张 VIP 卡密，适合小型社群团购",
+      "支持批次备注与渠道标记",
+      "导出 CSV 后可交给客服或代理发放",
+      "支付回调 + 自动交付双链路保障",
+    ],
+    usageSteps: [
+      "下单支付成功后，在订单详情查看卡密包状态",
+      "管理员后台按批次解锁并导出卡密列表",
+      "将卡号卡密分发给终端用户或代理",
+      "用户各自登录兑换，权益互不影响",
+    ],
     price: "¥99",
     stock: 18,
     badge: "LOW",
     accent: "rose",
+    productType: "CARD_PACKAGE",
     cover:
       "linear-gradient(135deg, rgba(232,99,122,0.28), rgba(232,99,122,0.04)), url('https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=800&q=80')"
   }
