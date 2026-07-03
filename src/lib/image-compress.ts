@@ -1,15 +1,14 @@
+import {
+  getClientCompressOptions,
+  type UploadPurpose,
+} from "@/lib/upload-config";
+
 export type CompressOptions = {
   maxWidth?: number;
   maxHeight?: number;
   quality?: number;
   mimeType?: "image/webp" | "image/jpeg";
-};
-
-const DEFAULTS: Required<CompressOptions> = {
-  maxWidth: 1920,
-  maxHeight: 1920,
-  quality: 0.82,
-  mimeType: "image/webp",
+  purpose?: UploadPurpose;
 };
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -42,13 +41,20 @@ function scaleDimensions(
 }
 
 /**
- * 客户端图片压缩：等比缩放 + WebP/JPEG 输出
+ * 客户端图片压缩：等比缩放 + WebP 输出（减轻上传带宽，服务端会再次校验并压缩）
  */
 export async function compressImage(
   file: File,
   options: CompressOptions = {}
 ): Promise<File> {
-  const opts = { ...DEFAULTS, ...options };
+  const preset = options.purpose ? getClientCompressOptions(options.purpose) : null;
+  const opts = {
+    maxWidth: options.maxWidth ?? preset?.maxWidth ?? 1920,
+    maxHeight: options.maxHeight ?? preset?.maxHeight ?? 1920,
+    quality: options.quality ?? preset?.quality ?? 0.82,
+    mimeType: options.mimeType ?? preset?.mimeType ?? "image/webp",
+  };
+
   const img = await loadImage(file);
   const { width, height } = scaleDimensions(
     img.naturalWidth,

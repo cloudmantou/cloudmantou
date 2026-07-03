@@ -31,7 +31,8 @@
 | Redis 限流 | ✅ 已接入 | API 路由在 `REDIS_URL` 可用时用 Redis；登录限流因 middleware 打包限制仍用内存 |
 | 支付密钥加密 | ✅ 已接入 | 后台网关密钥 AES-256-GCM 加密存储 |
 | 微信 V3 回调加固 | ⚠️ 部分 | 时间戳重放窗口 + 平台证书 serial 校验 |
-| 对象存储上传 | ❌ 未接入 | 图片仍写入本地 `public/uploads` |
+| 本地上传 | ✅ 已优化 | 客户端预压缩 + 服务端 Sharp 魔数校验/WebP 重编码 |
+| 对象存储 OSS | ❌ 未接入 | 预留配置，当前默认本地 `public/uploads` |
 | 全文搜索引擎 | ❌ 未接入 | 当前为 Prisma `contains` 标题/摘要/正文 |
 | EDITOR 角色 | ❌ 未落地 | 枚举存在，发布权限仍仅 ADMIN |
 
@@ -144,6 +145,16 @@ docker-compose exec app npx prisma db seed
 - 启动前：`pnpm prisma migrate deploy`
 - 生产环境：`NODE_ENV=production` 且必须配置 `SEED_ADMIN_PASSWORD`
 - 反代需正确传递真实客户端 IP，并配置 `AUTH_URL`、`SITE_URL` 为公网地址
+- 图片上传默认写入 `public/uploads`；Docker Compose 已通过 `uploads_data` 卷持久化
+
+### 图片上传（本地存储）
+
+双层压缩链路：
+
+1. **浏览器端**：Canvas 等比缩放并输出 WebP（封面 1600×900、正文 1920、日常 1600）
+2. **服务端**：魔数校验 → Sharp 去 EXIF、缩放、WebP 重编码（单文件 ≤ 2MB）
+
+上传接口：`POST /api/admin/upload`（管理员），表单字段 `file` + 可选 `purpose=cover|content|daily|general`
 
 ## 默认账号（仅开发）
 
@@ -158,5 +169,5 @@ docker-compose exec app npx prisma db seed
 - 支付配置变更审计日志
 - 微信 V3 平台证书自动轮换（当前需手动更新 serial/公钥）
 - 支付宝 form 提交需在真实浏览器验证 CSP 放行效果
-- 上传迁移至 OSS/S3，增加魔数校验与重编码
+- 可选迁移至 OSS/S3（本地存储已支持压缩与 Docker 卷持久化）
 - API 集成测试与 Playwright E2E 覆盖购买/兑换闭环

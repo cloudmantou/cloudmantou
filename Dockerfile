@@ -31,9 +31,13 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/node_modules/prisma ./node_modules/prisma
 COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/node_modules/sharp ./node_modules/sharp
+COPY --from=build /app/node_modules/@img ./node_modules/@img
 COPY scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 
-RUN chmod +x ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh \
+  && mkdir -p public/uploads \
+  && chown -R nextjs:nodejs public/uploads
 
 USER nextjs
 EXPOSE 3000

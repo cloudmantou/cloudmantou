@@ -8,5 +8,7 @@ else
   echo "[entrypoint] DATABASE_URL not set, skipping migrations."
 fi
 
+mkdir -p "${UPLOAD_DIR:-./public/uploads}"
+
 echo "[entrypoint] Starting Next.js server..."
 exec node server.js

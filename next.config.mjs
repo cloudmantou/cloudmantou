@@ -43,7 +43,7 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  serverExternalPackages: ["ioredis"],
+  serverExternalPackages: ["ioredis", "sharp"],
   async headers() {
     return [
       {

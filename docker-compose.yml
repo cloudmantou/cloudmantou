@@ -14,6 +14,8 @@ services:
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
       SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
       NODE_ENV: production
+    volumes:
+      - uploads_data:/app/public/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -58,3 +60,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  uploads_data:

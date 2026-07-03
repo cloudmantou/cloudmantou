@@ -1,18 +1,17 @@
 import { compressImage } from "@/lib/image-compress";
+import type { UploadPurpose } from "@/lib/upload-config";
 
 export async function uploadImageFile(
   file: File,
-  options?: { maxWidth?: number; maxHeight?: number; forCover?: boolean }
+  options?: { purpose?: UploadPurpose; forCover?: boolean }
 ): Promise<string> {
-  const compressed = await compressImage(file, {
-    maxWidth: options?.forCover ? 1600 : 1920,
-    maxHeight: options?.forCover ? 900 : 1920,
-    quality: options?.forCover ? 0.85 : 0.82,
-    mimeType: "image/webp",
-  });
+  const purpose: UploadPurpose = options?.purpose || (options?.forCover ? "cover" : "content");
+
+  const compressed = await compressImage(file, { purpose });
 
   const formData = new FormData();
   formData.append("file", compressed);
+  formData.append("purpose", purpose);
 
   const res = await fetch("/api/admin/upload", {
     method: "POST",

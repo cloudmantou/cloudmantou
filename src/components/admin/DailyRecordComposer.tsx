@@ -51,9 +51,10 @@ export function DailyRecordComposer({ onSuccess, redirectToList = true }: Props)
   };
 
   const uploadPhoto = async (file: File) => {
-    const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 });
+    const compressed = await compressImage(file, { purpose: "daily" });
     const formData = new FormData();
     formData.append("file", compressed);
+    formData.append("purpose", "daily");
     const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
