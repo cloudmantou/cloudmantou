@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { decryptGatewaySecrets } from "@/lib/secret-crypto";
 
 export type AlipayGatewayConfig = {
   enabled: boolean;
@@ -15,6 +16,7 @@ export type WechatGatewayConfig = {
   mchId: string;
   apiKey: string;
   publicKey?: string;
+  platformSerial?: string;
 };
 
 export type PaymentRuntimeConfig = {
@@ -33,7 +35,8 @@ async function readGatewaySettings(): Promise<Record<string, Record<string, unkn
   const row = await prisma.siteSetting.findUnique({ where: { key: "paymentGateways" } });
   if (!row?.value) return {};
   try {
-    return JSON.parse(row.value);
+    const parsed = JSON.parse(row.value) as Record<string, Record<string, unknown>>;
+    return decryptGatewaySecrets(parsed);
   } catch {
     return {};
   }
@@ -87,6 +90,9 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
   const wechatPublicKey = String(
     wechatDb.publicKey || process.env.WECHAT_V3_PUBLIC_KEY || ""
   ).trim();
+  const wechatPlatformSerial = String(
+    wechatDb.platformSerial || process.env.WECHAT_V3_PLATFORM_SERIAL || ""
+  ).trim();
 
   const alipay: AlipayGatewayConfig | null =
     alipayEnabled && alipayAppId && alipayPrivateKey && alipayPublicKey
@@ -108,6 +114,7 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
           mchId: wechatMchId,
           apiKey: wechatApiKey,
           publicKey: wechatPublicKey || undefined,
+          platformSerial: wechatPlatformSerial || undefined,
         }
       : null;
 

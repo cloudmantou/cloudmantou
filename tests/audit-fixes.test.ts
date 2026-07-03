@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { rateLimit, checkRateLimit, getClientIP } from "@/lib/rate-limit";
+import { rateLimit, getClientIP } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit-server";
 import { NextRequest } from "next/server";
 
 /**
@@ -129,10 +130,10 @@ describe("checkRateLimit — 返回 429 响应", () => {
 
     // 用极小窗口和 limit=1 快速触发限流
     const config = { limit: 1, windowMs: 60_000 };
-    const first = checkRateLimit(req, config);
+    const first = await checkRateLimit(req, config);
     expect(first).toBeNull(); // 第一次允许
 
-    const second = checkRateLimit(req, config);
+    const second = await checkRateLimit(req, config);
     expect(second).not.toBeNull();
     expect(second!.status).toBe(429);
     expect(second!.headers.get("Retry-After")).not.toBeNull();
@@ -143,12 +144,12 @@ describe("checkRateLimit — 返回 429 响应", () => {
     expect(body.code).toBe(42900);
   });
 
-  it("未超限时返回 null", () => {
+  it("未超限时返回 null", async () => {
     const id = uniqueId("checkrl-ok");
     const req = new NextRequest("http://localhost/api/test", {
       headers: { "x-forwarded-for": id },
     });
-    const result = checkRateLimit(req, { limit: 100, windowMs: 60_000 });
+    const result = await checkRateLimit(req, { limit: 100, windowMs: 60_000 });
     expect(result).toBeNull();
   });
 });

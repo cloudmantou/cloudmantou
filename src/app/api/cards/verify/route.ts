@@ -4,7 +4,7 @@ import { fail, ok } from "@/lib/api-response";
 import { cardVerifySchema } from "@/lib/validators/card";
 import { auth } from "@/lib/auth";
 import { verifyCardSecret, hashCardSecret, isLegacyHash } from "@/lib/card-crypto";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 速率限制：每用户每 15 分钟最多 10 次卡密验证
-  const limited = checkRateLimit(req, RATE_LIMITS.CARD_VERIFY, session.user.id);
+  const limited = await checkRateLimit(req, RATE_LIMITS.CARD_VERIFY, session.user.id);
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);

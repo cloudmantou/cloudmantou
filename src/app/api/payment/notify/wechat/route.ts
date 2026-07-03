@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { verifyWechatSign, verifyWechatV3Sign, verifyAmount, grantEntitlement } from "@/lib/payment";
 
 /**
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
   let rawBody = "";
 
   try {
+    const paymentConfig = await getPaymentRuntimeConfig();
     rawBody = await req.text();
     let body: Record<string, any>;
     let isV3 = false;
@@ -37,20 +39,25 @@ export async function POST(req: NextRequest) {
       const signature = req.headers.get("wechatpay-signature") || "";
       const serial = req.headers.get("wechatpay-serial") || "";
 
-      const wechatPublicKey = process.env.WECHAT_V3_PUBLIC_KEY;
+      const wechatPublicKey = paymentConfig.wechat?.publicKey || process.env.WECHAT_V3_PUBLIC_KEY;
       if (!wechatPublicKey) {
         console.error("[WeChat] WECHAT_V3_PUBLIC_KEY not configured");
         return wechatV2Response("FAIL", "配置错误");
       }
 
-      if (!verifyWechatV3Sign(timestamp, nonce, rawBody, signature, serial, wechatPublicKey)) {
+      if (
+        !verifyWechatV3Sign(timestamp, nonce, rawBody, signature, serial, wechatPublicKey, {
+          expectedSerial: paymentConfig.wechat?.platformSerial,
+          maxSkewSec: 300,
+        })
+      ) {
         console.warn("[WeChat v3] Signature verification failed");
         return wechatV2Response("FAIL", "签名验证失败");
       }
 
       // v3 解密 resource
       if (body.resource) {
-        const apiKey = process.env.WECHAT_API_KEY;
+        const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
         if (!apiKey) {
           return wechatV2Response("FAIL", "配置错误");
         }
@@ -69,7 +76,7 @@ export async function POST(req: NextRequest) {
       }
 
       // v2 签名验证
-      const apiKey = process.env.WECHAT_API_KEY;
+      const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
       if (!apiKey) {
         console.error("[WeChat] WECHAT_API_KEY not configured");
         return wechatV2Response("FAIL", "配置错误");

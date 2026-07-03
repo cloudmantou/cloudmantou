@@ -2,6 +2,7 @@ import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import { decryptGatewaySecrets, encryptGatewaySecrets } from "@/lib/secret-crypto";
 import { z } from "zod";
 
 const GATEWAY_IDS = ["alipay", "wechat", "stripe", "usdt", "epay", "vpay"] as const;
@@ -15,6 +16,7 @@ const gatewaySchema = z.object({
   publicKey: z.string().optional(),
   mchId: z.string().optional(),
   apiV3Key: z.string().optional(),
+  platformSerial: z.string().optional(),
   publishableKey: z.string().optional(),
   secretKey: z.string().optional(),
   webhookSecret: z.string().optional(),
@@ -47,6 +49,17 @@ function defaultGateways() {
 }
 
 async function readGateways(): Promise<Record<string, Record<string, unknown>>> {
+  const row = await prisma.siteSetting.findUnique({ where: { key: "paymentGateways" } });
+  if (!row?.value) return defaultGateways();
+  try {
+    const parsed = JSON.parse(row.value) as Record<string, Record<string, unknown>>;
+    return { ...defaultGateways(), ...decryptGatewaySecrets(parsed) };
+  } catch {
+    return defaultGateways();
+  }
+}
+
+async function readGatewaysRaw(): Promise<Record<string, Record<string, unknown>>> {
   const row = await prisma.siteSetting.findUnique({ where: { key: "paymentGateways" } });
   if (!row?.value) return defaultGateways();
   try {
@@ -186,7 +199,8 @@ export async function PUT(req: NextRequest) {
       return fail(parsed.error.errors[0].message, 42200, 422);
     }
 
-    const existing = await readGateways();
+    const existing = await readGatewaysRaw();
+    const existingDecrypted = decryptGatewaySecrets(existing);
 
     if (typeof parsed.data.testMode === "boolean") {
       await prisma.siteSetting.upsert({
@@ -197,7 +211,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (parsed.data.gateways) {
-      const merged = { ...existing };
+      const merged = { ...existingDecrypted };
       for (const [id, patch] of Object.entries(parsed.data.gateways)) {
         const prev = (merged[id] || {}) as Record<string, unknown>;
         const next: Record<string, unknown> = { ...prev, ...patch };
@@ -208,10 +222,11 @@ export async function PUT(req: NextRequest) {
         }
         merged[id] = next;
       }
+      const encrypted = encryptGatewaySecrets(merged);
       await prisma.siteSetting.upsert({
         where: { key: "paymentGateways" },
-        update: { value: JSON.stringify(merged) },
-        create: { key: "paymentGateways", value: JSON.stringify(merged) },
+        update: { value: JSON.stringify(encrypted) },
+        create: { key: "paymentGateways", value: JSON.stringify(encrypted) },
       });
     }
 

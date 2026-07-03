@@ -35,7 +35,7 @@ const securityHeaders = [
       "connect-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
-      "form-action 'self'",
+      "form-action 'self' https://openapi.alipay.com https://openapi.alipaydev.com",
     ].join("; "),
   },
 ];
@@ -43,6 +43,7 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  serverExternalPackages: ["ioredis"],
   async headers() {
     return [
       {

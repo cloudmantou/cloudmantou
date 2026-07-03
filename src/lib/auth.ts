@@ -31,6 +31,7 @@ export const {
         const identifier = (credentials.email as string).trim();
 
         // 速率限制：每账号每 15 分钟最多 10 次登录尝试（防暴力破解）
+        // auth 模块会被 middleware 打包，登录限流使用内存实现（API 路由走 Redis）
         const rlResult = rateLimit(
           `login:${identifier.toLowerCase()}`,
           RATE_LIMITS.LOGIN.limit,

@@ -66,15 +66,38 @@ export function verifyWechatSign(
 
 // ===== 微信支付 v3 签名验证 (SHA256-RSA2048) =====
 
+export type WechatV3VerifyOptions = {
+  expectedSerial?: string;
+  maxSkewSec?: number;
+};
+
 export function verifyWechatV3Sign(
   timestamp: string,
   nonce: string,
   body: string,
   signature: string,
   serial: string,
-  wechatPublicKey: string
+  wechatPublicKey: string,
+  options: WechatV3VerifyOptions = {}
 ): boolean {
   try {
+    if (!timestamp || !nonce || !signature || !serial) return false;
+
+    const ts = Number(timestamp);
+    if (!Number.isFinite(ts)) return false;
+
+    const maxSkew = options.maxSkewSec ?? 300;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSec - ts) > maxSkew) {
+      console.warn("[WechatV3] Timestamp outside replay window");
+      return false;
+    }
+
+    if (options.expectedSerial && serial !== options.expectedSerial) {
+      console.warn("[WechatV3] Platform certificate serial mismatch");
+      return false;
+    }
+
     const message = `${timestamp}\n${nonce}\n${body}\n`;
     const verify = crypto.createVerify("RSA-SHA256");
     verify.update(message, "utf8");

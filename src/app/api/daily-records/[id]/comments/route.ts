@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
 import { getInitialCommentStatus } from "@/lib/site-settings";
 import { z } from "zod";
 
@@ -83,7 +83,7 @@ export async function POST(
       return fail("请先登录", 40100, 401);
     }
 
-    const limited = checkRateLimit(req, RATE_LIMITS.COMMENT, session.user.id);
+    const limited = await checkRateLimit(req, RATE_LIMITS.COMMENT, session.user.id);
     if (limited) return limited;
 
     const record = await prisma.dailyRecord.findUnique({

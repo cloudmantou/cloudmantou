@@ -3,7 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
 import { getSiteSettings } from "@/lib/site-settings";
 
 const registerSchema = z.object({
@@ -20,7 +20,7 @@ const registerSchema = z.object({
 export async function POST(req: Request) {
   try {
     // 速率限制：每 IP 每小时最多 5 次注册
-    const limited = checkRateLimit(req, RATE_LIMITS.REGISTER);
+    const limited = await checkRateLimit(req, RATE_LIMITS.REGISTER);
     if (limited) return limited;
 
     const settings = await getSiteSettings();

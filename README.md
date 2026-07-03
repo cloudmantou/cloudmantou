@@ -28,7 +28,9 @@
 | 站点设置联动 | ⚠️ 部分 | `openRegistration`、`commentReview`、`maintenanceMode` 已接入 |
 | 卡密套餐在线购买 | ❌ 未开放 | `CARD_PACKAGE` 下单返回暂未开放 |
 | Stripe / USDT / 易支付 | ❌ 未实现 | 后台字段预留，无运行时实现 |
-| Redis 限流 | ❌ 未接入 | 当前为进程内内存 Map |
+| Redis 限流 | ✅ 已接入 | API 路由在 `REDIS_URL` 可用时用 Redis；登录限流因 middleware 打包限制仍用内存 |
+| 支付密钥加密 | ✅ 已接入 | 后台网关密钥 AES-256-GCM 加密存储 |
+| 微信 V3 回调加固 | ⚠️ 部分 | 时间戳重放窗口 + 平台证书 serial 校验 |
 | 对象存储上传 | ❌ 未接入 | 图片仍写入本地 `public/uploads` |
 | 全文搜索引擎 | ❌ 未接入 | 当前为 Prisma `contains` 标题/摘要/正文 |
 | EDITOR 角色 | ❌ 未落地 | 枚举存在，发布权限仍仅 ADMIN |
@@ -100,6 +102,9 @@ SEED_ADMIN_PASSWORD=your-strong-password
 
 # 可选
 REDIS_URL=redis://localhost:6379
+TRUST_PROXY_HEADERS=false
+SETTINGS_ENCRYPTION_KEY=optional-dedicated-encryption-key
+WECHAT_V3_PLATFORM_SERIAL=wechat-platform-cert-serial
 ```
 
 支付相关变量见 `.env.example` 中的 `ALIPAY_*`、`WECHAT_*`。
@@ -150,9 +155,8 @@ docker-compose exec app npx prisma db seed
 
 ## 已知限制（生产前待办）
 
-- 限流迁移至 Redis，并仅信任可信反代 IP
-- 支付密钥加密存储与变更审计
-- 微信 V3 平台证书序列号、时间戳重放校验
-- 支付宝 form 提交与 CSP `form-action` 兼容性验证
+- 支付配置变更审计日志
+- 微信 V3 平台证书自动轮换（当前需手动更新 serial/公钥）
+- 支付宝 form 提交需在真实浏览器验证 CSP 放行效果
 - 上传迁移至 OSS/S3，增加魔数校验与重编码
 - API 集成测试与 Playwright E2E 覆盖购买/兑换闭环
