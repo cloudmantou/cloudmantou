@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
+  PenLine,
   Settings,
   ShoppingCart,
   Users,
@@ -42,6 +43,7 @@ const navGroups: NavGroup[] = [
   {
     title: "内容管理",
     items: [
+      { href: "/admin/posts/new", label: "发布文章", icon: PenLine },
       { href: "/admin/posts", label: "文章管理", icon: FileText },
       { href: "/admin/comments", label: "评论管理", icon: MessageSquare },
       { href: "/admin/categories", label: "分类标签", icon: FolderOpen },
@@ -83,6 +85,10 @@ const pageTitles: Record<string, string> = {
   "/admin/settings": "系统设置",
 };
 
+function isEditorRoute(pathname: string) {
+  return pathname === "/admin/posts/new" || /\/admin\/posts\/[^/]+\/edit$/.test(pathname);
+}
+
 function resolveTitle(pathname: string) {
   if (pathname.includes("/admin/posts/new")) return "新建文章";
   if (pathname.includes("/admin/posts/") && pathname.endsWith("/edit")) return "编辑文章";
@@ -95,19 +101,10 @@ function resolveTitle(pathname: string) {
   return "后台管理";
 }
 
-function isEditorRoute(pathname: string) {
-  return /^\/admin\/posts\/(new|[^/]+\/edit)$/.test(pathname);
-}
-
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/admin";
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const editorMode = isEditorRoute(pathname);
-
-  if (editorMode) {
-    return <div className="admin-root admin-editor-bleed">{children}</div>;
-  }
 
   const title = resolveTitle(pathname);
   const displayName = session?.user?.nickname || session?.user?.username || "管理员";
@@ -136,9 +133,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <p className="admin-nav-group-title">{group.title}</p>
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = item.exact
-                  ? pathname === item.href
-                  : pathname.startsWith(item.href) && item.href !== "/admin";
+                const active =
+                  item.href === "/admin/posts/new"
+                    ? isEditorRoute(pathname)
+                    : item.href === "/admin/posts"
+                      ? pathname.startsWith("/admin/posts") && !isEditorRoute(pathname)
+                      : item.exact
+                        ? pathname === item.href
+                        : pathname.startsWith(item.href) && item.href !== "/admin";
                 const isDashboard = item.exact && pathname === "/admin";
 
                 return (

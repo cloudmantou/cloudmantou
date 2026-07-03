@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Send, ChevronDown, ImagePlus, Code2, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { Save, Send, ImagePlus, Code2, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import { uploadImageFile } from "@/lib/upload-image-client";
@@ -61,8 +60,6 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const [slugEdited, setSlugEdited] = useState(mode === "edit");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [tagInput, setTagInput] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
 
@@ -139,11 +136,6 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
       if (md) insertText(`${md}\n\n`, pos);
     }
   };
-
-  useEffect(() => {
-    document.body.classList.toggle("editor-focus-mode", focusMode);
-    return () => document.body.classList.remove("editor-focus-mode");
-  }, [focusMode]);
 
   const handleContentChange = (val: string | undefined) => {
     const v = val || "";
@@ -310,94 +302,38 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     { ok: charCount >= 300, warn: charCount > 0 && charCount < 300, no: charCount === 0, text: `内容字数${charCount === 0 ? "为空" : charCount < 300 ? "偏少" : "达标"}` },
   ];
 
-  return (
-    <div className="editor-page">
-      {/* Topbar */}
-      <header className="editor-topbar">
-        <div className="editor-topbar-left">
-          <Link href="/admin/posts" className="back-btn">
-            <ArrowLeft size={14} aria-hidden="true" />
-            返回
-          </Link>
-          <div className="editor-title-area">
-            <h1>{mode === "create" ? "新建文章" : "编辑文章"}</h1>
-            <div className="doc-status">
-              <div className={`status-dot ${saveState}`}></div>
-              <span>
-                {saveState === "saved" && "已自动保存"}
-                {saveState === "saving" && "正在保存…"}
-                {saveState === "unsaved" && "未保存"}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="editor-topbar-right">
-          <button
-            type="button"
-            onClick={() => setFocusMode((v) => !v)}
-            className={`e-btn e-btn-ghost e-btn-sm${focusMode ? " active" : ""}`}
-          >
-            ◎ {focusMode ? "退出专注" : "专注模式"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="e-btn e-btn-ghost e-btn-sm sidebar-toggle-btn"
-          >
-            ⚙ 设置
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave("DRAFT")}
-            disabled={isPending}
-            className="e-btn e-btn-ghost e-btn-sm"
-          >
-            <Save size={13} aria-hidden="true" />
-            保存草稿
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(isPaid ? "PAID_ONLY" : "PUBLISHED")}
-            disabled={isPending}
-            className="e-btn e-btn-accent e-btn-sm"
-          >
-            <Send size={13} aria-hidden="true" />
-            {isPaid ? "发布付费" : "发布文章"}
-            <span className="kbd-hint">⌘↵</span>
-          </button>
-        </div>
-      </header>
+  const saveStateLabel =
+    saveState === "saved"
+      ? "草稿 · 已自动保存"
+      : saveState === "saving"
+        ? "正在保存…"
+        : "草稿 · 未保存";
 
+  return (
+    <div className="post-editor-root">
       {error && <div className="editor-error">{error}</div>}
 
-      {/* Layout */}
-      <div className="editor-layout">
-        {/* Main */}
-        <div className="editor-main">
-          {/* Title */}
-          <div className="title-input-wrap">
-            <input
-              type="text"
-              className="title-input"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                // SEO 标题只在用户未手动编辑过时跟随 title 变化
-                if (!seoTitle || seoTitle === initialData?.title || seoTitle === "") {
-                  setSeoTitle(e.target.value);
-                }
-              }}
-              placeholder="输入文章标题…"
-            />
-          </div>
+      <div className="editor-container">
+        <div className="editor-main-card">
+          <input
+            type="text"
+            className="editor-title-input"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (!seoTitle || seoTitle === initialData?.title || seoTitle === "") {
+                setSeoTitle(e.target.value);
+              }
+            }}
+            placeholder="输入文章标题..."
+          />
 
-          {/* Slug */}
-          <div className="slug-bar">
-            <span>URL:</span>
-            <span style={{ color: "var(--e-text-muted)" }}>/posts/</span>
+          <div className="editor-slug-bar">
+            <span>URL</span>
+            <span className="editor-slug-prefix">/post/</span>
             <input
               type="text"
-              className="slug-input"
+              className="editor-slug-input"
               value={slug}
               onChange={(e) => {
                 setSlug(e.target.value);
@@ -406,7 +342,6 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             />
           </div>
 
-          {/* Markdown editor */}
           <div className="editor-insert-bar">
             <button
               type="button"
@@ -463,8 +398,8 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             <MDEditor
               value={content}
               onChange={handleContentChange}
-              height={focusMode ? 640 : 520}
-              preview={focusMode ? "edit" : "live"}
+              height={480}
+              preview="live"
               textareaProps={{
                 onSelect: (e) => {
                   const ta = e.currentTarget;
@@ -476,224 +411,88 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             />
           </div>
 
-          {/* Excerpt & Cover (放在主编辑区下方) */}
-          <div className="editor-extra">
-            <div>
-              <label className="form-label" style={{ color: "var(--e-text-muted)" }}>
-                文章摘要 · 用于列表和 RSS
-              </label>
-              <textarea
-                value={excerpt}
-                onChange={(e) => setExcerpt(e.target.value)}
-                placeholder="一句话总结这篇文章..."
-                rows={2}
-              />
-            </div>
-            <div>
-              <label className="form-label" style={{ color: "var(--e-text-muted)" }}>
-                封面图 URL（可选）
-              </label>
-              <div className="cover-url-row">
+          {isPaid && (
+            <div className="editor-paid-block">
+              <div className="form-group">
+                <label className="form-label">付费价格 (元)</label>
                 <input
-                  type="url"
-                  value={coverImage}
-                  onChange={(e) => setCoverImage(e.target.value)}
-                  placeholder="https://... 或点击侧栏上传"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="form-input"
+                  value={paidPrice}
+                  onChange={(e) => setPaidPrice(e.target.value)}
+                  placeholder="9.90"
                 />
-                <button
-                  type="button"
-                  className="e-btn e-btn-ghost e-btn-sm"
-                  onClick={() => coverInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  上传
-                </button>
+              </div>
+              <div className="form-group">
+                <label className="form-label">付费内容 (Markdown)</label>
+                <textarea
+                  className="form-textarea"
+                  value={paidContent}
+                  onChange={(e) => setPaidContent(e.target.value)}
+                  placeholder="付费章节内容..."
+                  rows={5}
+                />
               </div>
             </div>
-            {isPaid && (
-              <div
-                style={{
-                  background: "var(--e-accent-glow)",
-                  border: "1px solid var(--e-accent)",
-                  borderRadius: "var(--e-radius-sm)",
-                  padding: 16,
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div>
-                    <label className="form-label" style={{ color: "var(--e-accent-light)" }}>
-                      付费价格 (元)
-                    </label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={paidPrice}
-                      onChange={(e) => setPaidPrice(e.target.value)}
-                      placeholder="9.90"
-                      style={{
-                        width: "100%",
-                        padding: "9px 12px",
-                        background: "var(--e-surface)",
-                        border: "1px solid var(--e-border)",
-                        borderRadius: "var(--e-radius-xs)",
-                        color: "var(--e-text)",
-                        fontFamily: "JetBrains Mono, monospace",
-                        fontSize: 13,
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ color: "var(--e-accent-light)" }}>
-                      付费内容 (Markdown)
-                    </label>
-                    <textarea
-                      value={paidContent}
-                      onChange={(e) => setPaidContent(e.target.value)}
-                      placeholder="付费章节内容..."
-                      rows={6}
-                      style={{
-                        width: "100%",
-                        padding: "10px 12px",
-                        background: "var(--e-surface)",
-                        border: "1px solid var(--e-border)",
-                        borderRadius: "var(--e-radius-xs)",
-                        color: "var(--e-text)",
-                        fontFamily: "inherit",
-                        fontSize: 13,
-                        outline: "none",
-                        resize: "vertical",
-                        minHeight: 120,
-                        lineHeight: 1.55,
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Sidebar */}
-        <aside className={`editor-sidebar${sidebarOpen ? " open" : ""}`}>
-          {/* Publish Settings */}
-          <SidebarSection title="📝 发布设置" defaultOpen>
+        <aside className="editor-sidebar-stack">
+          <div className="publish-box">
+            <h4>发布设置</h4>
+            <div className="editor-status-indicator">
+              <div className={`status-dot ${saveState}`} />
+              <span>{saveStateLabel}</span>
+            </div>
             <div className="form-group">
-              <label className="form-label">文章状态</label>
+              <label className="form-label">访问权限</label>
               <select
                 className="form-select"
-                value={isPaid ? "paid" : "draft"}
-                onChange={() => {}}
-                disabled
-                style={{ opacity: 0.7 }}
+                value={isPaid ? "paid" : "public"}
+                onChange={(e) => setIsPaid(e.target.value === "paid")}
               >
-                <option value="draft">草稿</option>
-                <option value="published">已发布</option>
+                <option value="public">公开</option>
                 <option value="paid">付费</option>
               </select>
-              <div style={{ fontSize: 10, color: "var(--e-text-muted)", marginTop: 4 }}>
-                点击右上「发布文章」/「保存草稿」切换
-              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">文章分类</label>
-              <select
-                className="form-select"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+            <div className="toggle-row">
+              <span className="toggle-label">置顶文章</span>
+              <button
+                type="button"
+                className={`e-toggle${isTop ? " on" : ""}`}
+                onClick={() => setIsTop(!isTop)}
+                aria-pressed={isTop}
+                aria-label="置顶文章"
+              />
+            </div>
+            <div className="editor-publish-actions">
+              <button
+                type="button"
+                onClick={() => handleSave("DRAFT")}
+                disabled={isPending}
+                className="e-btn e-btn-ghost e-btn-sm"
               >
-                <option value="">选择分类...</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <Save size={13} aria-hidden="true" />
+                存草稿
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave(isPaid ? "PAID_ONLY" : "PUBLISHED")}
+                disabled={isPending}
+                className="e-btn e-btn-accent e-btn-sm"
+              >
+                <Send size={13} aria-hidden="true" />
+                {isPaid ? "发布付费" : "发布"}
+              </button>
             </div>
-          </SidebarSection>
+          </div>
 
-          {/* Tags */}
-          <SidebarSection title="🏷 标签" defaultOpen>
-            <div className="form-group">
-              <div className="tags-container" onClick={() => {}}>
-                {selectedTagIds.map((id) => {
-                  const tag = tags.find((t) => t.id === id);
-                  if (!tag) return null;
-                  return (
-                    <span key={id} className="tag-chip">
-                      {tag.name}
-                      <button
-                        type="button"
-                        className="tag-remove"
-                        onClick={() => toggleTag(id)}
-                        aria-label={`移除 ${tag.name}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  );
-                })}
-                <input
-                  type="text"
-                  className="tag-input"
-                  placeholder="搜索标签..."
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTagFromInput();
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    minWidth: 80,
-                    border: "none",
-                    outline: "none",
-                    background: "transparent",
-                    color: "var(--e-text)",
-                    fontFamily: "inherit",
-                    fontSize: 12,
-                  }}
-                />
-              </div>
-            </div>
-            {/* 可选标签 */}
-            {tags.length > 0 && (
-              <div className="form-group">
-                <label className="form-label">可选标签</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {tags
-                    .filter((t) => !selectedTagIds.includes(t.id))
-                    .map((tag) => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => toggleTag(tag.id)}
-                        style={{
-                          padding: "3px 8px",
-                          background: "transparent",
-                          border: "1px solid var(--e-border)",
-                          borderRadius: 4,
-                          fontSize: 11,
-                          color: "var(--e-text-muted)",
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        + {tag.name}
-                      </button>
-                    ))}
-                </div>
-              </div>
-            )}
-          </SidebarSection>
-
-          {/* Cover */}
-          <SidebarSection title="🖼 封面图片">
+          <div className="publish-box">
+            <h4>封面图</h4>
             <div
-              className={`cover-upload${coverImage ? " has-image" : ""}`}
+              className={`cover-upload cover-upload-wide${coverImage ? " has-image" : ""}`}
               onClick={() => coverInputRef.current?.click()}
             >
               <input
@@ -708,6 +507,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               />
               {coverImage ? (
                 <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={coverImage} alt="cover" onError={(e) => (e.currentTarget.style.display = "none")} />
                   <div className="cover-overlay">
                     <button
@@ -734,29 +534,94 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 </>
               ) : (
                 <div className="cover-upload-text">
-                  <strong>点击上传封面</strong>
-                  自动压缩 · 推荐 1200×630px
+                  <strong>📷 点击上传封面图</strong>
+                  推荐 1200×630px · 自动压缩
                 </div>
               )}
             </div>
-          </SidebarSection>
+          </div>
 
-          {/* SEO */}
-          <SidebarSection title="🔍 SEO 设置" defaultOpen>
+          <div className="publish-box">
+            <h4>分类</h4>
+            <select
+              className="form-select"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">选择分类...</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="publish-box">
+            <h4>标签</h4>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="搜索标签，回车添加"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTagFromInput();
+                }
+              }}
+            />
+            <div className="editor-tag-chips">
+              {selectedTagIds.map((id) => {
+                const tag = tags.find((t) => t.id === id);
+                if (!tag) return null;
+                return (
+                  <button key={id} type="button" className="editor-tag-badge" onClick={() => toggleTag(id)}>
+                    {tag.name} ×
+                  </button>
+                );
+              })}
+            </div>
+            {tags.length > 0 && (
+              <div className="editor-tag-suggestions">
+                {tags
+                  .filter((t) => !selectedTagIds.includes(t.id))
+                  .slice(0, 8)
+                  .map((tag) => (
+                    <button key={tag.id} type="button" className="editor-tag-suggest" onClick={() => toggleTag(tag.id)}>
+                      + {tag.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          <div className="publish-box">
+            <h4>摘要</h4>
+            <textarea
+              className="form-textarea"
+              value={excerpt}
+              onChange={(e) => setExcerpt(e.target.value)}
+              placeholder="用于列表和 RSS 的一句话摘要"
+              rows={3}
+            />
+          </div>
+
+          <div className="publish-box">
+            <h4>SEO</h4>
             <div className="seo-preview">
               <div className="seo-preview-title">{seoTitle || "文章标题"}</div>
               <div className="seo-preview-url">
                 https://{typeof window !== "undefined" ? window.location.host : "site"}
-                /posts/{slug || "url-slug"}
+                /post/{slug || "url-slug"}
               </div>
-              <div className="seo-preview-desc">{seoDesc || "文章摘要会显示在搜索结果中…"}</div>
+              <div className="seo-preview-desc">{seoDesc || excerpt || "文章摘要会显示在搜索结果中…"}</div>
             </div>
             <div className="form-group">
               <label className="form-label">
                 SEO 标题
-                <span className="field-counter">
-                  {seoTitle.length}/{SEO_TITLE_LIMIT}
-                </span>
+                <span className="field-counter">{seoTitle.length}/{SEO_TITLE_LIMIT}</span>
               </label>
               <input
                 type="text"
@@ -764,15 +629,13 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 value={seoTitle}
                 onChange={(e) => setSeoTitle(e.target.value)}
                 maxLength={SEO_TITLE_LIMIT}
-                placeholder="搜索引擎显示的标题"
+                placeholder="自定义 SEO 标题"
               />
             </div>
             <div className="form-group">
               <label className="form-label">
-                Meta 描述
-                <span className="field-counter">
-                  {seoDesc.length}/{SEO_DESC_LIMIT}
-                </span>
+                SEO 描述
+                <span className="field-counter">{seoDesc.length}/{SEO_DESC_LIMIT}</span>
               </label>
               <textarea
                 className="form-textarea"
@@ -780,144 +643,34 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 onChange={(e) => setSeoDesc(e.target.value)}
                 maxLength={SEO_DESC_LIMIT}
                 rows={3}
-                placeholder="~160 字符最佳"
+                placeholder="自定义 SEO 描述"
               />
             </div>
-            <div className="form-group">
-              <label className="form-label">焦点关键词</label>
-              <input
-                type="text"
-                className="form-input"
-                value={seoKeyword}
-                onChange={(e) => setSeoKeyword(e.target.value)}
-                placeholder="如: Next.js, React"
-              />
-            </div>
-          </SidebarSection>
+          </div>
 
-          {/* Options */}
-          <SidebarSection title="⚙ 文章选项" defaultOpen>
-            <div className="toggle-row">
-              <span className="toggle-label">置顶文章</span>
-              <button
-                type="button"
-                className={`e-toggle${isTop ? " on" : ""}`}
-                onClick={() => setIsTop(!isTop)}
-                aria-pressed={isTop}
-                aria-label="置顶文章"
-              />
-            </div>
-            <div className="toggle-row">
-              <span className="toggle-label">付费阅读</span>
-              <button
-                type="button"
-                className={`e-toggle${isPaid ? " on" : ""}`}
-                onClick={() => setIsPaid(!isPaid)}
-                aria-pressed={isPaid}
-                aria-label="付费阅读"
-              />
-            </div>
-            <div className="toggle-row">
-              <span className="toggle-label">开启评论</span>
-              <button type="button" className="e-toggle on" aria-label="开启评论" />
-            </div>
-            <div className="toggle-row">
-              <span className="toggle-label">允许转载</span>
-              <button type="button" className="e-toggle on" aria-label="允许转载" />
-            </div>
-          </SidebarSection>
-
-          {/* Stats */}
-          <SidebarSection title="📊 文章统计">
+          <div className="publish-box">
+            <h4>文章统计</h4>
             <div className="word-count-bar">
               <div className="word-count-item">
                 <div className="word-count-num">{charCount.toLocaleString()}</div>
                 <div className="word-count-label">字符</div>
               </div>
               <div className="word-count-item">
-                <div className="word-count-num">{wordCount.toLocaleString()}</div>
-                <div className="word-count-label">字数</div>
-              </div>
-              <div className="word-count-item">
                 <div className="word-count-num">{readTime}</div>
-                <div className="word-count-label">分钟阅读</div>
-              </div>
-              <div className="word-count-item">
-                <div className="word-count-num">{headCount}</div>
-                <div className="word-count-label">标题数</div>
+                <div className="word-count-label">分钟</div>
               </div>
             </div>
-            <div className="word-goal">
-              <div className="word-goal-bar">
-                <div className="word-goal-fill" style={{ width: `${wordGoalPct}%` }} />
-              </div>
-              <div className="word-goal-text">目标 1000 字 · 已完成 {wordGoalPct}%</div>
-            </div>
-          </SidebarSection>
-
-          {/* Checklist */}
-          <SidebarSection title="✅ 发布检查">
-            <div className="checklist">
-              {checklist.map((item, i) => (
+            <div className="checklist compact">
+              {checklist.slice(0, 4).map((item, i) => (
                 <div key={i} className="checklist-item">
-                  <span
-                    className={`check-icon ${
-                      item.ok ? "ok" : item.warn ? "warn" : "no"
-                    }`}
-                  >
-                    ●
-                  </span>
+                  <span className={`check-icon ${item.ok ? "ok" : item.warn ? "warn" : "no"}`}>●</span>
                   {item.text}
                 </div>
               ))}
             </div>
-          </SidebarSection>
-
-          {/* History */}
-          <SidebarSection title="🕐 修改历史" defaultOpen>
-            <div className="history-item">
-              <div className="history-dot" style={{ background: "var(--e-success)" }} />
-              <div>
-                <div>{mode === "create" ? "已创建" : "最近编辑"}</div>
-                <div className="history-time">刚刚</div>
-              </div>
-            </div>
-            <div className="history-item">
-              <div className="history-dot" />
-              <div>
-                <div>草稿</div>
-                <div className="history-time">{new Date().toLocaleString("zh-CN")}</div>
-              </div>
-            </div>
-            <div style={{ fontSize: 10, color: "var(--e-text-muted)", marginTop: 8, lineHeight: 1.5 }}>
-              完整历史功能需要服务端实现 PostRevision 模型。
-            </div>
-          </SidebarSection>
+          </div>
         </aside>
       </div>
-    </div>
-  );
-}
-
-function SidebarSection({
-  title,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className={`sidebar-section${open ? "" : " collapsed"}`}>
-      <div className="sidebar-section-header" onClick={() => setOpen(!open)}>
-        <span className="sidebar-section-title">{title}</span>
-        <span className="sidebar-section-toggle">
-          <ChevronDown size={12} />
-        </span>
-      </div>
-      {open && <div className="sidebar-section-body">{children}</div>}
     </div>
   );
 }
