@@ -28,7 +28,7 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError("邮箱或密码错误");
+        setError("用户名或密码错误");
       } else {
         router.push(callbackUrl);
         router.refresh();
@@ -48,15 +48,15 @@ function LoginForm() {
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-field">
-          <label htmlFor="email">邮箱</label>
+          <label htmlFor="email">用户名或邮箱</label>
           <input
             id="email"
-            type="email"
+            type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="请输入邮箱"
+            placeholder="admin"
             required
-            autoComplete="email"
+            autoComplete="username"
           />
         </div>
 

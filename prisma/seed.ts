@@ -63,7 +63,7 @@ async function main() {
   });
 
   // 管理员账号 — 密码从环境变量读取，缺失时使用开发默认值并打印警告
-  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD || "Adm1n!Cloud#2026";
+  const seedAdminPassword = process.env.SEED_ADMIN_PASSWORD || "admin123";
   if (!process.env.SEED_ADMIN_PASSWORD) {
     console.warn("⚠️  SEED_ADMIN_PASSWORD 未设置，使用开发默认密码。生产环境请通过环境变量配置强密码。");
   }

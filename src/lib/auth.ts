@@ -28,11 +28,11 @@ export const {
           return null;
         }
 
-        const email = credentials.email as string;
+        const identifier = (credentials.email as string).trim();
 
-        // 速率限制：每邮箱每 15 分钟最多 10 次登录尝试（防暴力破解）
+        // 速率限制：每账号每 15 分钟最多 10 次登录尝试（防暴力破解）
         const rlResult = rateLimit(
-          `login:${email.toLowerCase()}`,
+          `login:${identifier.toLowerCase()}`,
           RATE_LIMITS.LOGIN.limit,
           RATE_LIMITS.LOGIN.windowMs
         );
@@ -40,8 +40,10 @@ export const {
           throw new Error("登录尝试过于频繁，请稍后再试");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
+        const user = await prisma.user.findFirst({
+          where: identifier.includes("@")
+            ? { email: identifier }
+            : { username: identifier },
         });
 
         if (!user) return null;
