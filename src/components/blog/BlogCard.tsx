@@ -5,22 +5,25 @@ import { AccentTag } from "@/components/ui/AccentTag";
 type BlogCardProps = {
   post: BlogPost;
   index?: number;
-  onOpen: (post: BlogPost) => void;
 };
 
-export function BlogCard({ post, index = 0, onOpen }: BlogCardProps) {
+export function BlogCard({ post, index = 0 }: BlogCardProps) {
   return (
-    <button
+    <article
       className="blog-card fade-up"
       style={{ animationDelay: `${index * 70}ms` }}
-      type="button"
-      onClick={() => onOpen(post)}
     >
       <span className="blog-cover" style={{ backgroundImage: post.cover }}>
         <span>{post.icon}</span>
       </span>
       <span className="blog-body">
         <span className="blog-meta">
+          {post.categoryName ? (
+            <>
+              <span className="blog-category-pill">{post.categoryName}</span>
+              <span className="meta-dot" />
+            </>
+          ) : null}
           <span>{post.date}</span>
           <span className="meta-dot" />
           <Timer size={13} aria-hidden="true" />
@@ -42,6 +45,6 @@ export function BlogCard({ post, index = 0, onOpen }: BlogCardProps) {
         <strong className="blog-title">{post.title}</strong>
         <span className="blog-excerpt">{post.excerpt}</span>
       </span>
-    </button>
+    </article>
   );
 }

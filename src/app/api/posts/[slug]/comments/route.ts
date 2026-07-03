@@ -64,6 +64,10 @@ export async function GET(
       take: limit + 1, // fetch one extra to check if there's more
     });
 
+    const totalCount = await prisma.comment.count({
+      where: { postId: post.id, parentId: null, status: "APPROVED" },
+    });
+
     const hasMore = comments.length > limit;
     const items = hasMore ? comments.slice(0, limit) : comments;
     const nextCursor = hasMore ? items[items.length - 1].createdAt.toISOString() : null;
@@ -90,6 +94,7 @@ export async function GET(
 
     return ok({
       comments: formatted,
+      totalCount,
       nextCursor,
       hasMore,
     });

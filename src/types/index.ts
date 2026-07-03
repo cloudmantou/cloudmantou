@@ -12,6 +12,7 @@ export type PostTag = {
 export type BlogPost = {
   id: string;
   category: Exclude<BlogCategory, "all">;
+  categoryName?: string;
   title: string;
   excerpt: string;
   date: string;
@@ -34,6 +35,7 @@ export type Product = {
   badge: string;
   accent: Accent;
   cover: string;
+  productType?: "VIP_MONTH" | "VIP_QUARTER" | "VIP_YEAR" | "PAID_POST" | "CARD_PACKAGE";
 };
 
 export type MoodType = "happy" | "productive" | "tired" | "excited" | "chill";

@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Send, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Send, ChevronDown, ImagePlus, Code2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { htmlToMarkdown } from "@/lib/html-to-markdown";
+import { uploadImageFile } from "@/lib/upload-image-client";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -60,6 +62,108 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [tagInput, setTagInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  const slashItems = [
+    { id: "h2", label: "标题 2", desc: "章节标题", insert: "## 章节标题\n\n" },
+    { id: "h3", label: "标题 3", desc: "子章节标题", insert: "### 子章节\n\n" },
+    { id: "quote", label: "引用", desc: "引用块", insert: "> 引用内容\n\n" },
+    { id: "code-ts", label: "TypeScript", desc: "代码块", insert: "```typescript\n\n```\n\n" },
+    { id: "code-js", label: "JavaScript", desc: "代码块", insert: "```javascript\n\n```\n\n" },
+    { id: "code-go", label: "Go", desc: "代码块", insert: "```go\n\n```\n\n" },
+    { id: "code-bash", label: "Bash", desc: "代码块", insert: "```bash\n\n```\n\n" },
+    { id: "list", label: "列表", desc: "无序列表", insert: "- 列表项 1\n- 列表项 2\n\n" },
+    { id: "img", label: "图片", desc: "上传或粘贴图片", insert: "![描述](https://)\n\n" },
+  ];
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+
+  const insertText = useCallback((text: string, at?: { start: number; end: number }) => {
+    const pos = at ?? selection;
+    setContent((prev) => prev.slice(0, pos.start) + text + prev.slice(pos.end));
+    const next = pos.start + text.length;
+    setSelection({ start: next, end: next });
+  }, [selection]);
+
+  const handleImageFiles = async (files: FileList | null, forCover = false) => {
+    if (!files?.length) return;
+    setUploading(true);
+    setError("");
+    try {
+      const file = files[0];
+      const url = await uploadImageFile(file, { forCover });
+      if (forCover) {
+        setCoverImage(url);
+      } else {
+        const alt = file.name.replace(/\.[^.]+$/, "") || "image";
+        insertText(`\n![${alt}](${url})\n\n`);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "图片上传失败");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const ta = e.currentTarget;
+    const pos = { start: ta.selectionStart, end: ta.selectionEnd };
+    const clipboard = e.clipboardData;
+    const imageItem = Array.from(clipboard.items).find((item) =>
+      item.type.startsWith("image/")
+    );
+    const imageFile = imageItem?.getAsFile();
+    if (imageFile) {
+      e.preventDefault();
+      setUploading(true);
+      try {
+        const url = await uploadImageFile(imageFile);
+        insertText(`\n![paste](${url})\n\n`, pos);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "图片粘贴失败");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    const html = clipboard.getData("text/html");
+    if (html && /<(?:p|h\d|ul|ol|li|pre|blockquote|img|table|div|br|strong|em)\b/i.test(html)) {
+      e.preventDefault();
+      const md = htmlToMarkdown(html);
+      if (md) insertText(`${md}\n\n`, pos);
+    }
+  };
+
+  useEffect(() => {
+    document.body.classList.toggle("editor-focus-mode", focusMode);
+    return () => document.body.classList.remove("editor-focus-mode");
+  }, [focusMode]);
+
+  const handleContentChange = (val: string | undefined) => {
+    const v = val || "";
+    setContent(v);
+    if (v.endsWith("/")) {
+      const before = v.slice(0, -1);
+      if (before.length === 0 || /[\s\n]$/.test(before)) {
+        setSlashOpen(true);
+        setSlashIndex(0);
+        return;
+      }
+    }
+    setSlashOpen(false);
+  };
+
+  const insertSlash = (insert: string) => {
+    const trimmed = content.endsWith("/") ? content.slice(0, -1) : content;
+    setContent(trimmed + insert);
+    setSlashOpen(false);
+  };
 
   // Load categories and tags
   useEffect(() => {
@@ -230,6 +334,13 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
         <div className="editor-topbar-right">
           <button
             type="button"
+            onClick={() => setFocusMode((v) => !v)}
+            className={`e-btn e-btn-ghost e-btn-sm${focusMode ? " active" : ""}`}
+          >
+            ◎ {focusMode ? "退出专注" : "专注模式"}
+          </button>
+          <button
+            type="button"
             onClick={() => setSidebarOpen((v) => !v)}
             className="e-btn e-btn-ghost e-btn-sm sidebar-toggle-btn"
           >
@@ -296,12 +407,72 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           </div>
 
           {/* Markdown editor */}
-          <div className="editor-md-wrap" data-color-mode="dark">
+          <div className="editor-insert-bar">
+            <button
+              type="button"
+              className="editor-insert-btn"
+              onClick={() => insertText("```typescript\n\n```\n\n")}
+            >
+              <Code2 size={13} aria-hidden="true" />
+              代码块
+            </button>
+            <button
+              type="button"
+              className="editor-insert-btn"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+              上传图片
+            </button>
+            <span className="editor-insert-hint">
+              支持粘贴富文本 / 截图，自动转 Markdown 并压缩图片
+            </span>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                handleImageFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          <div className="editor-md-wrap" data-color-mode="dark" style={{ position: "relative" }}>
+            {slashOpen && (
+              <div className="slash-menu show" role="listbox">
+                <div className="slash-menu-title">插入内容</div>
+                {slashItems.map((item, i) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`slash-item${i === slashIndex ? " focus" : ""}`}
+                    onClick={() => insertSlash(item.insert)}
+                    onMouseEnter={() => setSlashIndex(i)}
+                  >
+                    <div className="slash-icon">{item.id === "h2" ? "H" : item.id === "h3" ? "H3" : item.id === "img" ? "🖼" : "¶"}</div>
+                    <div>
+                      <div className="slash-label">{item.label}</div>
+                      <div className="slash-desc">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
             <MDEditor
               value={content}
-              onChange={(val) => setContent(val || "")}
-              height={520}
-              preview="live"
+              onChange={handleContentChange}
+              height={focusMode ? 640 : 520}
+              preview={focusMode ? "edit" : "live"}
+              textareaProps={{
+                onSelect: (e) => {
+                  const ta = e.currentTarget;
+                  setSelection({ start: ta.selectionStart, end: ta.selectionEnd });
+                },
+                onPaste: handlePaste,
+                placeholder: "支持 Markdown · 输入 / 插入块 · 粘贴富文本或截图",
+              }}
             />
           </div>
 
@@ -322,12 +493,22 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               <label className="form-label" style={{ color: "var(--e-text-muted)" }}>
                 封面图 URL（可选）
               </label>
-              <input
-                type="url"
-                value={coverImage}
-                onChange={(e) => setCoverImage(e.target.value)}
-                placeholder="https://..."
-              />
+              <div className="cover-url-row">
+                <input
+                  type="url"
+                  value={coverImage}
+                  onChange={(e) => setCoverImage(e.target.value)}
+                  placeholder="https://... 或点击侧栏上传"
+                />
+                <button
+                  type="button"
+                  className="e-btn e-btn-ghost e-btn-sm"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  上传
+                </button>
+              </div>
             </div>
             {isPaid && (
               <div
@@ -513,11 +694,18 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           <SidebarSection title="🖼 封面图片">
             <div
               className={`cover-upload${coverImage ? " has-image" : ""}`}
-              onClick={() => {
-                const url = prompt("输入封面图 URL：", coverImage || "https://");
-                if (url !== null) setCoverImage(url);
-              }}
+              onClick={() => coverInputRef.current?.click()}
             >
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(e) => {
+                  handleImageFiles(e.target.files, true);
+                  e.target.value = "";
+                }}
+              />
               {coverImage ? (
                 <>
                   <img src={coverImage} alt="cover" onError={(e) => (e.currentTarget.style.display = "none")} />
@@ -527,8 +715,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                       className="cover-overlay-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const url = prompt("更换封面：", coverImage);
-                        if (url !== null) setCoverImage(url);
+                        coverInputRef.current?.click();
                       }}
                     >
                       更换
@@ -547,8 +734,8 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 </>
               ) : (
                 <div className="cover-upload-text">
-                  <strong>点击设置封面图片</strong>
-                  推荐 1200×630px
+                  <strong>点击上传封面</strong>
+                  自动压缩 · 推荐 1200×630px
                 </div>
               )}
             </div>
