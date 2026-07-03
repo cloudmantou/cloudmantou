@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { Heart, MessageCircle, MapPin, Loader2, Plus, Image as ImageIcon } from "lucide-react";
+import { isAdminRole } from "@/lib/roles";
 
 type RecordItem = {
   id: string;
@@ -32,6 +34,7 @@ const FILTERS = [
 
 export default function DailyRecordsPage() {
   const { data: session } = useSession();
+  const isAdmin = isAdminRole(session?.user?.role);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -136,8 +139,8 @@ export default function DailyRecordsPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Composer */}
-      {session && (
+      {/* Composer — 仅管理员 */}
+      {session && isAdmin && (
         <div className="mb-8 p-5 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
           <div className="flex items-center gap-3 mb-3">
             <div
@@ -261,6 +264,25 @@ export default function DailyRecordsPage() {
               {publishing ? "发布中..." : "发布"}
             </button>
           </div>
+        </div>
+      )}
+
+      {session && !isAdmin && (
+        <div
+          className="mb-8 p-4 rounded-lg text-sm"
+          style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+        >
+          日常记录由管理员发布。如需互动请前往文章评论区。
+          <Link href="/" style={{ color: "var(--accent)", marginLeft: 8 }}>返回首页 →</Link>
+        </div>
+      )}
+
+      {!session && (
+        <div
+          className="mb-8 p-4 rounded-lg text-sm text-center"
+          style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+        >
+          <Link href="/login" style={{ color: "var(--accent)" }}>登录</Link> 后可发表评论。
         </div>
       )}
 

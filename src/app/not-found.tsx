@@ -13,9 +13,9 @@ export default function NotFound() {
             <Home size={14} aria-hidden="true" />
             返回首页
           </Link>
-          <Link href="/dashboard" className="secondary">
+          <Link href="/login" className="secondary">
             <ArrowLeft size={14} aria-hidden="true" />
-            会员中心
+            登录
           </Link>
         </div>
       </div>

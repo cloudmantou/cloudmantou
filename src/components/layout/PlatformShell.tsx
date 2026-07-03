@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
   Bookmark,
@@ -9,7 +10,7 @@ import {
   Github,
   Home,
   KeyRound,
-  LayoutDashboard,
+  LogIn,
   Mail,
   Menu,
   PenLine,
@@ -27,8 +28,10 @@ import { ProductCard } from "@/components/shop/ProductCard";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { TypingEffect } from "@/components/ui/TypingEffect";
 import { SearchDialog } from "@/components/layout/SearchDialog";
+import { DailyCommentSection } from "@/components/daily/DailyCommentSection";
 import { favorites, products, stats, timeline } from "@/data/mock";
 import { siteConfig } from "@/config/site";
+import { isAdminRole } from "@/lib/roles";
 import type { BlogCategory, BlogPost, FavoriteCategory, Product, ProductCategory } from "@/types";
 
 type Section = "home" | "blog" | "shop" | "daily" | "favorites";
@@ -65,7 +68,9 @@ const productFilters: Array<{ id: ProductCategory; label: string }> = [
 ];
 
 export function PlatformShell() {
+  const router = useRouter();
   const { data: session } = useSession();
+  const isAdmin = isAdminRole(session?.user?.role);
   const [section, setSection] = useState<Section>("home");
   const [productCategory, setProductCategory] = useState<ProductCategory>("all");
   const [favCategory, setFavCategory] = useState<FavoriteCategory | "all">("all");
@@ -84,7 +89,76 @@ export function PlatformShell() {
   const [dailyTotal, setDailyTotal] = useState(0);
   const [dailyContent, setDailyContent] = useState("");
   const [dailyMood, setDailyMood] = useState("");
+  const [dailyWeather, setDailyWeather] = useState("");
+  const [dailyLocation, setDailyLocation] = useState("");
   const [dailyPublishing, setDailyPublishing] = useState(false);
+  const [dailyPhotos, setDailyPhotos] = useState<string[]>([]);
+  const [dailyTags, setDailyTags] = useState<string[]>([]);
+  const [dailyTagInput, setDailyTagInput] = useState("");
+  const [dailyVisibility, setDailyVisibility] = useState<"public" | "link" | "private" | "friends">("public");
+
+
+  const moodOptions = ["😊", "😌", "🤔", "😴", "🔥", "🎉", "😤", "☕"];
+  const weatherOptions = ["☀️", "⛅", "🌧️", "❄️", "🌙"];
+  const visibilityOptions = [
+    { id: "public" as const, label: "🌐 所有人可见" },
+    { id: "friends" as const, label: "👥 仅好友" },
+    { id: "link" as const, label: "🔗 链接可见" },
+    { id: "private" as const, label: "🔒 仅自己" },
+  ];
+
+  const openPostOverlay = (post: ApiPost) => {
+    const accentColors = ["gold", "teal", "rose", "blue", "orange"] as const;
+    const blogPost: BlogPost = {
+      id: post.id,
+      category: (post.category?.slug || "frontend") as BlogPost["category"],
+      categoryName: post.category?.name,
+      title: post.title,
+      excerpt: post.excerpt || "",
+      date: post.publishedAt ? new Date(post.publishedAt).toLocaleDateString("zh-CN") : "",
+      readTime: `${Math.max(1, Math.ceil((post.excerpt?.length || 200) / 500))} min`,
+      tags: post.tags.map((t, i) => ({
+        label: t.name,
+        accent: accentColors[i % accentColors.length],
+      })),
+      cover: post.coverImage
+        ? `url('${post.coverImage}')`
+        : "linear-gradient(135deg, rgba(232,185,100,0.22), rgba(77,217,182,0.16))",
+      icon: post.title.slice(0, 2).toUpperCase(),
+      premium: post.premium,
+      content: "",
+      slug: post.slug,
+    };
+    setSelectedPost(blogPost);
+  };
+
+  const cycleVisibility = () => {
+    const idx = visibilityOptions.findIndex((v) => v.id === dailyVisibility);
+    setDailyVisibility(visibilityOptions[(idx + 1) % visibilityOptions.length].id);
+  };
+
+  const handlePhotoUpload = (files: FileList | null) => {
+    if (!files) return;
+    const remaining = 9 - dailyPhotos.length;
+    Array.from(files)
+      .slice(0, remaining)
+      .forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            setDailyPhotos((prev) => (prev.length < 9 ? [...prev, reader.result as string] : prev));
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+  };
+
+  const addDailyTag = () => {
+    const tag = dailyTagInput.trim().replace(/^#/, "");
+    if (!tag || dailyTags.includes(tag) || dailyTags.length >= 10) return;
+    setDailyTags((prev) => [...prev, tag]);
+    setDailyTagInput("");
+  };
 
   useEffect(() => {
     // Load categories
@@ -152,6 +226,28 @@ export function PlatformShell() {
     window.setTimeout(() => setToast(null), 2200);
   };
 
+  const handleBuyProduct = (product: Product) => {
+    if (!session) {
+      router.push("/login?callbackUrl=/");
+      return;
+    }
+    if (!product.productType) {
+      showToast("该商品暂未开放购买");
+      return;
+    }
+    fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productType: product.productType }),
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.message || "下单失败");
+        showToast(`订单已创建：${data.data.orderNo}`);
+      })
+      .catch((e: Error) => showToast(e.message || "下单失败"));
+  };
+
   const selectSection = (nextSection: Section) => {
     setSection(nextSection);
     setMobileOpen(false);
@@ -217,14 +313,18 @@ export function PlatformShell() {
             })}
 
             <div className="nav-section-label">Workspace</div>
-            <Link className="nav-item nav-link" href="/dashboard">
-              <LayoutDashboard size={16} aria-hidden="true" />
-              <span>会员中心</span>
-            </Link>
-            <Link className="nav-item nav-link" href="/admin">
-              <ShieldCheck size={16} aria-hidden="true" />
-              <span>后台管理</span>
-            </Link>
+            {!session ? (
+              <Link className="nav-item nav-link" href="/login?callbackUrl=/">
+                <LogIn size={16} aria-hidden="true" />
+                <span>登录</span>
+              </Link>
+            ) : null}
+            {isAdmin ? (
+              <Link className="nav-item nav-link" href="/admin">
+                <ShieldCheck size={16} aria-hidden="true" />
+                <span>后台管理</span>
+              </Link>
+            ) : null}
             <button className="nav-item" type="button" onClick={() => showToast("在线工具将在后台模块接入")}>
               <Settings size={16} aria-hidden="true" />
               <span>在线工具</span>
@@ -257,14 +357,14 @@ export function PlatformShell() {
               <button
                 className="sidebar-logout"
                 type="button"
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: "/" })}
               >
                 退出
               </button>
             </div>
           ) : (
             <div className="sidebar-user">
-              <Link href="/login" className="sidebar-login-btn">
+              <Link href="/login?callbackUrl=/" className="sidebar-login-btn">
                 登录 / 注册
               </Link>
             </div>
@@ -303,10 +403,14 @@ export function PlatformShell() {
                   阅读最新文章
                   <ArrowRight size={15} aria-hidden="true" />
                 </button>
-                <Link href="/dashboard" className="quick-btn ghost">
+                <button
+                  type="button"
+                  onClick={() => selectSection("shop")}
+                  className="quick-btn ghost"
+                >
                   <KeyRound size={15} aria-hidden="true" />
-                  兑换卡密
-                </Link>
+                  购买会员
+                </button>
                 <button
                   type="button"
                   onClick={() => selectSection("shop")}
@@ -449,14 +553,20 @@ export function PlatformShell() {
                         ? `url('${post.coverImage}')`
                         : "linear-gradient(135deg, rgba(232,185,100,0.22), rgba(77,217,182,0.16))",
                       icon: post.title.slice(0, 2).toUpperCase(),
-                      premium: false,
+                      premium: post.premium,
                       content: "",
                       slug: post.slug,
+                      categoryName: post.category?.name,
                     };
                     return (
-                      <Link key={post.id} href={`/post/${post.slug}`} style={{ textDecoration: "none" }}>
-                        <BlogCard index={index} post={blogPost} onOpen={() => {}} />
-                      </Link>
+                      <button
+                        key={post.id}
+                        type="button"
+                        className="blog-card-btn"
+                        onClick={() => openPostOverlay(post)}
+                      >
+                        <BlogCard index={index} post={blogPost} />
+                      </button>
                     );
                   })
                 )}
@@ -470,7 +580,7 @@ export function PlatformShell() {
                 <h2 className="page-title" id="shop-title">
                   会员与卡密
                 </h2>
-                <p className="page-desc">会员套餐、付费文章兑换券和批量卡密以后会接入真实订单。</p>
+                <p className="page-desc">登录后可直接下单会员套餐，支付对接完成后自动开通。</p>
               </div>
               <div className="filters" aria-label="商品分类">
                 {productFilters.map((filter) => (
@@ -490,7 +600,7 @@ export function PlatformShell() {
                     index={index}
                     key={product.id}
                     product={product}
-                    onBuy={(item: Product) => showToast(`${item.name} 已加入模拟订单`)}
+                    onBuy={handleBuyProduct}
                   />
                 ))}
               </div>
@@ -503,37 +613,185 @@ export function PlatformShell() {
                 <h2 className="page-title" id="daily-title">
                   日常记录
                 </h2>
-                <p className="page-desc">{"// 生活不止代码，还有诗和远方"}</p>
+                <p className="page-desc">
+                  {isAdmin ? "// 管理员可在此发布日常" : "// 浏览动态，登录后可评论"}
+                </p>
               </div>
 
-              {/* Composer */}
-              {session && (
-                <div className="mb-6 p-4 rounded-lg" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+              {!session && (
+                <div
+                  className="mb-6 p-4 rounded-lg text-sm"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                >
+                  登录后可购买会员、评论文章与日常动态。
+                  <Link href="/login?callbackUrl=/" style={{ color: "var(--accent)", marginLeft: 8 }}>
+                    去登录 →
+                  </Link>
+                </div>
+              )}
+
+              {/* Composer — 仅管理员 */}
+              {session && isAdmin && (
+                <div className="daily-composer">
+                  <div className="daily-composer-header">
+                    <div className="daily-composer-avatar" aria-hidden="true">
+                      {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="daily-composer-author">
+                        {session.user?.nickname || session.user?.username}
+                      </div>
+                      <button
+                        type="button"
+                        className="daily-composer-visibility"
+                        onClick={cycleVisibility}
+                      >
+                        {visibilityOptions.find((v) => v.id === dailyVisibility)?.label}
+                      </button>
+                    </div>
+                  </div>
+
                   <textarea
                     value={dailyContent}
-                    onChange={(e) => setDailyContent(e.target.value)}
+                    onChange={(e) => setDailyContent(e.target.value.slice(0, 2000))}
                     placeholder="这一刻的想法..."
-                    rows={3}
-                    className="w-full px-0 py-1 text-sm outline-none resize-none bg-transparent"
-                    style={{ color: "var(--text)", lineHeight: 1.7 }}
+                    rows={4}
+                    className="daily-composer-textarea"
                   />
-                  <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-                    <span className="text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
+
+                  <div className="daily-composer-meta">
+                    <div className="daily-emoji-group">
+                      <span>心情</span>
+                      {moodOptions.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className={clsx("daily-emoji-btn", dailyMood === emoji && "active")}
+                          onClick={() => setDailyMood(dailyMood === emoji ? "" : emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="daily-emoji-group">
+                      <span>天气</span>
+                      {weatherOptions.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className={clsx("daily-emoji-btn", dailyWeather === emoji && "active")}
+                          onClick={() => setDailyWeather(dailyWeather === emoji ? "" : emoji)}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="daily-composer-location">
+                    <span aria-hidden="true">📍</span>
+                    <input
+                      type="text"
+                      value={dailyLocation}
+                      onChange={(e) => setDailyLocation(e.target.value)}
+                      placeholder="添加位置（可选）"
+                      className="daily-composer-location-input"
+                    />
+                  </div>
+
+                  {dailyPhotos.length > 0 && (
+                    <div className={clsx("daily-photos", dailyPhotos.length <= 2 ? "cols-2" : "cols-3")}>
+                      {dailyPhotos.map((photo, i) => (
+                        <div className="daily-photo daily-photo-preview" key={i}>
+                          <img src={photo} alt="" />
+                          <button
+                            type="button"
+                            className="daily-photo-remove"
+                            onClick={() => setDailyPhotos((prev) => prev.filter((_, j) => j !== i))}
+                            aria-label="移除图片"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="daily-composer-tags">
+                    {dailyTags.map((tag) => (
+                      <span key={tag} className="daily-tag-chip">
+                        #{tag}
+                        <button type="button" onClick={() => setDailyTags((prev) => prev.filter((t) => t !== tag))}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={dailyTagInput}
+                      onChange={(e) => setDailyTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addDailyTag();
+                        }
+                      }}
+                      placeholder="添加标签..."
+                      className="daily-tag-input"
+                    />
+                  </div>
+
+                  <div className="daily-composer-actions">
+                    <label className="daily-action-btn">
+                      📷 图片
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        hidden
+                        onChange={(e) => handlePhotoUpload(e.target.files)}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="daily-composer-toolbar">
+                    <span
+                      className={clsx(
+                        "daily-char-counter",
+                        dailyContent.length > 1800 && "warning",
+                        dailyContent.length >= 2000 && "danger"
+                      )}
+                    >
                       {dailyContent.length} / 2000
                     </span>
                     <button
                       type="button"
+                      className="daily-publish-btn"
                       onClick={() => {
                         if (!dailyContent.trim()) return;
                         setDailyPublishing(true);
                         fetch("/api/daily-records", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ content: dailyContent.trim() }),
+                          body: JSON.stringify({
+                            content: dailyContent.trim(),
+                            photos: dailyPhotos.length > 0 ? dailyPhotos : undefined,
+                            mood: dailyMood || undefined,
+                            weather: dailyWeather || undefined,
+                            location: dailyLocation.trim() || undefined,
+                            visibility: dailyVisibility,
+                            tagNames: dailyTags.length > 0 ? dailyTags : undefined,
+                          }),
                         })
                           .then((r) => {
                             if (r.ok) {
                               setDailyContent("");
+                              setDailyMood("");
+                              setDailyWeather("");
+                              setDailyLocation("");
+                              setDailyPhotos([]);
+                              setDailyTags([]);
+                              setDailyVisibility("public");
                               return fetch("/api/daily-records?pageSize=20").then((r) => r.json());
                             }
                           })
@@ -547,14 +805,27 @@ export function PlatformShell() {
                           .finally(() => setDailyPublishing(false));
                       }}
                       disabled={dailyPublishing || !dailyContent.trim()}
-                      className="px-3 py-1 text-xs rounded-md transition-colors"
-                      style={{ background: "var(--accent)", color: "var(--bg)", fontFamily: '"JetBrains Mono", monospace', opacity: dailyPublishing || !dailyContent.trim() ? 0.5 : 1 }}
                     >
                       发布
                     </button>
                   </div>
                 </div>
               )}
+
+              {session && !isAdmin && (
+                <div
+                  className="mb-6 p-4 rounded-lg text-xs"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
+                >
+                  日常记录由管理员发布。登录后可在每条动态下方评论。
+                </div>
+              )}
+
+              <div className="daily-timeline-header">
+                <h3 className="daily-timeline-title">
+                  时间线 <span className="daily-timeline-count">{dailyTotal} 条记录</span>
+                </h3>
+              </div>
 
               <div className="daily-timeline">
                 {dailyRecords.length === 0 ? (
@@ -571,11 +842,19 @@ export function PlatformShell() {
                         {item.location ? ` · 📍 ${item.location}` : ""}
                       </span>
                       <div className="daily-card">
-                        {item.mood && (
-                          <span className="daily-mood" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
-                            {item.mood}
-                          </span>
-                        )}
+                        <div className="daily-card-header">
+                          <div className="daily-card-author">
+                            <span className="daily-card-avatar">
+                              {(item.author?.nickname || item.author?.username || "U").slice(0, 1).toUpperCase()}
+                            </span>
+                            <span>{item.author?.nickname || item.author?.username || "用户"}</span>
+                          </div>
+                          {item.mood && (
+                            <span className="daily-mood" style={{ background: "var(--accent-dim)", color: "var(--accent)" }}>
+                              {item.mood}
+                            </span>
+                          )}
+                        </div>
                         <p className="daily-text">{item.content}</p>
 
                         {item.photos && item.photos.length > 0 && (
@@ -603,7 +882,10 @@ export function PlatformShell() {
                             className="daily-action"
                             type="button"
                             onClick={(e) => {
-                              if (!session) return;
+                              if (!session) {
+                                router.push("/login?callbackUrl=/");
+                                return;
+                              }
                               fetch(`/api/daily-records/${item.id}/like`, { method: "POST" })
                                 .then((r) => r.json())
                                 .then((d) => {
@@ -618,6 +900,10 @@ export function PlatformShell() {
                           >
                             🤍 {item.likesCount || 0}
                           </button>
+                          <DailyCommentSection
+                            recordId={item.id}
+                            initialCount={item.commentsCount || 0}
+                          />
                           <button
                             className="daily-action"
                             type="button"

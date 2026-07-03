@@ -27,10 +27,13 @@ export default auth((req) => {
     }
   }
 
-  // 会员中心：必须登录
+  // 用户中心：仅管理员可访问，普通会员在首页完成登录/购买/评论
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
-      return NextResponse.redirect(new URL("/login", req.url));
+      return NextResponse.redirect(new URL("/login?callbackUrl=/", req.url));
+    }
+    if (session.user?.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/", req.url));
     }
   }
 

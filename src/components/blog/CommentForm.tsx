@@ -31,7 +31,7 @@ export function CommentForm({
         className="text-center py-6 text-sm"
         style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}
       >
-        <Link href="/login" style={{ color: "var(--accent)", textDecoration: "underline" }}>
+        <Link href="/login?callbackUrl=/" style={{ color: "var(--accent)", textDecoration: "underline" }}>
           登录
         </Link>
         {" "}后参与讨论

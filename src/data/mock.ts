@@ -98,6 +98,7 @@ export const products: Product[] = [
     stock: 999,
     badge: "HOT",
     accent: "gold",
+    productType: "VIP_MONTH",
     cover:
       "linear-gradient(135deg, rgba(232,185,100,0.28), rgba(232,185,100,0.04)), url('https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=800&q=80')"
   },
@@ -110,6 +111,7 @@ export const products: Product[] = [
     stock: 999,
     badge: "SAVE",
     accent: "teal",
+    productType: "VIP_YEAR",
     cover:
       "linear-gradient(135deg, rgba(77,217,182,0.26), rgba(77,217,182,0.04)), url('https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=800&q=80')"
   },

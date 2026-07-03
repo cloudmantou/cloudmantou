@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       photos: r.photos ? JSON.parse(r.photos) : [],
       tagNames: r.tags.map((t) => t.tag.name),
       likesCount: r._count.likes,
+      commentsCount: r.commentCount,
       tags: undefined,
       _count: undefined,
     }));
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireAuth();
+    const session = await requireAdmin();
     const body = await req.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {

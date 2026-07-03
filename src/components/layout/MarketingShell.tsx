@@ -7,6 +7,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Home, Menu, X } from "lucide-react";
 import clsx from "clsx";
 import { siteConfig } from "@/config/site";
+import { isAdminRole } from "@/lib/roles";
 
 /**
  * MarketingShell —— 营销/内容页通用骨架
@@ -24,12 +25,20 @@ type NavLink = {
   matchPrefix?: string;
 };
 
-const navLinks: NavLink[] = [
-  { href: "/", label: "首页", icon: Home, matchPrefix: "" },
-  { href: "/category/engineering", label: "技术博客", matchPrefix: "/category" },
-  { href: "/dashboard", label: "会员中心" },
-  { href: "/admin", label: "后台管理" },
-];
+function buildNavLinks(session: { user?: { role?: string } } | null | undefined) {
+  const isAdmin = isAdminRole(session?.user?.role);
+  const links: NavLink[] = [
+    { href: "/", label: "首页", icon: Home, matchPrefix: "" },
+    { href: "/category/engineering", label: "技术博客", matchPrefix: "/category" },
+  ];
+  if (!session) {
+    links.push({ href: "/login?callbackUrl=/", label: "登录" });
+  }
+  if (isAdmin) {
+    links.push({ href: "/admin", label: "后台管理" });
+  }
+  return links;
+}
 
 export function MarketingShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -73,7 +82,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
 
           <nav className="side-nav" aria-label="主导航">
             <div className="nav-section-label">Navigation</div>
-            {navLinks.map((item) => {
+            {buildNavLinks(session).map((item) => {
               const Icon = item.icon;
               const active = item.matchPrefix
                 ? pathname.startsWith(item.matchPrefix)

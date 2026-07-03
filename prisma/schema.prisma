@@ -30,6 +30,7 @@ model User {
   entitlements Entitlement[]
   dailyRecords DailyRecord[]
   dailyRecordLikes DailyRecordLike[]
+  dailyRecordComments DailyRecordComment[]
 
   @@map("users")
 }
@@ -235,14 +236,16 @@ model DailyRecord {
   weather    String?
   location   String?
   visibility String   @default("public") // public, link, private, friends
-  isTop      Boolean  @default(false)
-  likeCount  Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  isTop         Boolean  @default(false)
+  likeCount     Int      @default(0)
+  commentCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  author  User         @relation(fields: [authorId], references: [id])
-  tags    DailyRecordTag[]
-  likes   DailyRecordLike[]
+  author   User                @relation(fields: [authorId], references: [id])
+  tags     DailyRecordTag[]
+  likes    DailyRecordLike[]
+  comments DailyRecordComment[]
 
   @@index([authorId])
   @@index([createdAt])
@@ -271,6 +274,25 @@ model DailyRecordLike {
 
   @@unique([userId, recordId])
   @@map("daily_record_likes")
+}
+
+model DailyRecordComment {
+  id        String        @id @default(cuid())
+  recordId  String
+  userId    String
+  parentId  String?
+  content   String        @db.Text
+  status    CommentStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+
+  record  DailyRecord          @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  DailyRecordComment?  @relation("DailyCommentReplies", fields: [parentId], references: [id])
+  replies DailyRecordComment[] @relation("DailyCommentReplies")
+
+  @@index([recordId, status])
+  @@index([userId])
+  @@map("daily_record_comments")
 }
 
 model SiteSetting {
