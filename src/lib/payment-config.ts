@@ -30,7 +30,9 @@ export type PaymentRuntimeConfig = {
 };
 
 const ALIPAY_GATEWAYS = {
-  sandbox: "https://openapi.alipaydev.com/gateway.do",
+  sandbox:
+    process.env.ALIPAY_SANDBOX_GATEWAY?.trim() ||
+    "https://openapi-sandbox.dl.alipaydev.com/gateway.do",
   production: "https://openapi.alipay.com/gateway.do",
 } as const;
 
@@ -45,13 +47,16 @@ async function readGatewaySettings(): Promise<Record<string, Record<string, unkn
   }
 }
 
-function normalizePem(value: string, type: "private" | "public"): string {
+export function normalizePem(value: string, type: "private" | "public"): string {
   const trimmed = value.trim();
   if (trimmed.includes("BEGIN")) return trimmed;
   const body = trimmed.replace(/\s+/g, "");
   const lines = body.match(/.{1,64}/g)?.join("\n") ?? body;
   if (type === "private") {
-    return `-----BEGIN RSA PRIVATE KEY-----\n${lines}\n-----END RSA PRIVATE KEY-----`;
+    // 支付宝开放平台「非 JAVA」导出为 PKCS#8；旧版 PKCS#1 以 MIIEow / MIIEp 开头
+    const pkcs1 = /^MIIE[op]/.test(body);
+    const label = pkcs1 ? "RSA PRIVATE KEY" : "PRIVATE KEY";
+    return `-----BEGIN ${label}-----\n${lines}\n-----END ${label}-----`;
   }
   return `-----BEGIN PUBLIC KEY-----\n${lines}\n-----END PUBLIC KEY-----`;
 }
@@ -112,7 +117,7 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
     alipayEnabled && alipayAppId && alipayPrivateKey && alipayPublicKey
       ? {
           enabled: true,
-          env: normalizeAlipayEnv(alipayDb.env),
+          env: normalizeAlipayEnv(alipayDb.env ?? process.env.ALIPAY_ENV),
           appId: alipayAppId,
           privateKey: normalizePem(alipayPrivateKey, "private"),
           publicKey: normalizePem(alipayPublicKey, "public"),

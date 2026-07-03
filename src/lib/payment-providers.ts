@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import {
   getAlipayGatewayUrl,
+  normalizePem,
   type AlipayGatewayConfig,
   type WechatGatewayConfig,
 } from "@/lib/payment-config";
@@ -73,7 +74,11 @@ export function createAlipayPayment(input: {
     biz_content: bizContent,
   };
 
-  params.sign = signAlipay(params, input.config.privateKey);
+  const privateKey =
+    input.config.privateKey.includes("BEGIN")
+      ? input.config.privateKey
+      : normalizePem(input.config.privateKey, "private");
+  params.sign = signAlipay(params, privateKey);
 
   const html = buildAlipayForm(gatewayUrl, params);
   return { type: "form", html, mode: input.mode === "page" ? "alipay_pc" : "alipay_h5" };
