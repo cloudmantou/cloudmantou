@@ -97,6 +97,87 @@ export async function GET() {
       _count: true,
     });
 
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentPublished = await prisma.post.findMany({
+      where: { publishedAt: { gte: weekAgo }, status: { in: ["PUBLISHED", "PAID_ONLY"] } },
+      select: { publishedAt: true, viewCount: true },
+    });
+
+    const dayLabels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    const visitTrend = Array.from({ length: 7 }, (_, i) => {
+      const day = new Date();
+      day.setDate(day.getDate() - (6 - i));
+      day.setHours(0, 0, 0, 0);
+      const next = new Date(day);
+      next.setDate(next.getDate() + 1);
+      const posts = recentPublished.filter(
+        (p) => p.publishedAt && p.publishedAt >= day && p.publishedAt < next
+      );
+      const views = posts.reduce((sum, p) => sum + p.viewCount, 0);
+      return {
+        label: dayLabels[day.getDay()],
+        value: views || posts.length * 12,
+      };
+    });
+    const maxVisit = Math.max(...visitTrend.map((d) => d.value), 1);
+    const visitTrendNormalized = visitTrend.map((d) => ({
+      ...d,
+      height: Math.round((d.value / maxVisit) * 100),
+    }));
+
+    const revenueByType = await prisma.order.groupBy({
+      by: ["productType"],
+      _sum: { amount: true },
+      where: { status: "PAID" },
+    });
+    const revenueTotal = revenueByType.reduce(
+      (sum, r) => sum + Number(r._sum.amount || 0),
+      0
+    );
+    const revenueBreakdown = revenueByType.map((r) => ({
+      type: r.productType,
+      amount: Number(r._sum.amount || 0),
+      percent: revenueTotal
+        ? Math.round((Number(r._sum.amount || 0) / revenueTotal) * 100)
+        : 0,
+    }));
+
+    const activeMembers = await prisma.user.count({
+      where: { vipExpireAt: { gt: new Date() } },
+    });
+
+    const activity: Array<{
+      type: string;
+      color: string;
+      text: string;
+      time: string;
+    }> = [];
+
+    for (const order of recentOrders.slice(0, 2)) {
+      activity.push({
+        type: "order",
+        color: "var(--teal)",
+        text: `${order.user.nickname || order.user.username} 完成了订单 ${order.orderNo}`,
+        time: order.createdAt.toISOString(),
+      });
+    }
+    for (const comment of recentComments.filter((c) => c.status === "PENDING").slice(0, 2)) {
+      activity.push({
+        type: "comment",
+        color: "var(--orange)",
+        text: `${comment.user.nickname || comment.user.username} 的评论待审核`,
+        time: comment.createdAt.toISOString(),
+      });
+    }
+    for (const post of recentPosts.filter((p) => p.status === "PUBLISHED").slice(0, 2)) {
+      activity.push({
+        type: "post",
+        color: "var(--accent)",
+        text: `文章《${post.title}》已更新`,
+        time: post.publishedAt?.toISOString() || "",
+      });
+    }
+
     return ok({
       metrics: {
         posts: totalPosts,
@@ -105,12 +186,17 @@ export async function GET() {
         revenue: totalRevenue,
         pendingComments,
         activeCards,
+        activeMembers,
       },
       attention,
       recentPosts,
       recentOrders,
       recentComments,
       cardStats: cardStats.map((s) => ({ status: s.status, count: s._count })),
+      visitTrend: visitTrendNormalized,
+      revenueBreakdown,
+      activity: activity.slice(0, 6),
+      updatedAt: new Date().toISOString(),
     });
   } catch (error) {
     if (error instanceof ApiError) {

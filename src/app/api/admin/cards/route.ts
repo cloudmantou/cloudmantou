@@ -2,7 +2,12 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { requireAdmin, ApiError } from "@/lib/guards";
-import { hashCardSecret, generateCardNo, generateCardSecret } from "@/lib/card-crypto";
+import {
+  hashCardSecret,
+  generateCardNo,
+  generateCardSecret,
+  type CardFormat,
+} from "@/lib/card-crypto";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +15,13 @@ export const dynamic = "force-dynamic";
 const generateSchema = z.object({
   type: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE"]),
   value: z.number().int().min(1, "数值必须大于0"),
-  count: z.number().int().min(1).max(500, "单次最多生成500张"),
+  count: z.number().int().min(1).max(500, "单次最多生成500张").optional(),
   expireDays: z.number().int().min(1).max(3650).optional(),
   batchNo: z.string().max(50).optional(),
+  prefix: z.string().max(10).optional(),
+  format: z.enum(["standard", "uuid", "numeric", "custom"]).optional(),
+  importLines: z.array(z.string().max(120)).max(500).optional(),
+  autoActivate: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -24,11 +33,18 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("type") || undefined;
     const status = searchParams.get("status") || undefined;
     const batchNo = searchParams.get("batchNo") || undefined;
+    const search = searchParams.get("search")?.trim() || undefined;
 
     const where: any = {
       ...(type && { type }),
       ...(status && { status }),
       ...(batchNo && { batchNo }),
+      ...(search && {
+        OR: [
+          { cardNo: { contains: search } },
+          { batchNo: { contains: search } },
+        ],
+      }),
     };
 
     const [cards, total] = await Promise.all([
@@ -78,24 +94,56 @@ export async function POST(req: NextRequest) {
       return fail(parsed.error.errors[0].message, 42200, 422);
     }
 
-    const { type, value, count, expireDays, batchNo } = parsed.data;
+    const {
+      type,
+      value,
+      count = 10,
+      expireDays,
+      batchNo,
+      prefix,
+      format,
+      importLines,
+      autoActivate = true,
+    } = parsed.data;
     const batch = batchNo || `BATCH-${Date.now().toString(36).toUpperCase()}`;
-    const expireAt = expireDays
-      ? new Date(Date.now() + expireDays * 24 * 60 * 60 * 1000)
-      : null;
+    const expireAt =
+      expireDays && expireDays > 0
+        ? new Date(Date.now() + expireDays * 24 * 60 * 60 * 1000)
+        : null;
 
-    // 生成卡密，只在本次返回明文
+    const cardFormat = (format || "standard") as CardFormat;
+    const genOptions = { prefix, format: cardFormat };
+
     const cards: Array<{ cardNo: string; secret: string; hash: string }> = [];
     const cardNos = new Set<string>();
 
-    for (let i = 0; i < count; i++) {
-      let cardNo = generateCardNo();
-      while (cardNos.has(cardNo)) cardNo = generateCardNo();
-      cardNos.add(cardNo);
+    const addCard = async (cardNo: string, secret?: string) => {
+      const normalized = cardNo.trim().toUpperCase();
+      if (!normalized || cardNos.has(normalized)) return false;
+      cardNos.add(normalized);
+      const plainSecret = secret?.trim() || generateCardSecret();
+      const hash = await hashCardSecret(plainSecret);
+      cards.push({ cardNo: normalized, secret: plainSecret, hash });
+      return true;
+    };
 
-      const secret = generateCardSecret();
-      const hash = await hashCardSecret(secret);
-      cards.push({ cardNo, secret, hash });
+    if (importLines && importLines.length > 0) {
+      for (const line of importLines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const [no, secret] = trimmed.split(/[,|\s]+/).map((s) => s.trim());
+        await addCard(no, secret);
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        let cardNo = generateCardNo(genOptions);
+        while (cardNos.has(cardNo)) cardNo = generateCardNo(genOptions);
+        await addCard(cardNo);
+      }
+    }
+
+    if (cards.length === 0) {
+      return fail("没有可生成的卡密", 42200, 422);
     }
 
     // 批量插入（只存哈希）
@@ -105,7 +153,7 @@ export async function POST(req: NextRequest) {
         cardSecretHash: c.hash,
         type,
         value,
-        status: "ACTIVE" as const,
+        status: autoActivate ? ("ACTIVE" as const) : ("DISABLED" as const),
         batchNo: batch,
         expireAt,
       })),

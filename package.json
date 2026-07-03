@@ -30,6 +30,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
@@ -38,7 +39,9 @@
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.19",
+    "postcss": "^8.5.16",
     "prisma": "^5.22.0",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.9"
   },

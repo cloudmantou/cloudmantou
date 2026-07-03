@@ -1,0 +1,41 @@
+/* ========================================================================
+   统一卡片 / 容器（"一刀改版"覆盖层 —— 写在末尾，覆盖上面所有同名卡片）
+   由 src/app/globals.css 末尾拆出，集中维护卡片样式 token。
+   ======================================================================== */
+.metric-card,
+.blog-card,
+.product-card,
+.daily-card,
+.fav-card,
+.workspace-panel,
+.vip-panel,
+.attention-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.blog-card {
+  grid-template-columns: 240px minmax(0, 1fr);
+  border-radius: 22px;
+}
+
+.blog-cover {
+  min-height: 172px;
+}
+
+.product-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.metrics-grid {
+  gap: 18px;
+}
+
+@media (max-width: 920px) {
+  .blog-card {
+    grid-template-columns: 1fr;
+  }
+}

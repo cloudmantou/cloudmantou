@@ -48,11 +48,37 @@ export function isLegacyHash(hash: string): boolean {
   return !hash.startsWith("$2");
 }
 
-export function generateCardNo(): string {
-  const prefix = "CM";
-  const timestamp = Date.now().toString(36).toUpperCase().slice(-5);
-  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
-  return `${prefix}-${timestamp}-${random}`;
+export type CardFormat = "standard" | "uuid" | "numeric" | "custom";
+
+const CARD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function randomSegment(len = 4): string {
+  let out = "";
+  const bytes = crypto.randomBytes(len);
+  for (let i = 0; i < len; i++) {
+    out += CARD_CHARS[bytes[i] % CARD_CHARS.length];
+  }
+  return out;
+}
+
+export function generateCardNo(options?: { prefix?: string; format?: CardFormat }): string {
+  const format = options?.format || "standard";
+  const prefix = (options?.prefix || "CM").replace(/-+$/, "").toUpperCase();
+
+  if (format === "uuid") {
+    return crypto.randomUUID().toUpperCase();
+  }
+
+  if (format === "numeric") {
+    const bytes = crypto.randomBytes(8);
+    let num = "";
+    for (let i = 0; i < 16; i++) {
+      num += String(bytes[i % 8] % 10);
+    }
+    return num;
+  }
+
+  return `${prefix}-${randomSegment()}-${randomSegment()}-${randomSegment()}`;
 }
 
 export function generateCardSecret(): string {
