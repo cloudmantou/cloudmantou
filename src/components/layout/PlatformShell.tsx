@@ -29,6 +29,7 @@ import { MetricCard } from "@/components/ui/MetricCard";
 import { TypingEffect } from "@/components/ui/TypingEffect";
 import { SearchDialog } from "@/components/layout/SearchDialog";
 import { DailyCommentSection } from "@/components/daily/DailyCommentSection";
+import { PaymentCheckout, type CheckoutOrder } from "@/components/payment/PaymentCheckout";
 import { favorites, products, stats, timeline } from "@/data/mock";
 import { siteConfig } from "@/config/site";
 import { isAdminRole } from "@/lib/roles";
@@ -87,25 +88,8 @@ export function PlatformShell() {
   // Daily records data
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
   const [dailyTotal, setDailyTotal] = useState(0);
-  const [dailyContent, setDailyContent] = useState("");
-  const [dailyMood, setDailyMood] = useState("");
-  const [dailyWeather, setDailyWeather] = useState("");
-  const [dailyLocation, setDailyLocation] = useState("");
-  const [dailyPublishing, setDailyPublishing] = useState(false);
-  const [dailyPhotos, setDailyPhotos] = useState<string[]>([]);
-  const [dailyTags, setDailyTags] = useState<string[]>([]);
-  const [dailyTagInput, setDailyTagInput] = useState("");
-  const [dailyVisibility, setDailyVisibility] = useState<"public" | "link" | "private" | "friends">("public");
-
-
-  const moodOptions = ["😊", "😌", "🤔", "😴", "🔥", "🎉", "😤", "☕"];
-  const weatherOptions = ["☀️", "⛅", "🌧️", "❄️", "🌙"];
-  const visibilityOptions = [
-    { id: "public" as const, label: "🌐 所有人可见" },
-    { id: "friends" as const, label: "👥 仅好友" },
-    { id: "link" as const, label: "🔗 链接可见" },
-    { id: "private" as const, label: "🔒 仅自己" },
-  ];
+  const [checkoutOrder, setCheckoutOrder] = useState<CheckoutOrder | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const openPostOverlay = (post: ApiPost) => {
     const accentColors = ["gold", "teal", "rose", "blue", "orange"] as const;
@@ -130,34 +114,6 @@ export function PlatformShell() {
       slug: post.slug,
     };
     setSelectedPost(blogPost);
-  };
-
-  const cycleVisibility = () => {
-    const idx = visibilityOptions.findIndex((v) => v.id === dailyVisibility);
-    setDailyVisibility(visibilityOptions[(idx + 1) % visibilityOptions.length].id);
-  };
-
-  const handlePhotoUpload = (files: FileList | null) => {
-    if (!files) return;
-    const remaining = 9 - dailyPhotos.length;
-    Array.from(files)
-      .slice(0, remaining)
-      .forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === "string") {
-            setDailyPhotos((prev) => (prev.length < 9 ? [...prev, reader.result as string] : prev));
-          }
-        };
-        reader.readAsDataURL(file);
-      });
-  };
-
-  const addDailyTag = () => {
-    const tag = dailyTagInput.trim().replace(/^#/, "");
-    if (!tag || dailyTags.includes(tag) || dailyTags.length >= 10) return;
-    setDailyTags((prev) => [...prev, tag]);
-    setDailyTagInput("");
   };
 
   useEffect(() => {
@@ -243,7 +199,13 @@ export function PlatformShell() {
       .then(async (r) => {
         const data = await r.json();
         if (!r.ok) throw new Error(data.message || "下单失败");
-        showToast(`订单已创建：${data.data.orderNo}`);
+        setCheckoutOrder({
+          id: data.data.id,
+          orderNo: data.data.orderNo,
+          title: data.data.title,
+          amount: data.data.amount,
+        });
+        setCheckoutOpen(true);
       })
       .catch((e: Error) => showToast(e.message || "下单失败"));
   };
@@ -613,12 +575,10 @@ export function PlatformShell() {
                 <h2 className="page-title" id="daily-title">
                   日常记录
                 </h2>
-                <p className="page-desc">
-                  {isAdmin ? "// 管理员可在此发布日常" : "// 浏览动态，登录后可评论"}
-                </p>
+                <p className="page-desc">{"// 浏览动态，登录后可评论"}</p>
               </div>
 
-              {!session && (
+              {!session ? (
                 <div
                   className="mb-6 p-4 rounded-lg text-sm"
                   style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
@@ -628,196 +588,12 @@ export function PlatformShell() {
                     去登录 →
                   </Link>
                 </div>
-              )}
-
-              {/* Composer — 仅管理员 */}
-              {session && isAdmin && (
-                <div className="daily-composer">
-                  <div className="daily-composer-header">
-                    <div className="daily-composer-avatar" aria-hidden="true">
-                      {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="daily-composer-author">
-                        {session.user?.nickname || session.user?.username}
-                      </div>
-                      <button
-                        type="button"
-                        className="daily-composer-visibility"
-                        onClick={cycleVisibility}
-                      >
-                        {visibilityOptions.find((v) => v.id === dailyVisibility)?.label}
-                      </button>
-                    </div>
-                  </div>
-
-                  <textarea
-                    value={dailyContent}
-                    onChange={(e) => setDailyContent(e.target.value.slice(0, 2000))}
-                    placeholder="这一刻的想法..."
-                    rows={4}
-                    className="daily-composer-textarea"
-                  />
-
-                  <div className="daily-composer-meta">
-                    <div className="daily-emoji-group">
-                      <span>心情</span>
-                      {moodOptions.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          className={clsx("daily-emoji-btn", dailyMood === emoji && "active")}
-                          onClick={() => setDailyMood(dailyMood === emoji ? "" : emoji)}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="daily-emoji-group">
-                      <span>天气</span>
-                      {weatherOptions.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          className={clsx("daily-emoji-btn", dailyWeather === emoji && "active")}
-                          onClick={() => setDailyWeather(dailyWeather === emoji ? "" : emoji)}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="daily-composer-location">
-                    <span aria-hidden="true">📍</span>
-                    <input
-                      type="text"
-                      value={dailyLocation}
-                      onChange={(e) => setDailyLocation(e.target.value)}
-                      placeholder="添加位置（可选）"
-                      className="daily-composer-location-input"
-                    />
-                  </div>
-
-                  {dailyPhotos.length > 0 && (
-                    <div className={clsx("daily-photos", dailyPhotos.length <= 2 ? "cols-2" : "cols-3")}>
-                      {dailyPhotos.map((photo, i) => (
-                        <div className="daily-photo daily-photo-preview" key={i}>
-                          <img src={photo} alt="" />
-                          <button
-                            type="button"
-                            className="daily-photo-remove"
-                            onClick={() => setDailyPhotos((prev) => prev.filter((_, j) => j !== i))}
-                            aria-label="移除图片"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="daily-composer-tags">
-                    {dailyTags.map((tag) => (
-                      <span key={tag} className="daily-tag-chip">
-                        #{tag}
-                        <button type="button" onClick={() => setDailyTags((prev) => prev.filter((t) => t !== tag))}>
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                    <input
-                      type="text"
-                      value={dailyTagInput}
-                      onChange={(e) => setDailyTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addDailyTag();
-                        }
-                      }}
-                      placeholder="添加标签..."
-                      className="daily-tag-input"
-                    />
-                  </div>
-
-                  <div className="daily-composer-actions">
-                    <label className="daily-action-btn">
-                      📷 图片
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        hidden
-                        onChange={(e) => handlePhotoUpload(e.target.files)}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="daily-composer-toolbar">
-                    <span
-                      className={clsx(
-                        "daily-char-counter",
-                        dailyContent.length > 1800 && "warning",
-                        dailyContent.length >= 2000 && "danger"
-                      )}
-                    >
-                      {dailyContent.length} / 2000
-                    </span>
-                    <button
-                      type="button"
-                      className="daily-publish-btn"
-                      onClick={() => {
-                        if (!dailyContent.trim()) return;
-                        setDailyPublishing(true);
-                        fetch("/api/daily-records", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            content: dailyContent.trim(),
-                            photos: dailyPhotos.length > 0 ? dailyPhotos : undefined,
-                            mood: dailyMood || undefined,
-                            weather: dailyWeather || undefined,
-                            location: dailyLocation.trim() || undefined,
-                            visibility: dailyVisibility,
-                            tagNames: dailyTags.length > 0 ? dailyTags : undefined,
-                          }),
-                        })
-                          .then((r) => {
-                            if (r.ok) {
-                              setDailyContent("");
-                              setDailyMood("");
-                              setDailyWeather("");
-                              setDailyLocation("");
-                              setDailyPhotos([]);
-                              setDailyTags([]);
-                              setDailyVisibility("public");
-                              return fetch("/api/daily-records?pageSize=20").then((r) => r.json());
-                            }
-                          })
-                          .then((d) => {
-                            if (d) {
-                              setDailyRecords(d.data || []);
-                              setDailyTotal(d.pagination?.total || 0);
-                            }
-                          })
-                          .catch(() => {})
-                          .finally(() => setDailyPublishing(false));
-                      }}
-                      disabled={dailyPublishing || !dailyContent.trim()}
-                    >
-                      发布
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {session && !isAdmin && (
+              ) : (
                 <div
                   className="mb-6 p-4 rounded-lg text-xs"
                   style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-muted)", fontFamily: '"DM Mono", monospace' }}
                 >
-                  日常记录由管理员发布。登录后可在每条动态下方评论。
+                  日常记录由管理员在后台发布。登录后可在每条动态下方评论。
                 </div>
               )}
 
@@ -987,6 +763,13 @@ export function PlatformShell() {
       </nav>
 
       <ArticleOverlay post={selectedPost} onClose={() => setSelectedPost(null)} />
+
+      <PaymentCheckout
+        order={checkoutOrder}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        onPaid={() => showToast("支付成功，权益已发放")}
+      />
 
       <div className={clsx("toast", toast && "show")} role="status" aria-live="polite">
         <Sparkles size={14} aria-hidden="true" />

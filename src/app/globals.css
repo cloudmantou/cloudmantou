@@ -2102,6 +2102,40 @@ button {
   .admin-menu {
     grid-template-columns: 1fr;
   }
+
+  .marketing-main {
+    margin-left: 0;
+    padding: 74px 16px 24px;
+  }
+
+  .payment-checkout-modal {
+    width: 100%;
+    max-width: none;
+    border-radius: 20px 20px 0 0;
+    align-self: flex-end;
+    max-height: 92vh;
+    overflow-y: auto;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .payment-checkout-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .payment-checkout-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .daily-composer,
+  .daily-item {
+    border-radius: 12px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2587,7 +2621,7 @@ button {
   /* 让 main 在窄屏 (≤768px) 躲开侧栏（侧栏变抽屉） */
 }
 
-@media (min-width: 769px) {
+@media (min-width: 921px) {
   .marketing-main {
     margin-left: var(--sidebar-w);
   }
@@ -4431,5 +4465,269 @@ body.editor-focus-mode .editor-layout {
   background: var(--e-accent-glow);
   border-color: var(--e-accent);
   color: var(--e-accent-light);
+}
+
+/* ===== Payment Checkout ===== */
+.payment-checkout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.payment-checkout-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(5, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.payment-checkout-modal {
+  position: relative;
+  width: min(440px, 100%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.payment-checkout-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payment-checkout-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.payment-checkout-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.payment-checkout-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.payment-checkout-order {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+
+.payment-checkout-product {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.payment-checkout-amount {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.payment-checkout-amount span {
+  font-size: 16px;
+  margin-right: 2px;
+}
+
+.payment-checkout-meta {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.payment-checkout-scene {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.payment-scene-btn {
+  flex: 1;
+  min-width: 90px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.payment-scene-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.payment-checkout-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.payment-channel-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.payment-channel-btn span {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.payment-channel-btn small {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 400;
+}
+
+.payment-channel-btn.alipay span {
+  background: rgba(22, 119, 255, 0.15);
+  color: #1677ff;
+}
+
+.payment-channel-btn.wechat span {
+  background: rgba(7, 193, 96, 0.15);
+  color: #07c160;
+}
+
+.payment-channel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.payment-checkout-qr {
+  text-align: center;
+  padding: 12px 0 4px;
+}
+
+.payment-checkout-qr img {
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+}
+
+.payment-checkout-qr p {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.payment-checkout-polling {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.payment-checkout-error {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--rose);
+  text-align: center;
+}
+
+.payment-result-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--bg);
+}
+
+.payment-result-card {
+  width: min(420px, 100%);
+  text-align: center;
+  padding: 32px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.payment-result-card h1 {
+  font-size: 20px;
+  color: var(--text);
+}
+
+.payment-result-card p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.payment-result-amount {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.payment-result-link {
+  margin-top: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
 }
 
