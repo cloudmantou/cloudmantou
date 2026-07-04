@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       VIP_DAYS: "VIP天数",
       PAID_ARTICLE: "付费文章",
       BALANCE: "余额",
+      GENERIC: "外部/通用",
     };
 
     const header = "卡号,类型,数值,状态,批次,使用者,使用时间,过期时间,创建时间";

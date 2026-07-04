@@ -86,6 +86,25 @@ export const DEFAULT_CARD_PACKAGE_TEMPLATES: CardPackageInput[] = [
     sortOrder: 30,
   },
   {
+    slug: "external-generic",
+    name: "外部权益卡密",
+    description: "兑换成功即完成核销，不自动解锁本站文章或会员。",
+    intro:
+      "适用于第三方平台、代理渠道或站外服务的卡密分发。用户兑换后仅标记卡密已使用，并展示你配置的兑换说明，不会写入本站 VIP 或文章券。\n\n可在商品管理中自定义 redemptionNote，生成卡密时也可单独填写备注。",
+    highlights: ["不绑定本站文章解锁", "适合站外/代理发卡", "支持自定义兑换说明"],
+    usageSteps: [
+      "用户登录会员中心",
+      "输入卡号与卡密完成兑换",
+      "按兑换说明前往对应服务使用权益",
+    ],
+    cardType: "GENERIC",
+    cardValue: 1,
+    price: 1,
+    badge: "EXT",
+    accent: "rose",
+    sortOrder: 35,
+  },
+  {
     slug: "balance-100",
     name: "余额充值卡",
     description: "兑换后账户余额增加，可用于后续站内消费。",
@@ -116,6 +135,14 @@ export function serializeCardPackageLists(input: {
   };
 }
 
+/** 商品展示价：0.01 等小金额保留有效小数，整数不显示 .00 */
+export function formatProductPrice(price: number | string): string {
+  const n = Number(price);
+  if (!Number.isFinite(n)) return "¥0";
+  const fixed = n.toFixed(2).replace(/\.?0+$/, "");
+  return `¥${fixed}`;
+}
+
 export function cardPackageToProduct(
   pkg: CardPackage,
   stock: number
@@ -128,7 +155,7 @@ export function cardPackageToProduct(
     intro: pkg.intro || undefined,
     highlights: parseStringArray(pkg.highlights),
     usageSteps: parseStringArray(pkg.usageSteps),
-    price: `¥${Number(pkg.price).toFixed(Number(pkg.price) % 1 === 0 ? 0 : 1)}`,
+    price: formatProductPrice(Number(pkg.price)),
     stock,
     badge: pkg.badge,
     accent: (pkg.accent as Accent) || "gold",
@@ -139,12 +166,41 @@ export function cardPackageToProduct(
   };
 }
 
+/** 可售库存：绑定商品、未售出（无订单）、状态为 ACTIVE */
+export function availableCardStockWhere(packageId: string) {
+  return {
+    packageId,
+    status: "ACTIVE" as const,
+    orderId: null,
+  };
+}
+
+export function formatCardValue(cardType: CardType | string, cardValue: number) {
+  switch (cardType) {
+    case "VIP_DAYS":
+      return `${cardValue} 天`;
+    case "PAID_ARTICLE":
+      return `${cardValue} 篇`;
+    case "BALANCE":
+      return `¥${cardValue}`;
+    case "GENERIC":
+      return "通用";
+    default:
+      return String(cardValue);
+  }
+}
+
 export async function countActiveCardStock(
-  prisma: { card: { count: (args: { where: { type: CardType; value: number; status: "ACTIVE" } }) => Promise<number> } },
-  cardType: CardType,
-  cardValue: number
+  prisma: {
+    card: {
+      count: (args: {
+        where: { packageId: string; status: "ACTIVE"; orderId: null };
+      }) => Promise<number>;
+    };
+  },
+  packageId: string
 ) {
   return prisma.card.count({
-    where: { type: cardType, value: cardValue, status: "ACTIVE" },
+    where: availableCardStockWhere(packageId),
   });
 }

@@ -180,9 +180,10 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
   payment      Payment?
   entitlements Entitlement[]
+  delivery     OrderDelivery?
 
   @@index([userId, status])
   @@index([orderNo])
@@ -210,21 +211,44 @@ model Card {
   id              String     @id @default(cuid())
   cardNo          String     @unique
   cardSecretHash  String     @unique
+  cardSecretEnc   String?    @db.Text
   type            CardType
   value           Int
   status          CardStatus @default(ACTIVE)
+  packageId       String?
   batchNo         String?
+  note            String?    @db.VarChar(500)
+  orderId         String?    @unique
   usedBy          String?
   usedAt          DateTime?
   expireAt        DateTime?
   createdAt       DateTime   @default(now())
 
-  user User? @relation("CardUser", fields: [usedBy], references: [id])
+  package  CardPackage?   @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  user     User?          @relation("CardUser", fields: [usedBy], references: [id])
+  delivery OrderDelivery?
 
   @@index([cardNo])
   @@index([batchNo])
   @@index([status])
+  @@index([type, value, status])
+  @@index([packageId, status])
   @@map("cards")
+}
+
+model OrderDelivery {
+  id            String         @id @default(cuid())
+  orderId       String         @unique
+  cardId        String         @unique
+  cardNo        String
+  cardSecretEnc String         @db.Text
+  status        DeliveryStatus @default(DELIVERED)
+  createdAt     DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Restrict)
+
+  @@map("order_deliveries")
 }
 
 model CardPackage {
@@ -240,12 +264,15 @@ model CardPackage {
   price       Decimal  @db.Decimal(10, 2)
   badge       String   @default("NEW")
   accent      String   @default("gold")
-  cover       String?  @db.Text
-  enabled     Boolean  @default(true)
-  published   Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  cover           String?  @db.Text
+  redemptionNote  String?  @db.VarChar(500)
+  enabled         Boolean  @default(true)
+  published       Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  cards Card[]
 
   @@index([cardType, cardValue])
   @@index([published, enabled])
@@ -381,6 +408,7 @@ enum CardType {
   VIP_DAYS
   PAID_ARTICLE
   BALANCE
+  GENERIC
 }
 
 enum CardStatus {
@@ -388,6 +416,12 @@ enum CardStatus {
   USED
   EXPIRED
   DISABLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
 }
 
 enum EntitlementType {

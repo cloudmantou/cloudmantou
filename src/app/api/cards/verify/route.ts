@@ -144,6 +144,26 @@ export async function POST(req: NextRequest) {
           type: "BALANCE",
           message: `已充值 ${(card.value / 100).toFixed(2)} 元`,
         };
+      } else if (card.type === "GENERIC") {
+        const pkg = card.packageId
+          ? await tx.cardPackage.findUnique({
+              where: { id: card.packageId },
+              select: { redemptionNote: true, name: true },
+            })
+          : await tx.cardPackage.findFirst({
+              where: { cardType: "GENERIC", cardValue: card.value },
+              select: { redemptionNote: true, name: true },
+            });
+        const note =
+          card.note?.trim() ||
+          pkg?.redemptionNote?.trim() ||
+          (pkg?.name ? `「${pkg.name}」兑换成功，请按购买渠道说明使用权益。` : null) ||
+          "卡密兑换成功。该卡密不绑定本站文章解锁，请按发卡方说明使用。";
+
+        benefit = {
+          type: "GENERIC",
+          message: note,
+        };
       }
 
       return benefit;

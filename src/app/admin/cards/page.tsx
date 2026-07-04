@@ -3,7 +3,11 @@
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { Copy, Download, Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { CardPackageEditor, type CardPackageRecord } from "@/components/admin/CardPackageEditor";
+import {
+  CardPackageEditor,
+  type CardPackageRecord,
+  type CardPackageSavePayload,
+} from "@/components/admin/CardPackageEditor";
 
 type Card = {
   id: string;
@@ -12,6 +16,8 @@ type Card = {
   value: number;
   status: string;
   batchNo: string | null;
+  packageId: string | null;
+  packageName: string | null;
   usedBy: string | null;
   usedAt: string | null;
   expireAt: string | null;
@@ -28,7 +34,7 @@ type CardStats = {
   weekNew: number;
   revenue: number;
   sellRate: number;
-  products: Array<{ type: string; value: number; total: number; active: number; used: number }>;
+  products: Array<{ packageId: string; total: number; active: number; used: number }>;
   batches: Array<{ batchNo: string | null; count: number; createdAt: string | null }>;
 };
 
@@ -36,13 +42,41 @@ const TYPE_LABELS: Record<string, string> = {
   VIP_DAYS: "VIP天数",
   PAID_ARTICLE: "付费文章",
   BALANCE: "余额",
+  GENERIC: "外部/通用",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "未售出",
-  USED: "已售出",
+  SOLD: "已售出",
+  USED: "已兑换",
   DISABLED: "已冻结",
   EXPIRED: "已过期",
+};
+
+function formatCardValue(type: string, value: number) {
+  switch (type) {
+    case "VIP_DAYS":
+      return `${value} 天`;
+    case "PAID_ARTICLE":
+      return `${value} 篇`;
+    case "BALANCE":
+      return `¥${value}`;
+    case "GENERIC":
+      return "通用";
+    default:
+      return String(value);
+  }
+}
+
+type MembershipProduct = {
+  productType: string;
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  priceLabel: string;
+  published: boolean;
+  enabled: boolean;
 };
 
 type TabId = "generate" | "inventory" | "products" | "logs";
@@ -55,6 +89,8 @@ export default function AdminCardsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [packageFilter, setPackageFilter] = useState("");
+  const [hideVipCards, setHideVipCards] = useState(true);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -70,14 +106,29 @@ export default function AdminCardsPage() {
   const [genFormat, setGenFormat] = useState("standard");
   const [genRemark, setGenRemark] = useState("");
   const [genImport, setGenImport] = useState("");
+  const [genMode, setGenMode] = useState<"import" | "random">("import");
+  const [importMode, setImportMode] = useState<"secrets" | "pairs">("secrets");
   const [autoActivate, setAutoActivate] = useState(true);
   const [cardPackages, setCardPackages] = useState<CardPackageRecord[]>([]);
+  const [membershipProducts, setMembershipProducts] = useState<MembershipProduct[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [editingPackage, setEditingPackage] = useState<CardPackageRecord | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<"create" | "edit">("edit");
   const [genResult, setGenResult] = useState<{ batchNo: string; count: number; cards: Array<{ cardNo: string; cardSecret: string }> } | null>(null);
   const [genError, setGenError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const loadMembershipProducts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/membership-products");
+      if (!res.ok) return;
+      const data = await res.json();
+      setMembershipProducts((data.data || []) as MembershipProduct[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const loadCardPackages = useCallback(async () => {
     try {
@@ -119,6 +170,8 @@ export default function AdminCardsPage() {
       try {
         const params = new URLSearchParams({ page: String(p), pageSize: "20" });
         if (statusFilter) params.set("status", statusFilter);
+        if (packageFilter) params.set("packageId", packageFilter);
+        if (hideVipCards) params.set("excludeType", "VIP_DAYS");
         if (search) params.set("search", search);
         const res = await fetch(`/api/admin/cards?${params}`);
         if (!res.ok) throw new Error(`请求失败 (${res.status})`);
@@ -131,13 +184,14 @@ export default function AdminCardsPage() {
       }
       setLoading(false);
     },
-    [statusFilter, search]
+    [statusFilter, packageFilter, hideVipCards, search]
   );
 
   useEffect(() => {
     loadStats();
     loadCardPackages();
-  }, [loadStats, loadCardPackages]);
+    loadMembershipProducts();
+  }, [loadStats, loadCardPackages, loadMembershipProducts]);
 
   useEffect(() => {
     if (tab === "inventory" || tab === "logs") load(page);
@@ -147,34 +201,119 @@ export default function AdminCardsPage() {
     setSelectedPackageId(pkg.id);
     setGenType(pkg.cardType);
     setGenValue(String(pkg.cardValue));
+    if (pkg.cardType === "GENERIC") {
+      setGenMode("import");
+      setImportMode("secrets");
+    }
   };
 
-  const savePackage = (payload: {
-    name: string;
-    description: string;
-    intro: string | null;
-    highlights: string[];
-    usageSteps: string[];
-    price: number;
-    badge: string;
-    accent: string;
-    cover: string | null;
-    published: boolean;
-  }) => {
-    if (!editingPackage) return;
+  const selectedPackage = cardPackages.find((p) => p.id === selectedPackageId);
+  const importLineCount = genImport.split("\n").map((l) => l.trim()).filter(Boolean).length;
+
+  const savePackage = (payload: CardPackageSavePayload) => {
     startTransition(async () => {
-      const res = await fetch(`/api/admin/card-packages/${editingPackage.id}`, {
+      const isCreate = editorMode === "create";
+      const res = await fetch(
+        isCreate ? "/api/admin/card-packages" : `/api/admin/card-packages/${editingPackage!.id}`,
+        {
+          method: isCreate ? "POST" : "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || (isCreate ? "创建失败" : "保存失败"));
+        return;
+      }
+      const saved = data.data as CardPackageRecord;
+      setEditorOpen(false);
+      setEditingPackage(null);
+      setEditorMode("edit");
+      await loadCardPackages();
+      if (saved?.id) {
+        setSelectedPackageId(saved.id);
+        applyPackage(saved);
+      }
+    });
+  };
+
+  const openCreatePackage = () => {
+    setEditorMode("create");
+    setEditingPackage(null);
+    setEditorOpen(true);
+  };
+
+  const openEditPackage = (pkg: CardPackageRecord) => {
+    setEditorMode("edit");
+    setEditingPackage(pkg);
+    setEditorOpen(true);
+  };
+
+  const patchPackage = (id: string, payload: { published?: boolean; enabled?: boolean }) => {
+    startTransition(async () => {
+      const res = await fetch(`/api/admin/card-packages/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.message || "保存失败");
+        alert(data.message || "操作失败");
         return;
       }
-      setEditorOpen(false);
-      setEditingPackage(null);
+      await loadCardPackages();
+    });
+  };
+
+  const togglePackagePublish = (pkg: CardPackageRecord) => {
+    const nextPublished = !pkg.published;
+    patchPackage(pkg.id, {
+      published: nextPublished,
+      enabled: nextPublished,
+    });
+  };
+
+  const toggleMembershipPublish = (item: MembershipProduct) => {
+    const nextPublished = !item.published;
+    startTransition(async () => {
+      const res = await fetch("/api/admin/membership-products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productType: item.productType,
+          published: nextPublished,
+          enabled: nextPublished,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "操作失败");
+        return;
+      }
+      await loadMembershipProducts();
+    });
+  };
+
+  const deletePackage = (pkg: CardPackageRecord) => {
+    const stock = pkg.stock ?? 0;
+    const hint =
+      stock > 0
+        ? `「${pkg.name}」还有 ${stock} 张可售库存，需先清空或售出后才能删除。`
+        : `确定删除商品「${pkg.name}」？此操作不可恢复。`;
+    if (!window.confirm(hint)) return;
+    if (stock > 0) return;
+
+    startTransition(async () => {
+      const res = await fetch(`/api/admin/card-packages/${pkg.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "删除失败");
+        return;
+      }
+      if (selectedPackageId === pkg.id) {
+        setSelectedPackageId("");
+      }
       await loadCardPackages();
     });
   };
@@ -182,10 +321,20 @@ export default function AdminCardsPage() {
   const handleGenerate = () => {
     setGenError("");
     setGenResult(null);
+    if (!selectedPackageId) {
+      setGenError("请先选择关联商品");
+      return;
+    }
     const importLines = genImport
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean);
+    const useImport = genMode === "import" || importLines.length > 0;
+
+    if (useImport && importLines.length === 0) {
+      setGenError("请粘贴至少一行卡密");
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -193,14 +342,14 @@ export default function AdminCardsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type: genType,
-            value: parseInt(genValue) || 30,
-            count: importLines.length > 0 ? undefined : parseInt(genCount) || 10,
+            packageId: selectedPackageId,
+            count: useImport ? undefined : parseInt(genCount) || 10,
             expireDays: parseInt(genExpireDays) || 365,
             batchNo: genBatchNo.trim() || genRemark.trim() || undefined,
             prefix: genPrefix.trim() || undefined,
             format: genFormat,
-            importLines: importLines.length > 0 ? importLines : undefined,
+            importLines: useImport ? importLines : undefined,
+            importMode: useImport ? importMode : undefined,
             autoActivate,
           }),
         });
@@ -208,6 +357,7 @@ export default function AdminCardsPage() {
         if (!res.ok) throw new Error(data.message);
         setGenResult(data.data);
         loadStats();
+        loadCardPackages();
         if (tab !== "inventory") setTab("inventory");
         load(1);
       } catch (e: unknown) {
@@ -252,12 +402,6 @@ export default function AdminCardsPage() {
       return `${genPrefix || "CM"}-${seg()}-${seg()}-${seg()}`;
     });
     alert(`预览前 ${count} 张卡号:\n\n${lines.join("\n")}`);
-  };
-
-  const formatPrice = (type: string, value: number) => {
-    if (type === "BALANCE") return `¥${value}`;
-    if (type === "VIP_DAYS") return value >= 365 ? `¥268` : value >= 90 ? `¥79.9` : `¥29.9`;
-    return `¥${value}`;
   };
 
   return (
@@ -339,7 +483,23 @@ export default function AdminCardsPage() {
       {tab === "generate" && (
         <div className="admin-panel" id="createSection">
           <div className="admin-panel-header">
-            <div className="admin-panel-title">⚡ 快速生成卡密</div>
+            <div className="admin-panel-title">📥 导入 / 生成卡密</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                type="button"
+                className={`admin-chip${genMode === "import" ? " active" : ""}`}
+                onClick={() => setGenMode("import")}
+              >
+                导入卡密
+              </button>
+              <button
+                type="button"
+                className={`admin-chip${genMode === "random" ? " active" : ""}`}
+                onClick={() => setGenMode("random")}
+              >
+                随机生成
+              </button>
+            </div>
           </div>
           <div className="admin-panel-body">
             {genError && (
@@ -348,7 +508,7 @@ export default function AdminCardsPage() {
               </div>
             )}
             <div className="admin-form-grid">
-              <div className="admin-form-group">
+              <div className="admin-form-group full">
                 <label className="admin-form-label">关联商品</label>
                 <select
                   className="admin-form-select"
@@ -358,82 +518,121 @@ export default function AdminCardsPage() {
                     if (pkg) applyPackage(pkg);
                   }}
                 >
-                  {cardPackages.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (¥{p.price}){p.published ? " · 已发布" : ""}
-                    </option>
-                  ))}
+                  {cardPackages.length === 0 ? (
+                    <option value="">暂无商品，请先在「商品管理」创建</option>
+                  ) : (
+                    cardPackages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (¥{p.price}) · 库存 {p.stock ?? 0}
+                        {p.published ? " · 已发布" : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
-                {cardPackages.find((p) => p.id === selectedPackageId)?.description ? (
+                {selectedPackage?.description ? (
                   <div className="admin-form-hint" style={{ marginTop: 6 }}>
-                    {cardPackages.find((p) => p.id === selectedPackageId)?.description}
+                    {selectedPackage.description}
+                    {selectedPackage.cardType ? (
+                      <span>
+                        {" "}
+                        · 权益 {formatCardValue(selectedPackage.cardType, selectedPackage.cardValue)}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">生成数量</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    className="admin-form-input"
-                    type="number"
-                    value={genCount}
-                    onChange={(e) => setGenCount(e.target.value)}
-                    min={1}
-                    max={500}
-                    style={{ flex: 1 }}
-                  />
-                  <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>张 (上限 500)</span>
-                </div>
-              </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">卡密格式</label>
-                <select className="admin-form-select" value={genFormat} onChange={(e) => setGenFormat(e.target.value)}>
-                  <option value="standard">标准格式 (XXXX-XXXX-XXXX)</option>
-                  <option value="uuid">UUID 格式</option>
-                  <option value="numeric">纯数字 (16位)</option>
-                  <option value="custom">自定义前缀 + 随机</option>
-                </select>
-              </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">自定义前缀 (可选)</label>
-                <input
-                  className="admin-form-input"
-                  value={genPrefix}
-                  onChange={(e) => setGenPrefix(e.target.value.slice(0, 10))}
-                  placeholder="如: CM-PRO-"
-                />
-              </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">有效期</label>
-                <select
-                  className="admin-form-select"
-                  value={genExpireDays}
-                  onChange={(e) => setGenExpireDays(e.target.value)}
-                >
-                  <option value="0">永不过期</option>
-                  <option value="30">激活后 30 天</option>
-                  <option value="90">激活后 90 天</option>
-                  <option value="365">激活后 365 天</option>
-                </select>
-              </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">卡密类型 / 数值</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <select className="admin-form-select" value={genType} onChange={(e) => setGenType(e.target.value)} style={{ flex: 1 }}>
-                    <option value="VIP_DAYS">VIP天数</option>
-                    <option value="PAID_ARTICLE">付费文章</option>
-                    <option value="BALANCE">余额</option>
-                  </select>
-                  <input
-                    className="admin-form-input"
-                    type="number"
-                    value={genValue}
-                    onChange={(e) => setGenValue(e.target.value)}
-                    min={1}
-                    style={{ width: 80 }}
-                  />
-                </div>
-              </div>
+
+              {genMode === "import" ? (
+                <>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">导入格式</label>
+                    <select
+                      className="admin-form-select"
+                      value={importMode}
+                      onChange={(e) => setImportMode(e.target.value as "secrets" | "pairs")}
+                    >
+                      <option value="secrets">仅卡密（卡号自动生成，推荐）</option>
+                      <option value="pairs">卡号 + 卡密（逗号分隔）</option>
+                    </select>
+                  </div>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">自动卡号前缀</label>
+                    <input
+                      className="admin-form-input"
+                      value={genPrefix}
+                      onChange={(e) => setGenPrefix(e.target.value.slice(0, 10))}
+                      placeholder="CM"
+                      disabled={importMode === "pairs"}
+                    />
+                  </div>
+                  <div className="admin-form-group full">
+                    <label className="admin-form-label">
+                      粘贴卡密 {importLineCount > 0 ? `（已识别 ${importLineCount} 条）` : ""}
+                    </label>
+                    <textarea
+                      className="admin-form-textarea"
+                      rows={10}
+                      value={genImport}
+                      onChange={(e) => setGenImport(e.target.value)}
+                      placeholder={
+                        importMode === "secrets"
+                          ? "每行一个卡密，卡号由系统自动生成\n例如:\nABCD-1234-EFGH-5678\nXK9mP2nQ8rT5vW1y\n第三方平台发来的兑换码..."
+                          : "每行一组：卡号,卡密\n例如:\nCM-AAAA-BBBB-CCCC,SECRET123"
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">生成数量</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        className="admin-form-input"
+                        type="number"
+                        value={genCount}
+                        onChange={(e) => setGenCount(e.target.value)}
+                        min={1}
+                        max={500}
+                        style={{ flex: 1 }}
+                      />
+                      <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>张 (上限 500)</span>
+                    </div>
+                  </div>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">卡号格式</label>
+                    <select className="admin-form-select" value={genFormat} onChange={(e) => setGenFormat(e.target.value)}>
+                      <option value="standard">标准格式 (XXXX-XXXX-XXXX)</option>
+                      <option value="uuid">UUID 格式</option>
+                      <option value="numeric">纯数字 (16位)</option>
+                      <option value="custom">自定义前缀 + 随机</option>
+                    </select>
+                  </div>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">卡号前缀</label>
+                    <input
+                      className="admin-form-input"
+                      value={genPrefix}
+                      onChange={(e) => setGenPrefix(e.target.value.slice(0, 10))}
+                      placeholder="CM"
+                    />
+                  </div>
+                  <div className="admin-form-group">
+                    <label className="admin-form-label">有效期</label>
+                    <select
+                      className="admin-form-select"
+                      value={genExpireDays}
+                      onChange={(e) => setGenExpireDays(e.target.value)}
+                    >
+                      <option value="0">永不过期</option>
+                      <option value="30">激活后 30 天</option>
+                      <option value="90">激活后 90 天</option>
+                      <option value="365">激活后 365 天</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div className="admin-form-group full">
                 <label className="admin-form-label">备注标签 (批次号)</label>
                 <input
@@ -441,15 +640,6 @@ export default function AdminCardsPage() {
                   value={genRemark}
                   onChange={(e) => setGenRemark(e.target.value)}
                   placeholder="如: 2026年7月促销活动"
-                />
-              </div>
-              <div className="admin-form-group full">
-                <label className="admin-form-label">批量导入 (每行一个，覆盖上方生成设置)</label>
-                <textarea
-                  className="admin-form-textarea"
-                  value={genImport}
-                  onChange={(e) => setGenImport(e.target.value)}
-                  placeholder={"粘贴自定义卡密，每行一个...\n例如:\nCM-XXXX-XXXX-XXXX\nCM-YYYY-YYYY-YYYY,SECRET123"}
                 />
               </div>
             </div>
@@ -468,21 +658,31 @@ export default function AdminCardsPage() {
                 type="button"
                 className={`admin-toggle${autoActivate ? " on" : ""}`}
                 onClick={() => setAutoActivate((v) => !v)}
-                aria-label="生成后自动激活"
+                aria-label="导入后自动上架"
               />
-              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>生成后自动激活</span>
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                {genMode === "import" ? "导入后自动上架" : "生成后自动激活"}
+              </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={previewKeys}>
-                预览卡密
-              </button>
+              {genMode === "random" && (
+                <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={previewKeys}>
+                  预览卡号
+                </button>
+              )}
               <button
                 type="button"
                 className="admin-btn admin-btn-accent admin-btn-sm"
                 onClick={handleGenerate}
-                disabled={isPending}
+                disabled={isPending || !selectedPackageId}
               >
-                {isPending ? "生成中..." : "生成卡密"}
+                {isPending
+                  ? genMode === "import"
+                    ? "导入中..."
+                    : "生成中..."
+                  : genMode === "import"
+                    ? `导入${importLineCount > 0 ? ` ${importLineCount} 条` : ""}`
+                    : "生成卡密"}
               </button>
             </div>
           </div>
@@ -534,11 +734,37 @@ export default function AdminCardsPage() {
                 }}
               />
             </div>
+            <select
+              className="admin-form-select"
+              value={packageFilter}
+              onChange={(e) => {
+                setPackageFilter(e.target.value);
+                setPage(1);
+              }}
+              style={{ minWidth: 160, fontSize: 12 }}
+            >
+              <option value="">全部商品</option>
+              {cardPackages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`admin-chip${hideVipCards ? " active" : ""}`}
+              onClick={() => {
+                setHideVipCards((v) => !v);
+                setPage(1);
+              }}
+            >
+              隐藏会员类
+            </button>
             <div className="admin-filter-chips">
               {[
                 { id: "", label: "全部" },
                 { id: "ACTIVE", label: "未售" },
-                { id: "USED", label: "已售" },
+                { id: "USED", label: "已售/已兑" },
                 { id: "EXPIRED", label: "已过期" },
                 { id: "DISABLED", label: "已冻结" },
               ].map((f) => (
@@ -562,8 +788,9 @@ export default function AdminCardsPage() {
               <thead>
                 <tr>
                   <th>卡号</th>
+                  <th>所属商品</th>
                   <th>类型</th>
-                  <th>面值</th>
+                  <th>权益</th>
                   <th>状态</th>
                   <th>批次</th>
                   <th>使用者</th>
@@ -574,19 +801,19 @@ export default function AdminCardsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
+                    <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
                       加载中...
                     </td>
                   </tr>
                 ) : loadError ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "var(--rose)" }}>
+                    <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--rose)" }}>
                       {loadError}
                     </td>
                   </tr>
                 ) : cards.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div style={{ padding: 32 }}>
                         <EmptyState title="暂无卡密" description="还没有任何卡密记录。" />
                       </div>
@@ -596,14 +823,15 @@ export default function AdminCardsPage() {
                   cards.map((c) => (
                     <tr key={c.id}>
                       <td className="mono">{c.cardNo}</td>
+                      <td style={{ fontSize: 11, maxWidth: 120 }}>{c.packageName || "—"}</td>
                       <td>
                         <span className="admin-badge purple">{TYPE_LABELS[c.type] || c.type}</span>
                       </td>
-                      <td className="mono">{formatPrice(c.type, c.value)}</td>
+                      <td className="mono">{formatCardValue(c.type, c.value)}</td>
                       <td>
                         <span
                           className={`admin-badge ${
-                            c.status === "USED"
+                            c.status === "USED" || c.status === "SOLD"
                               ? "success"
                               : c.status === "ACTIVE"
                                 ? "warning"
@@ -686,10 +914,50 @@ export default function AdminCardsPage() {
 
       {tab === "products" && (
         <>
+          <div className="admin-section-title" style={{ marginBottom: 8 }}>
+            会员套餐
+          </div>
+          <div className="admin-section-desc" style={{ marginBottom: 14 }}>
+            月度/年度会员的上下架会同步影响前台商店展示与下单。
+          </div>
+          <div className="admin-product-grid" style={{ marginBottom: 28 }}>
+            {membershipProducts.map((item) => (
+              <div key={item.productType} className="admin-product-card">
+                <div className="admin-product-name">{item.name}</div>
+                <div className="admin-product-price">{item.priceLabel}</div>
+                <p className="admin-product-desc">{item.description}</p>
+                <div className="admin-product-meta">
+                  <span>👑 会员套餐</span>
+                  <span className={item.published ? "admin-stat-up" : ""}>
+                    {item.published ? "✅ 已上架" : "📝 已下架"}
+                  </span>
+                </div>
+                <div className="admin-product-card-actions">
+                  <button
+                    type="button"
+                    className={`admin-btn admin-btn-sm ${item.published ? "admin-btn-ghost" : "admin-btn-accent"}`}
+                    onClick={() => toggleMembershipPublish(item)}
+                    disabled={isPending}
+                  >
+                    {item.published ? "下架" : "上架"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              配置卡密商品介绍，发布后前台商店会展示详情弹窗
+            <div>
+              <div className="admin-section-title" style={{ marginBottom: 4 }}>
+                卡密商品
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                新建商品后，到「生成卡密」导入库存
+              </div>
             </div>
+            <button type="button" className="admin-btn admin-btn-accent admin-btn-sm" onClick={openCreatePackage}>
+              + 新建商品
+            </button>
           </div>
           <div className="admin-product-grid">
             {cardPackages.map((pkg) => (
@@ -706,16 +974,21 @@ export default function AdminCardsPage() {
                     {pkg.published ? "✅ 已发布" : "📝 草稿"}
                   </span>
                 </div>
-                <div className="admin-product-card-actions">
+                <div className="admin-product-card-actions" style={{ flexWrap: "wrap" }}>
                   <button
                     type="button"
                     className="admin-btn admin-btn-ghost admin-btn-sm"
-                    onClick={() => {
-                      setEditingPackage(pkg);
-                      setEditorOpen(true);
-                    }}
+                    onClick={() => openEditPackage(pkg)}
                   >
-                    编辑介绍
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-btn admin-btn-sm ${pkg.published ? "admin-btn-ghost" : "admin-btn-accent"}`}
+                    onClick={() => togglePackagePublish(pkg)}
+                    disabled={isPending}
+                  >
+                    {pkg.published ? "下架" : "上架"}
                   </button>
                   <button
                     type="button"
@@ -725,7 +998,15 @@ export default function AdminCardsPage() {
                       setTab("generate");
                     }}
                   >
-                    去生成卡密
+                    导入卡密
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-danger admin-btn-sm"
+                    onClick={() => deletePackage(pkg)}
+                    disabled={isPending}
+                  >
+                    删除
                   </button>
                 </div>
               </div>
@@ -780,10 +1061,12 @@ export default function AdminCardsPage() {
       <CardPackageEditor
         pkg={editingPackage}
         open={editorOpen}
+        mode={editorMode}
         saving={isPending}
         onClose={() => {
           setEditorOpen(false);
           setEditingPackage(null);
+          setEditorMode("edit");
         }}
         onSave={savePackage}
       />

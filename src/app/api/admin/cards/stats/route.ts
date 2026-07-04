@@ -10,11 +10,19 @@ export async function GET() {
 
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [total, used, active, disabled, expired, weekNew, revenueResult, byType, batches] =
+    const soldWhere = {
+      OR: [{ status: "USED" as const }, { orderId: { not: null } }],
+    };
+    const availableWhere = {
+      status: "ACTIVE" as const,
+      orderId: null,
+    };
+
+    const [total, used, active, disabled, expired, weekNew, revenueResult, byPackage, batches] =
       await Promise.all([
         prisma.card.count(),
-        prisma.card.count({ where: { status: "USED" } }),
-        prisma.card.count({ where: { status: "ACTIVE" } }),
+        prisma.card.count({ where: soldWhere }),
+        prisma.card.count({ where: availableWhere }),
         prisma.card.count({ where: { status: "DISABLED" } }),
         prisma.card.count({ where: { status: "EXPIRED" } }),
         prisma.card.count({ where: { createdAt: { gte: weekAgo } } }),
@@ -23,7 +31,8 @@ export async function GET() {
           where: { status: "PAID" },
         }),
         prisma.card.groupBy({
-          by: ["type", "value", "status"],
+          by: ["packageId", "status"],
+          where: { packageId: { not: null } },
           _count: true,
         }),
         prisma.card.groupBy({
@@ -37,14 +46,13 @@ export async function GET() {
 
     const productMap = new Map<
       string,
-      { type: string; value: number; total: number; active: number; used: number }
+      { packageId: string; total: number; active: number; used: number }
     >();
 
-    for (const row of byType) {
-      const key = `${row.type}:${row.value}`;
-      const existing = productMap.get(key) || {
-        type: row.type,
-        value: row.value,
+    for (const row of byPackage) {
+      if (!row.packageId) continue;
+      const existing = productMap.get(row.packageId) || {
+        packageId: row.packageId,
         total: 0,
         active: 0,
         used: 0,
@@ -52,7 +60,7 @@ export async function GET() {
       existing.total += row._count;
       if (row.status === "ACTIVE") existing.active += row._count;
       if (row.status === "USED") existing.used += row._count;
-      productMap.set(key, existing);
+      productMap.set(row.packageId, existing);
     }
 
     return ok({
@@ -64,7 +72,12 @@ export async function GET() {
       weekNew,
       revenue: Number(revenueResult._sum.amount || 0),
       sellRate: total > 0 ? Math.round((used / total) * 1000) / 10 : 0,
-      products: Array.from(productMap.values()).sort((a, b) => b.total - a.total),
+      products: Array.from(productMap.values()).sort((a, b) => b.total - a.total).map((p) => ({
+        packageId: p.packageId,
+        total: p.total,
+        active: p.active,
+        used: p.used,
+      })),
       batches: batches
         .filter((b) => b.batchNo)
         .map((b) => ({

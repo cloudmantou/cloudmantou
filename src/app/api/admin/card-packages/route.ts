@@ -18,9 +18,10 @@ const packageSchema = z.object({
   intro: z.string().max(8000).optional().nullable(),
   highlights: z.array(z.string().max(200)).max(12).optional(),
   usageSteps: z.array(z.string().max(300)).max(8).optional(),
-  cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE"]),
+  cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE", "GENERIC"]),
+  redemptionNote: z.string().max(500).optional().nullable(),
   cardValue: z.number().int().min(1),
-  price: z.number().positive(),
+  price: z.number().min(0.01),
   badge: z.string().max(32).optional(),
   accent: z.string().max(32).optional(),
   cover: z.string().max(2000).optional().nullable(),
@@ -35,15 +36,16 @@ async function listPackagesWithStock() {
   });
 
   const stockRows = await prisma.card.groupBy({
-    by: ["type", "value", "status"],
-    where: { status: "ACTIVE" },
+    by: ["packageId"],
+    where: { status: "ACTIVE", orderId: null, packageId: { not: null } },
     _count: true,
   });
 
   const stockMap = new Map<string, number>();
   for (const row of stockRows) {
-    const key = `${row.type}:${row.value}`;
-    stockMap.set(key, (stockMap.get(key) || 0) + row._count);
+    if (row.packageId) {
+      stockMap.set(row.packageId, row._count);
+    }
   }
 
   return packages.map((pkg) => ({
@@ -51,7 +53,7 @@ async function listPackagesWithStock() {
     price: Number(pkg.price),
     highlights: pkg.highlights,
     usageSteps: pkg.usageSteps,
-    stock: stockMap.get(`${pkg.cardType}:${pkg.cardValue}`) || 0,
+    stock: stockMap.get(pkg.id) || 0,
   }));
 }
 
@@ -124,13 +126,14 @@ export async function POST(req: NextRequest) {
         badge: data.badge || "NEW",
         accent: data.accent || "gold",
         cover: data.cover || null,
+        redemptionNote: data.redemptionNote || null,
         enabled: data.enabled ?? true,
         published: data.published ?? false,
         sortOrder: data.sortOrder ?? 0,
       },
     });
 
-    const stock = await countActiveCardStock(prisma, created.cardType, created.cardValue);
+    const stock = await countActiveCardStock(prisma, created.id);
     return ok({ ...created, price: Number(created.price), stock });
   } catch (error) {
     if (error instanceof ApiError) {

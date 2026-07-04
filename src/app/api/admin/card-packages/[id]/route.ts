@@ -14,9 +14,10 @@ const updateSchema = z.object({
   intro: z.string().max(8000).optional().nullable(),
   highlights: z.array(z.string().max(200)).max(12).optional(),
   usageSteps: z.array(z.string().max(300)).max(8).optional(),
-  cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE"]).optional(),
+  cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE", "GENERIC"]).optional(),
+  redemptionNote: z.string().max(500).optional().nullable(),
   cardValue: z.number().int().min(1).optional(),
-  price: z.number().positive().optional(),
+  price: z.number().min(0.01).optional(),
   badge: z.string().max(32).optional(),
   accent: z.string().max(32).optional(),
   cover: z.string().max(2000).optional().nullable(),
@@ -67,13 +68,14 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         ...(data.badge !== undefined && { badge: data.badge }),
         ...(data.accent !== undefined && { accent: data.accent }),
         ...(data.cover !== undefined && { cover: data.cover }),
+        ...(data.redemptionNote !== undefined && { redemptionNote: data.redemptionNote }),
         ...(data.enabled !== undefined && { enabled: data.enabled }),
         ...(data.published !== undefined && { published: data.published }),
         ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
       },
     });
 
-    const stock = await countActiveCardStock(prisma, updated.cardType, updated.cardValue);
+    const stock = await countActiveCardStock(prisma, updated.id);
     return ok({ ...updated, price: Number(updated.price), stock });
   } catch (error) {
     if (error instanceof ApiError) {
@@ -92,6 +94,16 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
     if (!existing) {
       return fail("卡密商品不存在", 40400, 404);
     }
+
+    const boundCards = await prisma.card.count({ where: { packageId: id } });
+    if (boundCards > 0) {
+      return fail(
+        `该商品下还有 ${boundCards} 张卡密，请先在库存中处理或转移后再删除`,
+        40900,
+        409
+      );
+    }
+
     await prisma.cardPackage.delete({ where: { id } });
     return ok({ deleted: true });
   } catch (error) {
