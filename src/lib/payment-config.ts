@@ -91,7 +91,8 @@ export async function getPaymentRuntimeConfig(): Promise<PaymentRuntimeConfig> {
     "http://localhost:3000"
   ).replace(/\/$/, "");
 
-  const testMode = testModeRow?.value === "true";
+  const testMode =
+    testModeRow?.value === "true" && process.env.PAYMENT_TEST_MODE === "true";
 
   const alipayDb = (gateways.alipay || {}) as Record<string, string | boolean>;
   const wechatDb = (gateways.wechat || {}) as Record<string, string | boolean>;

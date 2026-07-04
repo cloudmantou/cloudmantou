@@ -18,8 +18,7 @@ export function rateLimit(
 }
 
 function trustProxyHeaders(): boolean {
-  if (process.env.TRUST_PROXY_HEADERS === "true") return true;
-  return process.env.NODE_ENV !== "production";
+  return process.env.TRUST_PROXY_HEADERS === "true";
 }
 
 export function getClientIP(req: NextRequest | Request): string {

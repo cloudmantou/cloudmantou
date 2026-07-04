@@ -4,6 +4,13 @@ const PREFIX = "enc:v1:";
 const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
 
+const SETTINGS_ENCRYPTION_KEY = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
+if (!SETTINGS_ENCRYPTION_KEY) {
+  throw new Error(
+    "SETTINGS_ENCRYPTION_KEY is required — set it in .env (generate with: openssl rand -hex 32)"
+  );
+}
+
 const SENSITIVE_GATEWAY_FIELDS = new Set([
   "privateKey",
   "publicKey",
@@ -14,13 +21,8 @@ const SENSITIVE_GATEWAY_FIELDS = new Set([
   "key",
 ]);
 
-function getEncryptionKey(): Buffer | null {
-  const raw =
-    process.env.SETTINGS_ENCRYPTION_KEY?.trim() ||
-    process.env.AUTH_SECRET?.trim() ||
-    "";
-  if (!raw) return null;
-  return crypto.createHash("sha256").update(raw, "utf8").digest();
+function getEncryptionKey(): Buffer {
+  return crypto.createHash("sha256").update(SETTINGS_ENCRYPTION_KEY!, "utf8").digest();
 }
 
 export function isEncryptedSecret(value: string): boolean {
@@ -28,17 +30,14 @@ export function isEncryptedSecret(value: string): boolean {
 }
 
 export function encryptSecret(plaintext: string): string {
-  const trimmed = plaintext.trim();
-  if (!trimmed || trimmed.includes("••••") || isEncryptedSecret(trimmed)) {
+  if (!plaintext || plaintext.includes("••••") || isEncryptedSecret(plaintext)) {
     return plaintext;
   }
+
+  const trimmed = plaintext.trim();
+  if (!trimmed) return plaintext;
 
   const key = getEncryptionKey();
-  if (!key) {
-    console.warn("[secret-crypto] SETTINGS_ENCRYPTION_KEY/AUTH_SECRET missing, storing gateway secret in plaintext");
-    return plaintext;
-  }
-
   const iv = crypto.randomBytes(IV_BYTES);
   const cipher = crypto.createCipheriv(ALGO, key, iv);
   const encrypted = Buffer.concat([cipher.update(trimmed, "utf8"), cipher.final()]);
@@ -51,11 +50,6 @@ export function decryptSecret(value: string): string {
   if (!value || !isEncryptedSecret(value)) return value;
 
   const key = getEncryptionKey();
-  if (!key) {
-    console.warn("[secret-crypto] cannot decrypt gateway secret without SETTINGS_ENCRYPTION_KEY/AUTH_SECRET");
-    return "";
-  }
-
   try {
     const payload = Buffer.from(value.slice(PREFIX.length), "base64");
     const iv = payload.subarray(0, IV_BYTES);

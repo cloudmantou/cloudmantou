@@ -5,6 +5,10 @@ import type { Role } from "@prisma/client";
 import { prisma } from "./prisma";
 import { rateLimit, RATE_LIMITS } from "./rate-limit";
 
+/** 固定 bcrypt 哈希，用于用户不存在时占位比对，缓解时序探测 */
+const DUMMY_PASSWORD_HASH =
+  "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/HS.i8Hy";
+
 export const {
   handlers,    // GET/POST handlers for /api/auth/*
   auth,        // 服务端获取 session
@@ -29,6 +33,7 @@ export const {
         }
 
         const identifier = (credentials.email as string).trim();
+        const password = credentials.password as string;
 
         // 登录限流仅用内存实现，避免 auth/middleware 打包 ioredis（node: 协议导致 Webpack 构建失败）
         const rlResult = rateLimit(
@@ -46,12 +51,12 @@ export const {
             : { username: identifier },
         });
 
-        if (!user) return null;
+        if (!user) {
+          await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+          return null;
+        }
 
-        const isValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password
-        );
+        const isValid = await bcrypt.compare(password, user.password);
 
         if (!isValid) return null;
 
@@ -67,16 +72,37 @@ export const {
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.role = user.role;
         token.id = user.id;
         token.nickname = user.nickname ?? null;
         token.username = user.username ?? null;
       }
+
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, nickname: true, username: true },
+        });
+
+        if (!dbUser) {
+          token.sessionInvalid = true;
+          return token;
+        }
+
+        token.role = dbUser.role;
+        token.nickname = dbUser.nickname;
+        token.username = dbUser.username;
+      }
+
       return token;
     },
     session({ session, token }) {
+      if (token.sessionInvalid) {
+        return { ...session, expires: new Date(0).toISOString() };
+      }
+
       if (session.user) {
         // NextAuth v5 beta 的 JWT 索引签名 [key: string]: unknown 会导致
         // 模块扩展中的具体类型被遮蔽，此处使用精确类型断言（非 as any）

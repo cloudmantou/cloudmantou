@@ -155,14 +155,34 @@ describe("checkRateLimit — 返回 429 响应", () => {
 });
 
 describe("getClientIP — 客户端 IP 提取", () => {
-  it("优先使用 x-forwarded-for 的第一个 IP", () => {
+  const originalTrustProxy = process.env.TRUST_PROXY_HEADERS;
+
+  afterEach(() => {
+    if (originalTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY_HEADERS;
+    } else {
+      process.env.TRUST_PROXY_HEADERS = originalTrustProxy;
+    }
+  });
+
+  it("默认不信任代理头，伪造 x-forwarded-for 时返回 unknown", () => {
+    delete process.env.TRUST_PROXY_HEADERS;
+    const req = new NextRequest("http://localhost", {
+      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+    });
+    expect(getClientIP(req)).toBe("unknown");
+  });
+
+  it("TRUST_PROXY_HEADERS=true 时优先使用 x-forwarded-for 的第一个 IP", () => {
+    process.env.TRUST_PROXY_HEADERS = "true";
     const req = new NextRequest("http://localhost", {
       headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
     expect(getClientIP(req)).toBe("1.2.3.4");
   });
 
-  it("回退到 x-real-ip", () => {
+  it("TRUST_PROXY_HEADERS=true 时回退到 x-real-ip", () => {
+    process.env.TRUST_PROXY_HEADERS = "true";
     const req = new NextRequest("http://localhost", {
       headers: { "x-real-ip": "9.9.9.9" },
     });

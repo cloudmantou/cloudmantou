@@ -67,15 +67,14 @@ export async function POST(req: NextRequest) {
         }
       }
     } else {
-      if (contentType.includes("xml")) {
-        body = parseXmlBody(rawBody);
-      } else {
-        try {
-          body = JSON.parse(rawBody);
-        } catch {
-          body = Object.fromEntries(new URLSearchParams(rawBody));
-        }
+      const isXml =
+        contentType.includes("xml") || rawBody.trim().startsWith("<xml");
+      if (!isXml) {
+        console.warn("[WeChat v2] Rejected non-XML callback", { contentType });
+        return wechatV2Response("FAIL", "invalid content type");
       }
+
+      body = parseXmlBody(rawBody);
 
       const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
       if (!apiKey) {
@@ -86,6 +85,18 @@ export async function POST(req: NextRequest) {
       if (!verifyWechatSign(body, apiKey)) {
         console.warn("[WeChat v2] Signature verification failed");
         return wechatV2Response("FAIL", "签名验证失败");
+      }
+
+      const expectedAppId = paymentConfig.wechat?.appId;
+      if (expectedAppId && body.appid !== expectedAppId) {
+        console.warn("[WeChat v2] appid mismatch:", body.appid, "expected:", expectedAppId);
+        return wechatV2Response("FAIL", "appid mismatch");
+      }
+
+      const expectedMchId = paymentConfig.wechat?.mchId;
+      if (expectedMchId && body.mch_id !== expectedMchId) {
+        console.warn("[WeChat v2] mch_id mismatch:", body.mch_id, "expected:", expectedMchId);
+        return wechatV2Response("FAIL", "mch mismatch");
       }
     }
 

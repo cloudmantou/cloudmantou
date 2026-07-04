@@ -35,9 +35,20 @@ const gatewaySchema = z.object({
   apiUrl: z.string().optional(),
 });
 
+const gatewaysSchema = z
+  .object({
+    alipay: gatewaySchema.optional(),
+    wechat: gatewaySchema.optional(),
+    stripe: gatewaySchema.optional(),
+    usdt: gatewaySchema.optional(),
+    epay: gatewaySchema.optional(),
+    vpay: gatewaySchema.optional(),
+  })
+  .strict();
+
 const saveSchema = z.object({
   testMode: z.boolean().optional(),
-  gateways: z.record(gatewaySchema).optional(),
+  gateways: gatewaysSchema.optional(),
 });
 
 function maskSecret(value?: string) {
@@ -167,7 +178,10 @@ export async function GET() {
         successRate,
       },
       channelStats,
-      testMode: testModeRow?.value === "true",
+      testMode:
+        testModeRow?.value === "true" && process.env.PAYMENT_TEST_MODE === "true",
+      testModeConfigured: testModeRow?.value === "true",
+      testModeEnvEnabled: process.env.PAYMENT_TEST_MODE === "true",
       gateways: maskedGateways,
       callbacks: {
         alipay: `${siteUrl}/api/payment/notify/alipay`,
@@ -213,6 +227,13 @@ export async function PUT(req: NextRequest) {
     const existingDecrypted = decryptGatewaySecrets(existing);
 
     if (typeof parsed.data.testMode === "boolean") {
+      if (parsed.data.testMode && process.env.PAYMENT_TEST_MODE !== "true") {
+        return fail(
+          "生产环境未启用 PAYMENT_TEST_MODE，无法开启测试支付模式",
+          40300,
+          403
+        );
+      }
       await prisma.siteSetting.upsert({
         where: { key: "paymentTestMode" },
         update: { value: String(parsed.data.testMode) },
@@ -223,6 +244,9 @@ export async function PUT(req: NextRequest) {
     if (parsed.data.gateways) {
       const merged = { ...existingDecrypted };
       for (const [id, patch] of Object.entries(parsed.data.gateways)) {
+        if (!GATEWAY_IDS.includes(id as (typeof GATEWAY_IDS)[number])) {
+          return fail(`不支持的支付网关: ${id}`, 42200, 422);
+        }
         const prev = (merged[id] || {}) as Record<string, unknown>;
         const next: Record<string, unknown> = { ...prev, ...patch };
         if (id === "alipay" && patch.env !== undefined) {

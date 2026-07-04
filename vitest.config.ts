@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    env: {
+      SETTINGS_ENCRYPTION_KEY: "vitest-settings-encryption-key-32chars!",
+      CARD_SECRET_SALT: "vitest-card-secret-salt-for-unit-tests",
+    },
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts"],

@@ -52,10 +52,19 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
   // 同步回跳参数（沙箱/生产均可能带上 sign + trade_no）
   if (returnParams.sign && returnParams.out_trade_no === orderNo && returnParams.trade_no) {
     if (verifyAlipaySign(returnParams, alipayConfig.publicKey)) {
-      if (
-        returnParams.total_amount &&
-        !verifyAmount(order.amount, returnParams.total_amount)
-      ) {
+      const expectedAppId = alipayConfig.appId;
+      if (expectedAppId && returnParams.app_id !== expectedAppId) {
+        console.warn("[Payment Sync] app_id mismatch:", returnParams.app_id);
+        return fail("支付应用不匹配", 40000, 400);
+      }
+
+      const expectedSellerId = alipayConfig.sellerId;
+      if (expectedSellerId && returnParams.seller_id !== expectedSellerId) {
+        console.warn("[Payment Sync] seller_id mismatch:", returnParams.seller_id);
+        return fail("收款商户不匹配", 40000, 400);
+      }
+
+      if (!returnParams.total_amount || !verifyAmount(order.amount, returnParams.total_amount)) {
         return fail("支付金额与订单不一致", 40000, 400);
       }
 
