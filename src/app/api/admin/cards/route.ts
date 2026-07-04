@@ -10,6 +10,7 @@ import {
 } from "@/lib/card-crypto";
 import { encryptCardSecret } from "@/lib/card-secret-storage";
 import { z } from "zod";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 export const dynamic = "force-dynamic";
 
@@ -123,7 +124,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const body = await req.json();
     const parsed = generateSchema.safeParse(body);
     if (!parsed.success) {
@@ -221,6 +222,12 @@ export async function POST(req: NextRequest) {
         expireAt,
         note: note?.trim() || null,
       })),
+    });
+
+    await auditAdminAction(req, session.user.id, "cards.generate", {
+      targetType: "card_batch",
+      targetId: batch,
+      detail: `count=${cards.length}`,
     });
 
     // 返回明文卡密（仅此一次）

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 // 不允许把任何人提升为 ADMIN（包括自己）；也不允许修改自己。
 // 调用方是 EDITOR 时只能改 vipLevel（虽然 EDITOR 当前不通过 requireAdmin，
@@ -55,6 +56,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       data,
     });
 
+    await auditAdminAction(req, session.user.id, "user.update", {
+      targetType: "user",
+      targetId: id,
+      detail: JSON.stringify(data),
+    });
+
     return ok({
       id: updated.id,
       role: updated.role,
@@ -70,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await requireAdmin();
     const { id } = await params;
@@ -84,6 +91,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (user.role === "ADMIN") return fail("不能删除管理员账户", 40900, 409);
 
     await prisma.user.delete({ where: { id } });
+    await auditAdminAction(req, session.user.id, "user.delete", {
+      targetType: "user",
+      targetId: id,
+      detail: user.username,
+    });
     return ok({ deleted: true });
   } catch (error) {
     if (error instanceof ApiError) {

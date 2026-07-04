@@ -4,6 +4,7 @@ import { requireAdmin, ApiError } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { buildVaultWriteData, toVaultDetail, toVaultListItem } from "@/lib/vault";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -43,7 +44,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const existing = await prisma.vaultEntry.findUnique({ where: { id } });
     if (!existing) {
       return fail("记录不存在", 40400, 404);
@@ -70,6 +71,11 @@ export async function PUT(
     );
 
     const row = await prisma.vaultEntry.update({ where: { id }, data });
+    await auditAdminAction(req, session.user.id, "vault.update", {
+      targetType: "vault_entry",
+      targetId: id,
+      detail: row.title,
+    });
     return ok(toVaultListItem(row));
   } catch (error) {
     if (error instanceof ApiError) {
@@ -81,13 +87,22 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
+    const existing = await prisma.vaultEntry.findUnique({
+      where: { id },
+      select: { title: true },
+    });
     await prisma.vaultEntry.delete({ where: { id } });
+    await auditAdminAction(req, session.user.id, "vault.delete", {
+      targetType: "vault_entry",
+      targetId: id,
+      detail: existing?.title,
+    });
     return ok({ deleted: true });
   } catch (error) {
     if (error instanceof ApiError) {

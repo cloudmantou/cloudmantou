@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import { DEFAULT_HOME_TYPING_PHRASES, invalidateSiteSettingsCache } from "@/lib/site-settings";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 const SETTING_KEYS = [
   "siteName",
@@ -97,7 +98,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const body = await req.json();
     const parsed = settingsSchema.safeParse(body);
     if (!parsed.success) {
@@ -118,6 +119,9 @@ export async function PUT(req: NextRequest) {
     }
 
     invalidateSiteSettingsCache();
+    await auditAdminAction(req, session.user.id, "settings.update", {
+      detail: entries.map(([key]) => key).join(","),
+    });
     return ok({ saved: true, count: entries.length });
   } catch (error) {
     if (error instanceof ApiError) {

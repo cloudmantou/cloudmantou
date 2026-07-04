@@ -8,6 +8,7 @@ import {
   grantEntitlement,
   decryptWechatV3Resource,
 } from "@/lib/payment";
+import { recordPaymentNotifyAudit } from "@/lib/payment-notify-audit";
 
 /**
  * 微信支付异步通知回调（兼容 V2 XML 与 V3 JSON）
@@ -40,6 +41,12 @@ export async function POST(req: NextRequest) {
         paymentConfig.wechat?.publicKey || process.env.WECHAT_V3_PUBLIC_KEY;
       if (!wechatPublicKey) {
         console.error("[WeChat] WECHAT_V3_PUBLIC_KEY not configured");
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "CONFIG_MISSING",
+          reason: "v3_public_key_not_configured",
+          rawBody,
+        });
         return wechatV2Response("FAIL", "配置错误");
       }
 
@@ -50,6 +57,12 @@ export async function POST(req: NextRequest) {
         })
       ) {
         console.warn("[WeChat v3] Signature verification failed");
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "SIGN_FAILED",
+          reason: "v3",
+          rawBody,
+        });
         return wechatV2Response("FAIL", "签名验证失败");
       }
 
@@ -71,6 +84,12 @@ export async function POST(req: NextRequest) {
         contentType.includes("xml") || rawBody.trim().startsWith("<xml");
       if (!isXml) {
         console.warn("[WeChat v2] Rejected non-XML callback", { contentType });
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "INVALID_CONTENT_TYPE",
+          reason: contentType,
+          rawBody,
+        });
         return wechatV2Response("FAIL", "invalid content type");
       }
 
@@ -79,11 +98,24 @@ export async function POST(req: NextRequest) {
       const apiKey = paymentConfig.wechat?.apiKey || process.env.WECHAT_API_KEY;
       if (!apiKey) {
         console.error("[WeChat] WECHAT_API_KEY not configured");
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "CONFIG_MISSING",
+          reason: "v2_api_key_not_configured",
+          rawBody,
+        });
         return wechatV2Response("FAIL", "配置错误");
       }
 
       if (!verifyWechatSign(body, apiKey)) {
         console.warn("[WeChat v2] Signature verification failed");
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          orderNo: body.out_trade_no,
+          status: "SIGN_FAILED",
+          reason: "v2",
+          rawBody,
+        });
         return wechatV2Response("FAIL", "签名验证失败");
       }
 
@@ -178,6 +210,12 @@ export async function POST(req: NextRequest) {
     return wechatV2Response("SUCCESS");
   } catch (error) {
     console.error("[WeChat Notify Error]", error);
+    await recordPaymentNotifyAudit({
+      channel: "WECHAT",
+      status: "ERROR",
+      reason: error instanceof Error ? error.message : "unknown",
+      rawBody,
+    });
     return wechatV2Response("FAIL", "处理失败");
   }
 }

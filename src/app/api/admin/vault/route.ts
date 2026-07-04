@@ -4,6 +4,7 @@ import { requireAdmin, ApiError } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { buildVaultWriteData, toVaultListItem } from "@/lib/vault";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 const createSchema = z.object({
   title: z.string().min(1, "标题不能为空").max(200),
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
     const body = await req.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
@@ -62,6 +63,12 @@ export async function POST(req: NextRequest) {
 
     const data = buildVaultWriteData(parsed.data);
     const row = await prisma.vaultEntry.create({ data });
+
+    await auditAdminAction(req, session.user.id, "vault.create", {
+      targetType: "vault_entry",
+      targetId: row.id,
+      detail: row.title,
+    });
 
     return ok(toVaultListItem(row));
   } catch (error) {

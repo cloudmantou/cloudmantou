@@ -454,3 +454,35 @@ enum VaultEntryType {
   SECRET
   NOTE
 }
+
+/// 支付回调失败/异常审计（便于排错，仅存 insert）
+model PaymentNotifyAudit {
+  id        String         @id @default(cuid())
+  channel   PaymentChannel
+  orderNo   String?        @db.VarChar(64)
+  status    String         @db.VarChar(64)
+  reason    String?        @db.VarChar(500)
+  rawBody   String?        @db.LongText
+  createdAt DateTime       @default(now())
+
+  @@index([orderNo])
+  @@index([createdAt])
+  @@map("payment_notify_audits")
+}
+
+/// 管理员操作审计（仅 insert，不可更新）
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String   @db.VarChar(100)
+  targetType String?  @db.VarChar(50)
+  targetId   String?  @db.VarChar(100)
+  detail     String?  @db.Text
+  ip         String?  @db.VarChar(64)
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}

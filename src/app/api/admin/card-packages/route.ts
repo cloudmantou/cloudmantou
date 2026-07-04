@@ -8,6 +8,7 @@ import {
   DEFAULT_CARD_PACKAGE_TEMPLATES,
   serializeCardPackageLists,
 } from "@/lib/card-packages";
+import { coverImageSchema } from "@/lib/post-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ const packageSchema = z.object({
   price: z.number().min(0.01),
   badge: z.string().max(32).optional(),
   accent: z.string().max(32).optional(),
-  cover: z.string().max(2000).optional().nullable(),
+  cover: coverImageSchema,
   enabled: z.boolean().optional(),
   published: z.boolean().optional(),
   sortOrder: z.number().int().optional(),

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
 import { NextResponse } from "next/server";
 
 async function fetchMaintenanceMode(origin: string): Promise<boolean> {
@@ -38,6 +39,18 @@ export default auth(async (req) => {
         );
       }
       return NextResponse.rewrite(new URL("/maintenance", req.url));
+    }
+  }
+
+  if (
+    pathname.startsWith("/api/admin") &&
+    ["POST", "PUT", "DELETE", "PATCH"].includes(req.method || "")
+  ) {
+    if (!isAllowedAdminMutationOrigin(req)) {
+      return NextResponse.json(
+        { code: 40300, message: "跨站请求被拒绝" },
+        { status: 403 }
+      );
     }
   }
 

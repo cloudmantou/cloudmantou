@@ -3,7 +3,8 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import type { Role } from "@prisma/client";
 import { prisma } from "./prisma";
-import { rateLimit, RATE_LIMITS } from "./rate-limit";
+import { getClientIP } from "./rate-limit";
+import { checkLoginRateLimit } from "./login-rate-limit";
 
 /** 固定 bcrypt 哈希，用于用户不存在时占位比对，缓解时序探测 */
 const DUMMY_PASSWORD_HASH =
@@ -27,27 +28,24 @@ export const {
         email: { label: "邮箱", type: "email" },
         password: { label: "密码", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
         const identifier = (credentials.email as string).trim();
         const password = credentials.password as string;
+        const clientIp = getClientIP(request);
 
-        // 登录限流仅用内存实现，避免 auth/middleware 打包 ioredis（node: 协议导致 Webpack 构建失败）
-        const rlResult = rateLimit(
-          `login:${identifier.toLowerCase()}`,
-          RATE_LIMITS.LOGIN.limit,
-          RATE_LIMITS.LOGIN.windowMs
-        );
+        // 登录限流：账号 + IP 双维度（内存实现，避免 auth 打包 ioredis）
+        const rlResult = checkLoginRateLimit(clientIp, identifier);
         if (!rlResult.success) {
           throw new Error("登录尝试过于频繁，请稍后再试");
         }
 
         const user = await prisma.user.findFirst({
           where: identifier.includes("@")
-            ? { email: identifier }
+            ? { email: identifier.toLowerCase() }
             : { username: identifier },
         });
 

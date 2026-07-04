@@ -2,10 +2,12 @@ import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import { auditAdminAction } from "@/lib/admin-audit-log";
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdmin();
+    await auditAdminAction(req, session.user.id, "payments.list");
 
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
