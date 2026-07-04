@@ -1,6 +1,11 @@
-import { auth } from "@/lib/auth";
-import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
+import NextAuth from "next-auth";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { buildContentSecurityPolicy, generateCspNonce } from "@/config/csp";
+import { authConfig } from "@/lib/auth.config";
+import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
+
+const { auth } = NextAuth(authConfig);
 
 async function fetchMaintenanceMode(origin: string): Promise<boolean> {
   try {
@@ -16,7 +21,21 @@ async function fetchMaintenanceMode(origin: string): Promise<boolean> {
   }
 }
 
+function withCsp(_req: NextRequest, response: NextResponse, nonce: string): NextResponse {
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
+  return response;
+}
+
+function nextWithCsp(req: NextRequest, nonce: string): NextResponse {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
+  return response;
+}
+
 export default auth(async (req) => {
+  const nonce = generateCspNonce();
   const { pathname } = req.nextUrl;
   const session = req.auth;
   const isAdmin = session?.user?.role === "ADMIN";
@@ -33,12 +52,19 @@ export default auth(async (req) => {
     const maintenance = await fetchMaintenanceMode(req.nextUrl.origin);
     if (maintenance && !isAdmin) {
       if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { code: 50300, message: "站点维护中，请稍后再试" },
-          { status: 503 }
+        return withCsp(
+          req,
+          NextResponse.json({ code: 50300, message: "站点维护中，请稍后再试" }, { status: 503 }),
+          nonce
         );
       }
-      return NextResponse.rewrite(new URL("/maintenance", req.url));
+      const requestHeaders = new Headers(req.headers);
+      requestHeaders.set("x-nonce", nonce);
+      const response = NextResponse.rewrite(new URL("/maintenance", req.url), {
+        request: { headers: requestHeaders },
+      });
+      response.headers.set("Content-Security-Policy", buildContentSecurityPolicy(nonce));
+      return response;
     }
   }
 
@@ -47,9 +73,10 @@ export default auth(async (req) => {
     ["POST", "PUT", "DELETE", "PATCH"].includes(req.method || "")
   ) {
     if (!isAllowedAdminMutationOrigin(req)) {
-      return NextResponse.json(
-        { code: 40300, message: "跨站请求被拒绝" },
-        { status: 403 }
+      return withCsp(
+        req,
+        NextResponse.json({ code: 40300, message: "跨站请求被拒绝" }, { status: 403 }),
+        nonce
       );
     }
   }
@@ -57,30 +84,36 @@ export default auth(async (req) => {
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     if (!session) {
       if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { code: 40100, message: "请先登录" },
-          { status: 401 }
+        return withCsp(
+          req,
+          NextResponse.json({ code: 40100, message: "请先登录" }, { status: 401 }),
+          nonce
         );
       }
-      return NextResponse.redirect(new URL("/login", req.url));
+      return withCsp(req, NextResponse.redirect(new URL("/login", req.url)), nonce);
     }
     if (!isAdmin) {
       if (pathname.startsWith("/api/")) {
-        return NextResponse.json(
-          { code: 40300, message: "无访问权限" },
-          { status: 403 }
+        return withCsp(
+          req,
+          NextResponse.json({ code: 40300, message: "无访问权限" }, { status: 403 }),
+          nonce
         );
       }
-      return NextResponse.redirect(new URL("/", req.url));
+      return withCsp(req, NextResponse.redirect(new URL("/", req.url)), nonce);
     }
   }
 
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
-      return NextResponse.redirect(new URL("/login?callbackUrl=/dashboard", req.url));
+      return withCsp(
+        req,
+        NextResponse.redirect(new URL("/login?callbackUrl=/dashboard", req.url)),
+        nonce
+      );
     }
     if (isAdmin) {
-      return NextResponse.redirect(new URL("/admin", req.url));
+      return withCsp(req, NextResponse.redirect(new URL("/admin", req.url)), nonce);
     }
   }
 
@@ -93,14 +126,15 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/site/settings/public")
   ) {
     if (!session) {
-      return NextResponse.json(
-        { code: 40100, message: "请先登录" },
-        { status: 401 }
+      return withCsp(
+        req,
+        NextResponse.json({ code: 40100, message: "请先登录" }, { status: 401 }),
+        nonce
       );
     }
   }
 
-  return NextResponse.next();
+  return nextWithCsp(req, nonce);
 });
 
 export const config = {

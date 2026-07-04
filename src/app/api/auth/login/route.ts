@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { signIn } from "@/lib/auth";
 import { fail } from "@/lib/api-response";
-import { checkLoginRateLimitServer } from "@/lib/login-rate-limit-server";
-import { verifyCredentials } from "@/lib/credentials-auth";
 
 const loginSchema = z.object({
   email: z.string().min(1, "请输入用户名或邮箱"),
@@ -20,36 +18,20 @@ export async function POST(req: NextRequest) {
     }
 
     const { email, password, callbackUrl } = parsed.data;
-    const rl = await checkLoginRateLimitServer(req, email);
-    if (!rl.success) {
-      const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
-      return new Response(
-        JSON.stringify({
-          code: 42900,
-          message: `登录尝试过于频繁，请 ${retryAfter} 秒后重试`,
-          data: null,
-        }),
-        {
-          status: 429,
-          headers: {
-            "Content-Type": "application/json",
-            "Retry-After": String(retryAfter),
-          },
-        }
-      );
-    }
-
-    const user = await verifyCredentials(email, password);
-    if (!user) {
-      return fail("用户名或密码错误", 40100, 401);
-    }
 
     try {
-      await signIn("credentials", {
+      const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
       });
+
+      if (result?.error) {
+        if (result.error === "CredentialsSignin") {
+          return fail("用户名或密码错误", 40100, 401);
+        }
+        return fail("登录失败，请稍后重试", 50000, 500);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("频繁")) {

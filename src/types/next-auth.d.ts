@@ -24,5 +24,6 @@ declare module "next-auth/jwt" {
     role: Role;
     nickname?: string | null;
     username?: string | null;
+    sessionInvalid?: boolean;
   }
 }

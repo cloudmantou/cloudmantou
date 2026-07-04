@@ -1,21 +1,17 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { Role } from "@prisma/client";
-import { getClientIP } from "./rate-limit";
-import { checkLoginRateLimit } from "./login-rate-limit";
+import { authConfig } from "./auth.config";
+import { checkLoginRateLimitServer } from "./login-rate-limit-server";
 import { verifyCredentials } from "./credentials-auth";
 
 export const {
-  handlers,    // GET/POST handlers for /api/auth/*
-  auth,        // 服务端获取 session
+  handlers, // GET/POST handlers for /api/auth/*
+  auth, // 服务端获取 session
   signIn,
   signOut,
 } = NextAuth({
-  // 不使用 PrismaAdapter — Credentials provider 用 JWT 策略，adapter 会冲突
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: "credentials",
@@ -31,8 +27,7 @@ export const {
         const identifier = (credentials.email as string).trim();
         const password = credentials.password as string;
 
-        // middleware 打包路径无法使用 Redis；内存双维度限流作为兜底
-        const rlResult = checkLoginRateLimit(getClientIP(request), identifier);
+        const rlResult = await checkLoginRateLimitServer(request, identifier);
         if (!rlResult.success) {
           throw new Error("登录尝试过于频繁，请稍后再试");
         }
@@ -42,6 +37,7 @@ export const {
     }),
   ],
   callbacks: {
+    ...authConfig.callbacks,
     async jwt({ token, user }) {
       if (user) {
         token.role = user.role;

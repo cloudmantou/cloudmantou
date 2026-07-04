@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { getPostAccess } from "@/lib/post-access";
 import { countApprovedPostComments } from "@/lib/comment-count";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { getCspNonce } from "@/lib/csp-nonce";
 import { buildBlogPostingJsonLd, buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { PostContent } from "./PostContent";
 import { MarketingShell } from "@/components/layout/MarketingShell";
@@ -143,13 +144,14 @@ export default async function PostPage({ params }: PageProps) {
         : null,
   };
 
-  const ctx = await getSeoContext();
+  const [ctx, nonce] = await Promise.all([getSeoContext(), getCspNonce()]);
   const authorName = post.author.nickname || post.author.username;
 
   return (
     <MarketingShell>
       <JsonLd
         ctx={ctx}
+        nonce={nonce}
         extra={[
           buildBlogPostingJsonLd(ctx, {
             title: post.title,

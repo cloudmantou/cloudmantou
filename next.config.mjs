@@ -1,7 +1,3 @@
-/** 与 src/config/csp.ts 中 ALIPAY_FORM_ACTION_CSP 保持同步 */
-const ALIPAY_FORM_ACTION_CSP =
-  "'self' https://openapi.alipay.com https://openapi.alipaydev.com https://openapi-sandbox.dl.alipaydev.com";
-
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
@@ -28,26 +24,13 @@ const securityHeaders = [
     key: "X-DNS-Prefetch-Control",
     value: "on",
   },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      `form-action ${ALIPAY_FORM_ACTION_CSP}`,
-    ].join("; "),
-  },
 ];
 
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   serverExternalPackages: ["ioredis", "sharp"],
+  turbopack: {},
   webpack(config, { dev }) {
     if (dev) {
       config.watchOptions = {

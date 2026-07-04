@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+import { buildContentSecurityPolicy } from "@/config/csp";
 import { checkLoginRateLimit } from "@/lib/login-rate-limit";
 import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -7,6 +8,22 @@ import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 function uniqueId(label: string): string {
   return `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+describe("buildContentSecurityPolicy", () => {
+  it("生产环境 script 使用 nonce 且不含 unsafe-inline", () => {
+    const csp = buildContentSecurityPolicy("abc123", false);
+    const scriptSrc = csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";
+    expect(scriptSrc).toContain("'nonce-abc123'");
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("unsafe-inline");
+    expect(scriptSrc).not.toContain("unsafe-eval");
+  });
+
+  it("开发环境保留 inline script 以兼容 HMR", () => {
+    const csp = buildContentSecurityPolicy("abc123", true);
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+  });
+});
 
 describe("checkLoginRateLimit — 账号 + IP 双维度", () => {
   it("同一 IP 满额后任意账号都会被拒", () => {
