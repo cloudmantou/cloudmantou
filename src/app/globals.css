@@ -140,7 +140,7 @@ button {
   display: flex;
   width: var(--sidebar-w);
   flex-direction: column;
-  padding: 28px 18px 18px;
+  padding: 28px 18px 22px;
   overflow-y: auto;
   background:
     linear-gradient(165deg, rgba(12, 15, 32, 0.82) 0%, rgba(7, 9, 22, 0.88) 55%, rgba(5, 7, 18, 0.9) 100%);
@@ -221,8 +221,8 @@ button {
   width: 18px;
   height: 18px;
   pointer-events: none;
-  z-index: 1;
-  opacity: 0.55;
+  z-index: 0;
+  opacity: 0.35;
   border-color: rgba(77, 217, 182, 0.65);
   border-style: solid;
 }
@@ -409,12 +409,24 @@ button {
   font-weight: 500;
 }
 
+.sidebar-footer {
+  position: relative;
+  z-index: 2;
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
 .social-row {
   display: flex;
   gap: 8px;
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+.social-row:first-child {
+  margin-top: 0;
 }
 
 .social-link,
@@ -447,7 +459,7 @@ button {
 
 /* ===== Sidebar User ===== */
 .sidebar-user {
-  margin-top: auto;
+  margin-top: 0;
   padding: 12px 10px 4px;
   border-top: 1px solid rgba(77, 217, 182, 0.12);
   border-radius: 12px 12px 0 0;

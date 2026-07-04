@@ -178,7 +178,6 @@ export function PlatformSidebar({
         <div className="sidebar-scanlines" aria-hidden="true" />
         <div className="sidebar-edge-glow" aria-hidden="true" />
         <div className="sidebar-corner sidebar-corner--tl" aria-hidden="true" />
-        <div className="sidebar-corner sidebar-corner--br" aria-hidden="true" />
         <div className="avatar-wrap" aria-hidden="true">
           <span className="avatar-ring" />
           <span className="avatar">馒</span>
@@ -227,30 +226,32 @@ export function PlatformSidebar({
           </button>
         </nav>
 
-        <ContactLinksRow />
+        <div className="sidebar-footer">
+          <ContactLinksRow />
 
-        {session ? (
-          <div className="sidebar-user">
-            <div className="sidebar-user-info">
-              <span className="sidebar-user-avatar">
-                {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
-              </span>
-              <div className="sidebar-user-meta">
-                <span className="sidebar-user-name">{session.user?.nickname || session.user?.username}</span>
-                <span className="sidebar-user-role">{session.user?.role === "ADMIN" ? "管理员" : "会员"}</span>
+          {session ? (
+            <div className="sidebar-user">
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-avatar">
+                  {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="sidebar-user-meta">
+                  <span className="sidebar-user-name">{session.user?.nickname || session.user?.username}</span>
+                  <span className="sidebar-user-role">{session.user?.role === "ADMIN" ? "管理员" : "会员"}</span>
+                </div>
               </div>
+              <button className="sidebar-logout" type="button" onClick={() => signOut({ callbackUrl: "/" })}>
+                退出
+              </button>
             </div>
-            <button className="sidebar-logout" type="button" onClick={() => signOut({ callbackUrl: "/" })}>
-              退出
-            </button>
-          </div>
-        ) : (
-          <div className="sidebar-user">
-            <Link href="/login?callbackUrl=/" className="sidebar-login-btn" onClick={closeMobile}>
-              登录 / 注册
-            </Link>
-          </div>
-        )}
+          ) : (
+            <div className="sidebar-user">
+              <Link href="/login?callbackUrl=/" className="sidebar-login-btn" onClick={closeMobile}>
+                登录 / 注册
+              </Link>
+            </div>
+          )}
+        </div>
       </aside>
 
         <main className={clsx("main", mainClassName)}>{children}</main>
