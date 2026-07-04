@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -15,7 +15,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "comments.moderate", { targetType: "comment", targetId: id });
     const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);
@@ -50,12 +50,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "comments.delete", { targetType: "comment", targetId: id });
     const comment = await prisma.comment.findUnique({ where: { id: id } });
     if (!comment) {
       return fail("评论不存在", 40400, 404);

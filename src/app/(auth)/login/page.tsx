@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -21,18 +20,20 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, callbackUrl }),
       });
 
-      if (result?.error) {
-        setError("用户名或密码错误");
-      } else {
-        router.push(callbackUrl);
-        router.refresh();
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(json?.message || "用户名或密码错误");
+        return;
       }
+
+      router.push(json?.data?.callbackUrl || callbackUrl);
+      router.refresh();
     } catch {
       setError("登录失败，请稍后重试");
     } finally {

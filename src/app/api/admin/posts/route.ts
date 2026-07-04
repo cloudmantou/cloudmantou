@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    const session = await requireAdminAndAudit(req, "posts.create");
     const body = await req.json();
     const parsed = createPostSchema.safeParse(body);
     if (!parsed.success) {
@@ -91,13 +91,6 @@ export async function POST(req: NextRequest) {
     const existing = await prisma.post.findUnique({ where: { slug: data.slug } });
     if (existing) {
       return fail("slug 已存在，请换一个", 40900, 409);
-    }
-
-    // Get current user from session
-    const { auth } = await import("@/lib/auth");
-    const session = await auth();
-    if (!session?.user?.id) {
-      return fail("请先登录", 40100, 401);
     }
 
     const post = await prisma.$transaction(async (tx) => {

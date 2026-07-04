@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -6,8 +6,8 @@ import { dailyRecordUpdateSchema } from "@/lib/daily-record-schema";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
     const { id } = await params;
+    await requireAdminAndAudit(req, "daily_records.update", { targetType: "daily_record", targetId: id });
     const body = await req.json();
     const parsed = dailyRecordUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -32,10 +32,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
     const { id } = await params;
+    await requireAdminAndAudit(req, "daily_records.delete", { targetType: "daily_record", targetId: id });
 
     const record = await prisma.dailyRecord.findUnique({ where: { id } });
     if (!record) return fail("记录不存在", 40400, 404);

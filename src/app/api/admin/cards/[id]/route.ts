@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -14,7 +14,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "cards.update", { targetType: "card", targetId: id });
     const card = await prisma.card.findUnique({ where: { id: id } });
     if (!card) {
       return fail("卡密不存在", 40400, 404);

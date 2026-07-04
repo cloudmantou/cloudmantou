@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { countActiveCardStock, serializeCardPackageLists } from "@/lib/card-packages";
 import { coverImageSchema } from "@/lib/post-schema";
 
@@ -31,8 +31,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, context: RouteContext) {
   try {
-    await requireAdmin();
     const { id } = await context.params;
+    await requireAdminAndAudit(req, "card_packages.update", { targetType: "card_package", targetId: id });
     const body = await req.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {
@@ -87,10 +87,10 @@ export async function PUT(req: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
-    await requireAdmin();
     const { id } = await context.params;
+    await requireAdminAndAudit(req, "card_packages.delete", { targetType: "card_package", targetId: id });
     const existing = await prisma.cardPackage.findUnique({ where: { id } });
     if (!existing) {
       return fail("卡密商品不存在", 40400, 404);

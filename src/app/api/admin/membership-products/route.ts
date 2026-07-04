@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api-response";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import {
   listMembershipProductsForAdmin,
   updateMembershipCatalogState,
@@ -31,7 +31,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "membership_products.update");
     const body = await req.json();
     const parsed = updateSchema.safeParse(body);
     if (!parsed.success) {

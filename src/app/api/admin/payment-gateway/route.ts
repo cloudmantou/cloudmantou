@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -216,7 +216,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "payment_gateway.update");
     const body = await req.json();
     const parsed = saveSchema.safeParse(body);
     if (!parsed.success) {

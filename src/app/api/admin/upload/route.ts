@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { ok, fail } from "@/lib/api-response";
 import { processUploadImage, ImageProcessError } from "@/lib/image-process-server";
 import { saveUploadBuffer, ensureUploadRoot } from "@/lib/local-storage";
@@ -11,7 +11,7 @@ import { isAllowedImageBuffer } from "@/lib/image-magic";
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "upload.image");
     await ensureUploadRoot();
 
     const formData = await req.formData();

@@ -1,4 +1,9 @@
+import type { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
+import { auditAdminAction } from "@/lib/admin-audit-log";
+import { isVaultTotpConfigured } from "@/lib/vault-totp";
+import { verifyVaultUnlockToken, VAULT_UNLOCK_COOKIE } from "@/lib/vault-session";
 
 export class ApiError extends Error {
   code: number;
@@ -39,5 +44,35 @@ export async function requireAuth() {
     throw new ApiError("请先登录", 40100, 401);
   }
 
+  return session;
+}
+
+/** Vault 二次验证：配置 TOTP 后需有效解锁 cookie */
+export async function requireVaultUnlock(_req?: NextRequest) {
+  const session = await requireAdmin();
+  if (!isVaultTotpConfigured()) {
+    return session;
+  }
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(VAULT_UNLOCK_COOKIE)?.value;
+  if (!verifyVaultUnlockToken(token, session.user.id)) {
+    throw new ApiError("请先完成 Vault 二次验证", 40301, 403);
+  }
+
+  return session;
+}
+
+export async function requireAdminAndAudit(
+  req: NextRequest,
+  action: string,
+  options?: {
+    targetType?: string;
+    targetId?: string;
+    detail?: string;
+  }
+) {
+  const session = await requireAdmin();
+  await auditAdminAction(req, session.user.id, action, options);
   return session;
 }

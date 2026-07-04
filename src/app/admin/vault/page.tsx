@@ -85,6 +85,10 @@ export default function AdminVaultPage() {
   const [showSecret, setShowSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [totpConfigured, setTotpConfigured] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
 
   const loadItems = useCallback(async (type: string, q: string) => {
     setLoading(true);
@@ -94,6 +98,12 @@ export default function AdminVaultPage() {
       if (q) params.set("q", q);
       const res = await fetch(`/api/admin/vault?${params}`);
       const data = await res.json();
+      if (res.status === 403 && data.code === 40301) {
+        setNeedsUnlock(true);
+        setItems([]);
+        return;
+      }
+      setNeedsUnlock(false);
       setItems(data.data || []);
     } catch {
       setItems([]);
@@ -101,7 +111,31 @@ export default function AdminVaultPage() {
     setLoading(false);
   }, []);
 
+  const handleUnlock = async () => {
+    if (!totpCode.trim()) return;
+    setUnlocking(true);
+    try {
+      const res = await fetch("/api/admin/vault/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: totpCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "验证失败");
+      setTotpCode("");
+      setNeedsUnlock(false);
+      await loadItems(typeFilter, search);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "验证失败");
+    }
+    setUnlocking(false);
+  };
+
   useEffect(() => {
+    fetch("/api/admin/vault/verify")
+      .then((r) => r.json())
+      .then((d) => setTotpConfigured(Boolean(d.data?.totpConfigured)))
+      .catch(() => setTotpConfigured(false));
     loadItems(typeFilter, search);
   }, [typeFilter, loadItems]);
 
@@ -187,6 +221,28 @@ export default function AdminVaultPage() {
 
   return (
     <div className="admin-page">
+      {totpConfigured && needsUnlock && (
+        <div className="admin-card" style={{ marginBottom: 16, padding: 16 }}>
+          <p style={{ margin: "0 0 12px", color: "var(--text-secondary)" }}>
+            访问私密笔记前请输入 Authenticator 中的 6 位验证码（15 分钟内有效）
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              style={{ width: 140, letterSpacing: "0.2em" }}
+            />
+            <button type="button" className="admin-btn primary" onClick={handleUnlock} disabled={unlocking}>
+              {unlocking ? "验证中..." : "解锁"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">

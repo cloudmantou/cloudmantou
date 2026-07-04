@@ -87,6 +87,7 @@ export default auth(async (req) => {
   if (
     pathname.startsWith("/api/") &&
     ["POST", "PUT", "DELETE", "PATCH"].includes(req.method || "") &&
+    !pathname.startsWith("/api/auth/login") &&
     !pathname.startsWith("/api/auth") &&
     !pathname.startsWith("/api/payment/notify") &&
     !pathname.startsWith("/api/site/settings/public")

@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -16,7 +16,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "tags.update", { targetType: "tag", targetId: id });
     const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);
@@ -56,12 +56,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "tags.delete", { targetType: "tag", targetId: id });
     const tag = await prisma.tag.findUnique({ where: { id: id } });
     if (!tag) {
       return fail("标签不存在", 40400, 404);

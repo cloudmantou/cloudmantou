@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import {
   countActiveCardStock,
   DEFAULT_CARD_PACKAGE_TEMPLATES,
@@ -99,7 +99,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "card_packages.create");
     const body = await req.json();
     const parsed = packageSchema.safeParse(body);
     if (!parsed.success) {

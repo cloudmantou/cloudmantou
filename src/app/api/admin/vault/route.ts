@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireVaultUnlock, ApiError } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { buildVaultWriteData, toVaultListItem } from "@/lib/vault";
@@ -19,7 +19,7 @@ const createSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdmin();
+    await requireVaultUnlock(req);
 
     const { searchParams } = req.nextUrl;
     const type = searchParams.get("type");
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireAdmin();
+    const session = await requireVaultUnlock(req);
     const body = await req.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {

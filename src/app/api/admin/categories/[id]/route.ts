@@ -1,4 +1,4 @@
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
@@ -17,7 +17,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "categories.update", { targetType: "category", targetId: id });
     const category = await prisma.category.findUnique({ where: { id: id } });
     if (!category) {
       return fail("分类不存在", 40400, 404);
@@ -59,12 +59,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireAdminAndAudit(req, "categories.delete", { targetType: "category", targetId: id });
     const category = await prisma.category.findUnique({
       where: { id: id },
       include: { _count: { select: { posts: true } } },

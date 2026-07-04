@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { requireAdmin, ApiError } from "@/lib/guards";
+import { requireVaultUnlock, ApiError } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { buildVaultWriteData, toVaultDetail, toVaultListItem } from "@/lib/vault";
@@ -23,7 +23,7 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    await requireAdmin();
+    await requireVaultUnlock(_req);
     const row = await prisma.vaultEntry.findUnique({ where: { id } });
     if (!row) {
       return fail("记录不存在", 40400, 404);
@@ -44,7 +44,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    const session = await requireAdmin();
+    const session = await requireVaultUnlock(req);
     const existing = await prisma.vaultEntry.findUnique({ where: { id } });
     if (!existing) {
       return fail("记录不存在", 40400, 404);
@@ -92,7 +92,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    const session = await requireAdmin();
+    const session = await requireVaultUnlock(req);
     const existing = await prisma.vaultEntry.findUnique({
       where: { id },
       select: { title: true },
