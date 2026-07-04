@@ -1587,3 +1587,101 @@
     max-height: none;
   }
 }
+
+/* 私密笔记 */
+.admin-root .vault-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-root .vault-link-btn {
+  background: none;
+  border: none;
+  color: var(--accent-light);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.admin-root .vault-link-btn:hover {
+  text-decoration: underline;
+}
+
+.admin-root .vault-ext-link {
+  color: var(--teal);
+  font-size: 12px;
+}
+
+.admin-root .vault-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.admin-root .vault-editor-panel {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-root .vault-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-root .vault-editor-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-root .vault-editor-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-root .vault-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-root .vault-secret-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-root .vault-secret-row .form-input {
+  flex: 1;
+}
+
+.admin-root .vault-content-area {
+  min-height: 180px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.admin-root .form-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}

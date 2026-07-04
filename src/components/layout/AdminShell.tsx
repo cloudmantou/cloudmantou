@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   Users,
   Wallet,
+  Lock,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -70,7 +71,10 @@ const navGroups: NavGroup[] = [
   },
   {
     title: "系统",
-    items: [{ href: "/admin/settings", label: "系统设置", icon: Settings }],
+    items: [
+      { href: "/admin/vault", label: "私密笔记", icon: Lock },
+      { href: "/admin/settings", label: "系统设置", icon: Settings },
+    ],
   },
 ];
 
@@ -86,6 +90,7 @@ const pageTitles: Record<string, string> = {
   "/admin/cards": "卡密管理",
   "/admin/payment-gateway": "支付对接",
   "/admin/payments": "支付记录",
+  "/admin/vault": "私密笔记",
   "/admin/settings": "系统设置",
 };
 

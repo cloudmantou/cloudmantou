@@ -357,6 +357,25 @@ model SiteSetting {
   @@map("site_settings")
 }
 
+/// 管理员私密笔记（账号、密码、密钥、保密文章）
+model VaultEntry {
+  id         String         @id @default(cuid())
+  title      String
+  type       VaultEntryType @default(NOTE)
+  account    String?        @db.VarChar(500)
+  secretEnc  String?        @db.Text
+  url        String?        @db.VarChar(1000)
+  contentEnc String?        @db.LongText
+  remark     String?        @db.VarChar(500)
+  pinned     Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([type, pinned])
+  @@index([updatedAt])
+  @@map("vault_entries")
+}
+
 enum Role {
   USER
   EDITOR
@@ -428,4 +447,10 @@ enum EntitlementType {
   VIP
   PAID_POST
   CARD_BALANCE
+}
+
+enum VaultEntryType {
+  ACCOUNT
+  SECRET
+  NOTE
 }
