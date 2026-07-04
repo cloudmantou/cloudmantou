@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { parseContactLinks, type ContactLink } from "@/lib/contact-links";
 
 import {
   BRAND_NAME,
@@ -16,6 +17,7 @@ export type SiteSettings = {
   siteSubtitle: string;
   siteDescription: string;
   homeTypingPhrases: string[];
+  contactLinks: ContactLink[];
 };
 
 export const DEFAULT_HOME_TYPING_PHRASES = [
@@ -34,6 +36,7 @@ const DEFAULTS: SiteSettings = {
   siteSubtitle: DEFAULT_SITE_SUBTITLE,
   siteDescription: DEFAULT_SITE_DESCRIPTION,
   homeTypingPhrases: DEFAULT_HOME_TYPING_PHRASES,
+  contactLinks: [],
 };
 
 let cache: { value: SiteSettings; expiresAt: number } | null = null;
@@ -56,6 +59,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
           "siteSubtitle",
           "siteDescription",
           "homeTypingPhrases",
+          "contactLinks",
         ],
       },
     },
@@ -90,6 +94,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     siteSubtitle: map.siteSubtitle || DEFAULTS.siteSubtitle,
     siteDescription: map.siteDescription || DEFAULTS.siteDescription,
     homeTypingPhrases,
+    contactLinks: parseContactLinks(map.contactLinks),
   };
 
   cache = { value, expiresAt: Date.now() + CACHE_MS };

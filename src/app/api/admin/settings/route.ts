@@ -5,6 +5,7 @@ import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import { DEFAULT_HOME_TYPING_PHRASES, invalidateSiteSettingsCache } from "@/lib/site-settings";
 import { auditAdminAction } from "@/lib/admin-audit-log";
+import { CONTACT_LINK_KINDS, serializeContactLinks } from "@/lib/contact-links";
 
 const SETTING_KEYS = [
   "siteName",
@@ -18,7 +19,19 @@ const SETTING_KEYS = [
   "commentReview",
   "maintenanceMode",
   "homeTypingPhrases",
+  "contactLinks",
 ] as const;
+
+const contactLinkSchema = z.object({
+  id: z.string().min(1).max(64),
+  kind: z.enum(CONTACT_LINK_KINDS),
+  label: z.string().min(1).max(40),
+  enabled: z.boolean(),
+  sortOrder: z.number().int().min(0).max(99),
+  href: z.string().max(500).optional(),
+  iconUrl: z.string().max(500).optional(),
+  qrImageUrl: z.string().max(500).optional(),
+});
 
 // 严格白名单：只允许这 10 个 key，其它字段直接报错。
 // 此前开放 Object.entries(body) 会写入任意 key，存在污染 / 覆盖风险。
@@ -35,6 +48,7 @@ const settingsSchema = z
     commentReview: z.boolean().optional(),
     maintenanceMode: z.boolean().optional(),
     homeTypingPhrases: z.string().max(8000).optional(),
+    contactLinks: z.array(contactLinkSchema).max(12).optional(),
   })
   .strict();
 
@@ -86,6 +100,15 @@ export async function GET() {
         }
         return map.homeTypingPhrases;
       })(),
+      contactLinks: (() => {
+        if (!map.contactLinks) return [];
+        try {
+          const parsed = JSON.parse(map.contactLinks);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })(),
     });
   } catch (error) {
     if (error instanceof ApiError) {
@@ -105,16 +128,25 @@ export async function PUT(req: NextRequest) {
       return fail(parsed.error.errors[0].message, 42200, 422);
     }
 
-    const entries = Object.entries(parsed.data) as [string, string | number | boolean][];
+    const entries = Object.entries(parsed.data) as [string, unknown][];
     for (const [key, value] of entries) {
-      const stored =
-        key === "homeTypingPhrases"
-          ? JSON.stringify(parseHomeTypingPhrases(String(value)))
-          : String(value);
+      let stored: string;
+      let type = "string";
+
+      if (key === "homeTypingPhrases") {
+        stored = JSON.stringify(parseHomeTypingPhrases(String(value)));
+        type = "json";
+      } else if (key === "contactLinks") {
+        stored = serializeContactLinks(Array.isArray(value) ? value : []);
+        type = "json";
+      } else {
+        stored = String(value);
+      }
+
       await prisma.siteSetting.upsert({
         where: { key },
-        update: { value: stored, type: key === "homeTypingPhrases" ? "json" : "string" },
-        create: { key, value: stored, type: key === "homeTypingPhrases" ? "json" : "string" },
+        update: { value: stored, type },
+        create: { key, value: stored, type },
       });
     }
 

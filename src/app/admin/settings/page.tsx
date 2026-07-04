@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Save, Loader2 } from "lucide-react";
+import { ContactLinksEditor } from "@/components/admin/ContactLinksEditor";
+import type { ContactLink } from "@/lib/contact-links";
 
 const TIMEZONES = [
   { value: "Asia/Shanghai", label: "Asia/Shanghai (UTC+8)" },
@@ -33,6 +35,7 @@ export default function AdminSettingsPage() {
     commentReview: true,
     maintenanceMode: false,
     homeTypingPhrases: "",
+    contactLinks: [] as ContactLink[],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,7 +45,13 @@ export default function AdminSettingsPage() {
     fetch("/api/admin/settings")
       .then((r) => r.json())
       .then((d) => {
-        if (d.data) setSettings((prev) => ({ ...prev, ...d.data }));
+        if (d.data) {
+          setSettings((prev) => ({
+            ...prev,
+            ...d.data,
+            contactLinks: Array.isArray(d.data.contactLinks) ? d.data.contactLinks : [],
+          }));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -189,6 +198,20 @@ export default function AdminSettingsPage() {
               />
             </Field>
           </div>
+        </section>
+
+        <section className="data-panel contact-links-panel">
+          <div className="data-panel-header">
+            <span className="data-panel-title">联系方式</span>
+            <span className="data-panel-meta">侧边栏社交入口</span>
+          </div>
+          <p className="contact-links-intro">
+            配置微信公众号、微信、Telegram、邮箱等。可填写跳转链接，或上传自定义图标与二维码（点击图标弹出二维码）。
+          </p>
+          <ContactLinksEditor
+            links={settings.contactLinks}
+            onChange={(contactLinks) => update("contactLinks", contactLinks)}
+          />
         </section>
 
         {/* System Parameters */}

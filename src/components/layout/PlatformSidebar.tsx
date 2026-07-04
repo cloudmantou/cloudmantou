@@ -7,14 +7,11 @@ import { useSession, signOut } from "next-auth/react";
 import {
   Bookmark,
   CalendarDays,
-  Github,
   Home,
   KeyRound,
   LogIn,
-  Mail,
   Menu,
   PenLine,
-  Send,
   Settings,
   ShieldCheck,
   UserRound,
@@ -25,6 +22,7 @@ import { siteConfig } from "@/config/site";
 import { isAdminRole } from "@/lib/roles";
 import { SearchDialog } from "@/components/layout/SearchDialog";
 import { HomeBackdrop } from "@/components/home/HomeBackdrop";
+import { ContactLinksRow } from "@/components/layout/ContactLinksRow";
 
 export type PlatformSection = "home" | "blog" | "shop" | "daily" | "favorites";
 
@@ -229,17 +227,7 @@ export function PlatformSidebar({
           </button>
         </nav>
 
-        <div className="social-row">
-          <a className="social-link" href="https://github.com" aria-label="GitHub">
-            <Github size={15} />
-          </a>
-          <a className="social-link" href="mailto:hello@example.com" aria-label="Email">
-            <Mail size={15} />
-          </a>
-          <a className="social-link" href="https://t.me" aria-label="Telegram">
-            <Send size={15} />
-          </a>
-        </div>
+        <ContactLinksRow />
 
         {session ? (
           <div className="sidebar-user">
