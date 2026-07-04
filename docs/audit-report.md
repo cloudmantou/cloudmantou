@@ -173,11 +173,11 @@ const card = cards.find(
 **文件**: `.env` 第 2 行
 
 ```
-DATABASE_URL="mysql://cloudmantoua:cloudmantoua@124.221.8.124:3306/cloudmantoua"
+DATABASE_URL="mysql://<user>:<password>@<host>:3306/<database>"
 ```
 
-- 数据库暴露在公网 IP
-- 用户名和密码相同（`cloudmantoua`）
+- 数据库暴露在公网 IP（示例已脱敏，勿将真实连接串写入仓库）
+- 用户名与密码相同或过于简单
 - `docker-compose.yml` 也暴露 3306 端口
 
 建议使用内网地址、强密码、或通过 SSH 隧道连接。

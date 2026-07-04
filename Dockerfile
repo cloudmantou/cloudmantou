@@ -10,10 +10,12 @@ RUN pnpm install --frozen-lockfile --prod=false
 # --- Build ---
 FROM base AS build
 WORKDIR /app
+ARG SETTINGS_ENCRYPTION_KEY=build-time-placeholder-32chars-min
+ENV SETTINGS_ENCRYPTION_KEY=$SETTINGS_ENCRYPTION_KEY
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm prisma generate
-RUN pnpm build
+RUN pnpm build --webpack
 
 # --- Production ---
 FROM base AS runner

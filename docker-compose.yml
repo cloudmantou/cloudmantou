@@ -1,6 +1,9 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-build-time-placeholder-32chars-min}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -12,7 +15,9 @@ services:
       SITE_URL: ${SITE_URL:-http://localhost:3000}
       CARD_SECRET_SALT: ${CARD_SECRET_SALT}
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
-      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:?SETTINGS_ENCRYPTION_KEY is required}
+      CRON_SECRET: ${CRON_SECRET:-}
+      PAYMENT_TEST_MODE: ${PAYMENT_TEST_MODE:-false}
       NODE_ENV: production
     volumes:
       - uploads_data:/app/public/uploads
