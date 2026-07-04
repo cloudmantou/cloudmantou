@@ -10,6 +10,20 @@ import { getRedisClient } from "@/lib/redis";
 
 export { RATE_LIMITS, getClientIP, getRateLimitIdentifier };
 
+function shouldRequireRedis(): boolean {
+  if (process.env.RATE_LIMIT_REQUIRE_REDIS === "true") return true;
+  return process.env.NODE_ENV === "production" && Boolean(process.env.REDIS_URL?.trim());
+}
+
+function failClosedResult(limit: number, windowMs: number): RateLimitResult {
+  return {
+    success: false,
+    limit,
+    remaining: 0,
+    resetAt: Date.now() + windowMs,
+  };
+}
+
 async function redisRateLimit(
   identifier: string,
   limit: number,
@@ -43,7 +57,7 @@ async function redisRateLimit(
       resetAt,
     };
   } catch (err) {
-    console.warn("[rate-limit] Redis unavailable, using memory store:", err);
+    console.warn("[rate-limit] Redis unavailable:", err);
     return null;
   }
 }
@@ -55,6 +69,14 @@ export async function rateLimitAsync(
 ): Promise<RateLimitResult> {
   const redisResult = await redisRateLimit(identifier, limit, windowMs);
   if (redisResult) return redisResult;
+
+  if (shouldRequireRedis()) {
+    console.error(
+      "[rate-limit] Redis required in production but unavailable; denying request (fail-closed)"
+    );
+    return failClosedResult(limit, windowMs);
+  }
+
   return memoryRateLimit(identifier, limit, windowMs);
 }
 

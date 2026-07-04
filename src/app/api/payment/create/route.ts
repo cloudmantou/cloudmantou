@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { createWechatPayment } from "@/lib/payment-providers";
+import { ensureOrderPayable, expireStalePendingOrders } from "@/lib/order-lifecycle";
 import {
   detectPaymentScene,
   resolveAlipayMode,
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
     const scene = resolveScene(req, parsed.data.scene);
     const config = await getPaymentRuntimeConfig();
 
+    await expireStalePendingOrders({ userId: session.user.id });
+
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { payment: true },
@@ -59,6 +62,11 @@ export async function POST(req: NextRequest) {
 
     if (order.status === "PAID") {
       return fail("订单已支付", 40000, 400);
+    }
+
+    const payable = await ensureOrderPayable(order);
+    if (payable.expired) {
+      return fail("订单已过期，请重新下单", 40000, 400);
     }
 
     if (order.status !== "PENDING") {

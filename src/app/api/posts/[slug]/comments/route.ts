@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
+import { applyPostCommentCountDelta } from "@/lib/comment-count";
 import { getInitialCommentStatus } from "@/lib/site-settings";
 import { z } from "zod";
 
@@ -150,27 +151,28 @@ export async function POST(
 
     const initialStatus = await getInitialCommentStatus();
 
-    const comment = await prisma.comment.create({
-      data: {
-        postId: post.id,
-        userId: session.user.id,
-        parentId: parentId || null,
-        content,
-        status: initialStatus,
-      },
-      include: {
-        user: {
-          select: { id: true, username: true, nickname: true, avatar: true },
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          postId: post.id,
+          userId: session.user.id,
+          parentId: parentId || null,
+          content,
+          status: initialStatus,
         },
-      },
-    });
-
-    if (initialStatus === "APPROVED") {
-      await prisma.post.update({
-        where: { id: post.id },
-        data: { commentCount: { increment: 1 } },
+        include: {
+          user: {
+            select: { id: true, username: true, nickname: true, avatar: true },
+          },
+        },
       });
-    }
+
+      if (initialStatus === "APPROVED") {
+        await applyPostCommentCountDelta(tx, post.id, 1);
+      }
+
+      return created;
+    });
 
     return ok({
       id: comment.id,

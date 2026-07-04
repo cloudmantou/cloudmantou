@@ -2,6 +2,7 @@ import { requireAdmin, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import { onCommentDeleted, onCommentStatusChange } from "@/lib/comment-count";
 import { z } from "zod";
 
 const updateCommentSchema = z.object({
@@ -35,17 +36,7 @@ export async function PUT(
         data: { status: nextStatus },
       });
 
-      if (previousStatus !== "APPROVED" && nextStatus === "APPROVED") {
-        await tx.post.update({
-          where: { id: comment.postId },
-          data: { commentCount: { increment: 1 } },
-        });
-      } else if (previousStatus === "APPROVED" && nextStatus === "REJECTED") {
-        await tx.post.update({
-          where: { id: comment.postId },
-          data: { commentCount: { decrement: 1 } },
-        });
-      }
+      await onCommentStatusChange(tx, comment.postId, previousStatus, nextStatus);
     });
 
     return ok({ id, status: nextStatus });
@@ -71,12 +62,7 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
-      if (comment.status === "APPROVED") {
-        await tx.post.update({
-          where: { id: comment.postId },
-          data: { commentCount: { decrement: 1 } },
-        });
-      }
+      await onCommentDeleted(tx, comment.postId, comment.status);
       await tx.comment.delete({ where: { id } });
     });
     return ok({ deleted: true });

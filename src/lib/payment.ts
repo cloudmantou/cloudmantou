@@ -2,6 +2,11 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { deliverCardPackageOrder } from "@/lib/card-delivery";
+import {
+  assertOrderTransition,
+  assertPaymentTransition,
+  pairedStatusesForPaid,
+} from "@/lib/payment-state";
 
 // ===== 支付宝签名验证 =====
 
@@ -189,6 +194,10 @@ type OrderForFinalize = {
   payment: { id: string } | null;
 };
 
+export function canFinalizeOrder(status: string): boolean {
+  return status === "PENDING";
+}
+
 /** 将支付宝订单标记为已支付并发放权益（异步通知与主动查单共用） */
 export async function finalizeAlipayOrder(input: {
   order: OrderForFinalize;
@@ -201,14 +210,30 @@ export async function finalizeAlipayOrder(input: {
     return true;
   }
 
-  if (order.status !== "PENDING") {
+  if (!canFinalizeOrder(order.status)) {
     return false;
   }
 
+  const { orderStatus, paymentStatus } = pairedStatusesForPaid();
+
   await prisma.$transaction(async (tx) => {
+    const current = await tx.order.findUnique({
+      where: { id: order.id },
+      select: {
+        status: true,
+        payment: { select: { id: true, status: true } },
+      },
+    });
+
+    if (!current || current.status === "PAID") {
+      return;
+    }
+
+    assertOrderTransition(current.status, orderStatus);
+
     const updated = await tx.order.updateMany({
-      where: { id: order.id, status: "PENDING" },
-      data: { status: "PAID", paidAt: new Date() },
+      where: { id: order.id, status: current.status },
+      data: { status: orderStatus, paidAt: new Date() },
     });
 
     if (updated.count === 0) {
@@ -220,11 +245,12 @@ export async function finalizeAlipayOrder(input: {
       channel: "ALIPAY" as const,
       amount: order.amount,
       tradeNo,
-      status: "SUCCESS" as const,
+      status: paymentStatus,
       rawCallback,
     };
 
-    if (order.payment) {
+    if (current.payment) {
+      assertPaymentTransition(current.payment.status, paymentStatus);
       await tx.payment.update({
         where: { orderId: order.id },
         data: paymentData,

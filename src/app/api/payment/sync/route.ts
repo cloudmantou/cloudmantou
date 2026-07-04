@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { queryAlipayTrade } from "@/lib/payment-providers";
+import { expireStalePendingOrders, ensureOrderPayable } from "@/lib/order-lifecycle";
 import { finalizeAlipayOrder, verifyAlipaySign, verifyAmount } from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,13 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
 
   if (order.status === "PAID") {
     return ok({ status: "PAID", synced: true, source: "cache" });
+  }
+
+  await expireStalePendingOrders({ userId: order.userId });
+
+  const payable = await ensureOrderPayable(order);
+  if (payable.expired) {
+    return ok({ status: "EXPIRED", synced: true, source: "expiry" });
   }
 
   if (order.status !== "PENDING") {
