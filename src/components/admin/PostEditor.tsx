@@ -10,7 +10,19 @@ import { uploadImageFile } from "@/lib/upload-image-client";
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 type Category = { id: string; name: string; slug: string };
-type Tag = { id: string; name: string; slug: string };
+type Tag = { id: string; name: string; slug: string; color?: string | null };
+
+function slugifyTagName(name: string) {
+  const ascii = name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (ascii.length >= 1) return ascii.slice(0, 30);
+  return `tag-${Date.now().toString(36)}`;
+}
 
 type PostEditorProps = {
   mode: "create" | "edit";
@@ -60,6 +72,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const [slugEdited, setSlugEdited] = useState(mode === "edit");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [tagInput, setTagInput] = useState("");
+  const [tagCreating, setTagCreating] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
 
@@ -210,20 +223,43 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     );
   };
 
-  const addTagFromInput = () => {
-    const trimmed = tagInput.trim();
-    if (!trimmed) return;
-    // 尝试匹配已有标签
+  const addTagFromInput = async () => {
+    const trimmed = tagInput.trim().replace(/^#/, "");
+    if (!trimmed || tagCreating) return;
+
     const matched = tags.find((t) => t.name.toLowerCase() === trimmed.toLowerCase());
     if (matched) {
       if (!selectedTagIds.includes(matched.id)) {
         setSelectedTagIds((prev) => [...prev, matched.id]);
       }
-    } else {
-      // 没有匹配：临时显示未保存的 tag 名（用 input 自带的 chip 方案过于复杂，
-      // 简化为不创建临时 tag，让用户去 /admin/tags 先建好）
+      setTagInput("");
+      return;
     }
-    setTagInput("");
+
+    setTagCreating(true);
+    try {
+      const res = await fetch("/api/admin/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, slug: slugifyTagName(trimmed) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "创建标签失败");
+
+      const created: Tag = {
+        id: data.data.id,
+        name: data.data.name,
+        slug: data.data.slug,
+        color: data.data.color,
+      };
+      setTags((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "zh-CN")));
+      setSelectedTagIds((prev) => [...prev, created.id]);
+      setTagInput("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "创建标签失败");
+    } finally {
+      setTagCreating(false);
+    }
   };
 
   const handleSave = (publishStatus: "DRAFT" | "PUBLISHED" | "PAID_ONLY") => {
@@ -567,16 +603,20 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             <input
               type="text"
               className="form-input"
-              placeholder="搜索标签，回车添加"
+              placeholder="输入标签名，回车快速创建"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
+              disabled={tagCreating}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addTagFromInput();
+                  void addTagFromInput();
                 }
               }}
             />
+            <p className="form-field-hint" style={{ marginTop: 6 }}>
+              {tagCreating ? "正在创建标签…" : "不存在时会自动创建并添加到本文"}
+            </p>
             <div className="editor-tag-chips">
               {selectedTagIds.map((id) => {
                 const tag = tags.find((t) => t.id === id);

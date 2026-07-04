@@ -1,28 +1,23 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { Suspense, useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Bookmark,
   CalendarDays,
-  Github,
   Home,
   KeyRound,
-  LogIn,
-  Mail,
-  Menu,
-  UserRound,
   PenLine,
-  Send,
-  Settings,
-  ShieldCheck,
   Sparkles,
-  X,
   ArrowRight,
 } from "lucide-react";
 import clsx from "clsx";
+import {
+  PlatformSidebar,
+  type PlatformSection,
+} from "@/components/layout/PlatformSidebar";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { ArticleOverlay } from "@/components/blog/ArticleOverlay";
 import { HomeBackdrop } from "@/components/home/HomeBackdrop";
@@ -30,15 +25,13 @@ import { ProductCard } from "@/components/shop/ProductCard";
 import { ProductDetailModal } from "@/components/shop/ProductDetailModal";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { TypingEffect } from "@/components/ui/TypingEffect";
-import { SearchDialog } from "@/components/layout/SearchDialog";
 import { DailyCommentSection } from "@/components/daily/DailyCommentSection";
 import { PaymentCheckout, type CheckoutOrder } from "@/components/payment/PaymentCheckout";
-import { favorites, stats, timeline } from "@/data/mock";
-import { siteConfig } from "@/config/site";
-import { isAdminRole } from "@/lib/roles";
+import { favorites, stats as mockStats, timeline } from "@/data/mock";
+import { DEFAULT_HOME_TYPING_PHRASES } from "@/lib/site-settings";
 import type { BlogCategory, BlogPost, FavoriteCategory, Product, ProductCategory } from "@/types";
 
-type Section = "home" | "blog" | "shop" | "daily" | "favorites";
+type Section = PlatformSection;
 
 type ApiPost = {
   id: string;
@@ -60,8 +53,10 @@ const sections: Array<{ id: Section; label: string; icon: typeof Home; badge?: s
   { id: "blog", label: "技术博客", icon: PenLine },
   { id: "shop", label: "会员与卡密", icon: KeyRound },
   { id: "daily", label: "日常记录", icon: CalendarDays },
-  { id: "favorites", label: "收藏夹", icon: Bookmark }
+  { id: "favorites", label: "收藏夹", icon: Bookmark },
 ];
+
+const VALID_SECTIONS = new Set<Section>(["home", "blog", "shop", "daily", "favorites"]);
 
 const productFilters: Array<{ id: ProductCategory; label: string }> = [
   { id: "all", label: "全部" },
@@ -71,15 +66,15 @@ const productFilters: Array<{ id: ProductCategory; label: string }> = [
   { id: "service", label: "服务" }
 ];
 
-export function PlatformShell() {
+function PlatformShellInner() {
   const router = useRouter();
-  const { data: session } = useSession();
-  const isAdmin = isAdminRole(session?.user?.role);
+  const searchParams = useSearchParams();
+  const { data: session, status: sessionStatus } = useSession();
+  const isLoggedIn = sessionStatus === "authenticated" && Boolean(session?.user);
   const [section, setSection] = useState<Section>("home");
   const [productCategory, setProductCategory] = useState<ProductCategory>("all");
   const [favCategory, setFavCategory] = useState<FavoriteCategory | "all">("all");
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   // Real blog data
@@ -96,6 +91,13 @@ export function PlatformShell() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productDetailOpen, setProductDetailOpen] = useState(false);
   const [shopProducts, setShopProducts] = useState<Product[]>([]);
+  const [typingPhrases, setTypingPhrases] = useState<string[]>(DEFAULT_HOME_TYPING_PHRASES);
+  const [homeSubtitle, setHomeSubtitle] = useState("");
+
+  const homeStats = useMemo(
+    () => mockStats.filter((item) => item.label !== "会员专栏" && item.label !== "卡密库存"),
+    []
+  );
 
   const openPostOverlay = (post: ApiPost) => {
     const accentColors = ["gold", "teal", "rose", "blue", "orange"] as const;
@@ -121,6 +123,20 @@ export function PlatformShell() {
     };
     setSelectedPost(blogPost);
   };
+
+  useEffect(() => {
+    fetch("/api/site/home-content")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d.data?.typingPhrases) && d.data.typingPhrases.length > 0) {
+          setTypingPhrases(d.data.typingPhrases);
+        }
+        if (typeof d.data?.siteSubtitle === "string") {
+          setHomeSubtitle(d.data.siteSubtitle);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Load categories
@@ -156,6 +172,13 @@ export function PlatformShell() {
   }, []);
 
   useEffect(() => {
+    const fromUrl = searchParams.get("section");
+    if (fromUrl && VALID_SECTIONS.has(fromUrl as Section)) {
+      setSection(fromUrl as Section);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (section !== "daily") return;
     fetch("/api/daily-records?pageSize=20")
       .then((r) => r.json())
@@ -172,6 +195,11 @@ export function PlatformShell() {
         (product) => productCategory === "all" || product.category === productCategory
       ),
     [productCategory, shopProducts]
+  );
+
+  const publishedCardProducts = useMemo(
+    () => shopProducts.filter((product) => product.category === "card"),
+    [shopProducts]
   );
 
   const filteredFavorites = useMemo(
@@ -206,8 +234,14 @@ export function PlatformShell() {
   };
 
   const handleBuyProduct = (product: Product) => {
-    if (!session) {
-      router.push("/login?callbackUrl=/");
+    if (sessionStatus === "loading") {
+      showToast("正在验证登录状态，请稍候");
+      return;
+    }
+    if (!isLoggedIn) {
+      const callback =
+        section === "shop" ? "/?section=shop" : section === "home" ? "/" : `/?section=${section}`;
+      router.push(`/login?callbackUrl=${encodeURIComponent(callback)}`);
       return;
     }
     if (!product.productType) {
@@ -238,161 +272,37 @@ export function PlatformShell() {
       .catch((e: Error) => showToast(e.message || "下单失败"));
   };
 
-  const selectSection = (nextSection: Section) => {
+  const selectSection = useCallback((nextSection: Section) => {
     setSection(nextSection);
-    setMobileOpen(false);
-  };
+    const url = nextSection === "home" ? "/" : `/?section=${nextSection}`;
+    router.replace(url, { scroll: false });
+  }, [router]);
 
   return (
     <>
-      <header className="mobile-header">
-        <span className="mobile-logo">
-          Cloud<span>Mantou</span>
-        </span>
-        <div className="flex items-center gap-2">
-          <SearchDialog />
-          <button
-            className="icon-button"
-            type="button"
-            onClick={() => setMobileOpen((value) => !value)}
-            aria-label="打开导航"
-          >
-            {mobileOpen ? <X size={21} /> : <Menu size={21} />}
-          </button>
-        </div>
-      </header>
-
-      <div
-        className={clsx("sidebar-overlay", mobileOpen && "show")}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden="true"
-      />
-
-      <div className="layout">
-        <aside className={clsx("sidebar", mobileOpen && "open")}>
-          <div className="avatar-wrap" aria-hidden="true">
-            <span className="avatar-ring" />
-            <span className="avatar">CM</span>
-          </div>
-          <div className="sidebar-name">{siteConfig.name}</div>
-          <div className="sidebar-tag">
-            <span className="pulse-dot" />
-            在线 · 会员平台
-          </div>
-
-          <div className="mb-4">
-            <SearchDialog />
-          </div>
-
-          <nav className="side-nav" aria-label="主导航">
-            <div className="nav-section-label">Navigation</div>
-            {sections.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  className={clsx("nav-item", section === item.id && "active")}
-                  key={item.id}
-                  type="button"
-                  onClick={() => selectSection(item.id)}
-                >
-                  <Icon size={16} aria-hidden="true" />
-                  <span>{item.label}</span>
-                  {item.badge ? <span className="nav-badge">{item.badge}</span> : null}
-                </button>
-              );
-            })}
-
-            <div className="nav-section-label">Workspace</div>
-            {!session ? (
-              <Link className="nav-item nav-link" href="/login?callbackUrl=/">
-                <LogIn size={16} aria-hidden="true" />
-                <span>登录</span>
-              </Link>
-            ) : null}
-            {session && !isAdmin ? (
-              <Link className="nav-item nav-link" href="/dashboard">
-                <UserRound size={16} aria-hidden="true" />
-                <span>会员中心</span>
-              </Link>
-            ) : null}
-            {isAdmin ? (
-              <Link className="nav-item nav-link" href="/admin">
-                <ShieldCheck size={16} aria-hidden="true" />
-                <span>后台管理</span>
-              </Link>
-            ) : null}
-            <button className="nav-item" type="button" onClick={() => showToast("在线工具将在后台模块接入")}>
-              <Settings size={16} aria-hidden="true" />
-              <span>在线工具</span>
-            </button>
-          </nav>
-
-          <div className="social-row">
-            <a className="social-link" href="https://github.com" aria-label="GitHub">
-              <Github size={15} />
-            </a>
-            <a className="social-link" href="mailto:hello@example.com" aria-label="Email">
-              <Mail size={15} />
-            </a>
-            <a className="social-link" href="https://t.me" aria-label="Telegram">
-              <Send size={15} />
-            </a>
-          </div>
-
-          {session ? (
-            <div className="sidebar-user">
-              <div className="sidebar-user-info">
-                <span className="sidebar-user-avatar">
-                  {(session.user?.nickname || session.user?.username || "U").slice(0, 1).toUpperCase()}
-                </span>
-                <div className="sidebar-user-meta">
-                  <span className="sidebar-user-name">{session.user?.nickname || session.user?.username}</span>
-                  <span className="sidebar-user-role">{session.user?.role === "ADMIN" ? "管理员" : "会员"}</span>
-                </div>
-              </div>
-              <button
-                className="sidebar-logout"
-                type="button"
-                onClick={() => signOut({ callbackUrl: "/" })}
-              >
-                退出
-              </button>
-            </div>
-          ) : (
-            <div className="sidebar-user">
-              <Link href="/login?callbackUrl=/" className="sidebar-login-btn">
-                登录 / 注册
-              </Link>
-            </div>
-          )}
-        </aside>
-
-        <main className="main">
+      <PlatformSidebar
+        mode="spa"
+        activeSection={section}
+        onSelectSection={selectSection}
+        onToast={showToast}
+      >
           {section === "home" ? (
             <>
             <HomeBackdrop />
             <section className="page active home-hero" aria-labelledby="home-title">
               <div className="home-hero-content">
               <div className="home-greeting" aria-hidden="true">
-                <span className="greeting-diamond" /> CLOUDMANTOU · BLOG &amp; MEMBERSHIP
+                <span className="greeting-diamond" /> {homeSubtitle || "个人技术博客"}
               </div>
               <h1 className="home-title" id="home-title">
-                个人技术博客，
+                写代码，记运维，
                 <br />
-                也卖一点<span>会员内容</span>。
+                聊<span>独立产品</span>。
               </h1>
               <p className="home-sub">
-                <TypingEffect
-                  phrases={[
-                    "记录开发、运维、独立产品和自动发卡系统的真实实践。",
-                    "公开文章免费阅读 · 深度内容支持会员或卡密解锁。",
-                    "Next.js 15 · Prisma · MySQL · NextAuth · Docker",
-                    "分享技术，记录运营，创造价值。",
-                  ]}
-                />
+                <TypingEffect phrases={typingPhrases} />
               </p>
 
-              {/* Quick actions */}
               <div className="quick-actions">
                 <button
                   type="button"
@@ -402,36 +312,20 @@ export function PlatformShell() {
                   阅读最新文章
                   <ArrowRight size={15} aria-hidden="true" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => selectSection("shop")}
-                  className="quick-btn ghost"
-                >
-                  <KeyRound size={15} aria-hidden="true" />
-                  购买会员
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectSection("shop")}
-                  className="quick-btn ghost"
-                >
-                  <Sparkles size={15} aria-hidden="true" />
-                  查看会员内容
-                </button>
               </div>
 
               <div className="metrics-grid">
-                {stats.map((metric, index) => (
+                {homeStats.map((metric, index) => (
                   <MetricCard index={index} key={metric.label} metric={metric} />
                 ))}
               </div>
 
               {/* About + Tech stack */}
               <section className="section-block">
-                <h2 className="section-title">关于平台</h2>
+                <h2 className="section-title">关于本站</h2>
                 <p className="about-text">
-                  CloudMantou 是一套面向独立开发者的内容变现工具：把博客、会员付费、卡密自动交付和运营后台整合在同一个 Next.js 应用里。
-                  公开文章免费阅读并做好 SEO，深度内容通过会员订阅或单篇卡密解锁，支付回调、库存锁定和发卡补偿链路分层设计，保证交付可靠。
+                  这里是馒头的<strong>个人技术博客</strong>，主要写开发、运维、独立产品与内容变现相关的内容。
+                  公开文章免费阅读并做好 SEO，深度内容可通过会员或卡密解锁。本站也运营自研工具<strong>馒头助手</strong>（iOS 应用安装，支持香色闺阁、源阅读等）。
                 </p>
               </section>
 
@@ -452,6 +346,37 @@ export function PlatformShell() {
                   <span className="tech-pill">Zod</span>
                 </div>
               </section>
+
+              {publishedCardProducts.length > 0 && (
+                <section className="section-block mt-8">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="section-title" style={{ margin: 0 }}>
+                      在售卡密
+                    </h2>
+                    <button
+                      type="button"
+                      className="quick-btn ghost"
+                      style={{ padding: "8px 14px", fontSize: 12 }}
+                      onClick={() => selectSection("shop")}
+                    >
+                      查看全部
+                      <ArrowRight size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="product-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+                    {publishedCardProducts.slice(0, 3).map((product, index) => (
+                      <ProductCard
+                        index={index}
+                        key={product.id}
+                        product={product}
+                        loggedIn={isLoggedIn}
+                        onBuy={handleBuyProduct}
+                        onSelect={openProductDetail}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* Latest articles preview */}
               {apiPosts.length > 0 && (
@@ -581,8 +506,19 @@ export function PlatformShell() {
                 <h2 className="page-title" id="shop-title">
                   会员与卡密
                 </h2>
-                <p className="page-desc">登录后可直接下单会员套餐，支付对接完成后自动开通。</p>
+                <p className="page-desc">购买会员或卡密需先登录，支付成功后可在会员中心查看订单与卡密。</p>
               </div>
+              {!isLoggedIn ? (
+                <div
+                  className="mb-6 p-4 rounded-lg text-sm"
+                  style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+                >
+                  请先登录后再购买商品。
+                  <Link href="/login?callbackUrl=%2F%3Fsection%3Dshop" style={{ color: "var(--accent)", marginLeft: 8 }}>
+                    去登录 →
+                  </Link>
+                </div>
+              ) : null}
               <div className="filters" aria-label="商品分类">
                 {productFilters.map((filter) => (
                   <button
@@ -596,15 +532,25 @@ export function PlatformShell() {
                 ))}
               </div>
               <div className="product-grid">
-                {filteredProducts.map((product, index) => (
-                  <ProductCard
-                    index={index}
-                    key={product.id}
-                    product={product}
-                    onBuy={handleBuyProduct}
-                    onSelect={openProductDetail}
-                  />
-                ))}
+                {filteredProducts.length === 0 ? (
+                  <div
+                    className="text-center py-12 text-sm"
+                    style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace', gridColumn: "1 / -1" }}
+                  >
+                    暂无商品。管理员在后台「卡密管理 → 商品管理」发布卡密商品后会显示在这里。
+                  </div>
+                ) : (
+                  filteredProducts.map((product, index) => (
+                    <ProductCard
+                      index={index}
+                      key={product.id}
+                      product={product}
+                      loggedIn={isLoggedIn}
+                      onBuy={handleBuyProduct}
+                      onSelect={openProductDetail}
+                    />
+                  ))
+                )}
               </div>
             </section>
           ) : null}
@@ -782,8 +728,7 @@ export function PlatformShell() {
               </div>
             </section>
           ) : null}
-        </main>
-      </div>
+      </PlatformSidebar>
 
       <nav className="bottom-nav" aria-label="移动端导航">
         {sections.map((item) => {
@@ -807,6 +752,7 @@ export function PlatformShell() {
       <ProductDetailModal
         product={selectedProduct}
         open={productDetailOpen}
+        loggedIn={isLoggedIn}
         onClose={() => {
           setProductDetailOpen(false);
           setSelectedProduct(null);
@@ -821,7 +767,7 @@ export function PlatformShell() {
         order={checkoutOrder}
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        onPaid={() => showToast("支付成功，权益已发放")}
+        onPaid={() => {}}
       />
 
       <div className={clsx("toast", toast && "show")} role="status" aria-live="polite">
@@ -829,5 +775,13 @@ export function PlatformShell() {
         {toast}
       </div>
     </>
+  );
+}
+
+export function PlatformShell() {
+  return (
+    <Suspense fallback={null}>
+      <PlatformShellInner />
+    </Suspense>
   );
 }

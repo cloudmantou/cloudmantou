@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { CategoryPosts } from "./CategoryPosts";
 import { MarketingShell } from "@/components/layout/MarketingShell";
 
@@ -10,19 +11,23 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const category = await prisma.category.findUnique({
-    where: { slug },
-    select: { name: true, description: true },
-  });
+  const [ctx, category] = await Promise.all([
+    getSeoContext(),
+    prisma.category.findUnique({
+      where: { slug },
+      select: { name: true, description: true },
+    }),
+  ]);
 
   if (!category) {
     return { title: "分类不存在" };
   }
 
-  return {
+  return buildPageMetadata(ctx, {
     title: `${category.name} - 文章分类`,
-    description: category.description || undefined,
-  };
+    description: category.description || `${category.name} 相关技术文章 · ${ctx.name}`,
+    path: `/category/${slug}`,
+  });
 }
 
 export default async function CategoryPage({ params }: PageProps) {

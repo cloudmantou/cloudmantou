@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
 import { PlatformShell } from "@/components/layout/PlatformShell";
+import { buildPageMetadata, getSeoContext } from "@/lib/seo";
 
-// 首页：DigitalHub 侧栏 SPA（博客 / 商城 / 日常 / 收藏）
+export async function generateMetadata(): Promise<Metadata> {
+  const ctx = await getSeoContext();
+  return buildPageMetadata(ctx, {
+    title: `${ctx.name} — ${ctx.subtitle}`,
+    description: ctx.description,
+    path: "/",
+  });
+}
+
 export default function HomePage() {
   return <PlatformShell />;
 }

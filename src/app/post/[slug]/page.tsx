@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getPostAccess } from "@/lib/post-access";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildBlogPostingJsonLd, buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { PostContent } from "./PostContent";
 import { MarketingShell } from "@/components/layout/MarketingShell";
 
@@ -12,25 +14,25 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = await prisma.post.findUnique({
-    where: { slug },
-    select: { title: true, excerpt: true, coverImage: true, status: true },
-  });
+  const [ctx, post] = await Promise.all([
+    getSeoContext(),
+    prisma.post.findUnique({
+      where: { slug },
+      select: { title: true, excerpt: true, coverImage: true, status: true },
+    }),
+  ]);
 
   if (!post || post.status === "DRAFT") {
     return { title: "文章不存在" };
   }
 
-  return {
+  return buildPageMetadata(ctx, {
     title: post.title,
     description: post.excerpt || undefined,
-    openGraph: {
-      title: post.title,
-      description: post.excerpt || undefined,
-      type: "article",
-      ...(post.coverImage ? { images: [post.coverImage] } : {}),
-    },
-  };
+    path: `/post/${slug}`,
+    type: "article",
+    image: post.coverImage,
+  });
 }
 
 export default async function PostPage({ params }: PageProps) {
@@ -139,8 +141,25 @@ export default async function PostPage({ params }: PageProps) {
         : null,
   };
 
+  const ctx = await getSeoContext();
+  const authorName = post.author.nickname || post.author.username;
+
   return (
     <MarketingShell>
+      <JsonLd
+        ctx={ctx}
+        extra={[
+          buildBlogPostingJsonLd(ctx, {
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            coverImage: post.coverImage,
+            publishedAt: post.publishedAt,
+            updatedAt: post.updatedAt,
+            authorName,
+          }),
+        ]}
+      />
       <article
         className="min-h-screen px-4 py-10 md:px-8"
         style={{ background: "var(--article-bg)" }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -114,8 +114,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/admin";
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   const title = resolveTitle(pathname);
+  const navigating = pendingHref !== null && pendingHref !== pathname;
   const displayName = session?.user?.nickname || session?.user?.username || "管理员";
   const initial = displayName.slice(0, 1).toUpperCase();
 
@@ -131,7 +137,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-brand">
           <div className="admin-brand-icon">CM</div>
           <div className="admin-brand-text">
-            <h2>CloudMantou</h2>
+            <h2>馒头的博客</h2>
             <span>Admin Panel</span>
           </div>
         </div>
@@ -156,8 +162,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={clsx("admin-nav-item", (active || isDashboard) && "active")}
-                    onClick={() => setMobileOpen(false)}
+                    prefetch
+                    className={clsx(
+                      "admin-nav-item",
+                      (active || isDashboard) && "active",
+                      pendingHref === item.href && "pending"
+                    )}
+                    onClick={() => {
+                      setPendingHref(item.href);
+                      setMobileOpen(false);
+                    }}
                   >
                     <Icon size={18} aria-hidden="true" />
                     <span>{item.label}</span>
@@ -205,7 +219,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className="admin-content">{children}</div>
+        <div className={clsx("admin-content", navigating && "is-navigating")}>
+          {navigating ? <div className="admin-route-progress" aria-hidden="true" /> : null}
+          {children}
+        </div>
       </div>
     </div>
   );

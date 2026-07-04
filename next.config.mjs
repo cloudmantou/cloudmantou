@@ -35,7 +35,7 @@ const securityHeaders = [
       "connect-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
-      "form-action 'self' https://openapi.alipay.com https://openapi.alipaydev.com",
+      "form-action 'self' https:",
     ].join("; "),
   },
 ];
@@ -47,7 +47,8 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // 支付跳转页不叠加全站 CSP，由 route handler 返回独立策略
+        source: "/((?!payment/alipay-launch).*)",
         headers: securityHeaders,
       },
     ];

@@ -32,6 +32,7 @@ export default function AdminSettingsPage() {
     openRegistration: true,
     commentReview: true,
     maintenanceMode: false,
+    homeTypingPhrases: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -117,7 +118,7 @@ export default function AdminSettingsPage() {
                 onChange={(e) => update("siteName", e.target.value)}
                 maxLength={100}
                 className="form-input"
-                placeholder="CloudMantou"
+                placeholder="馒头的博客"
               />
             </Field>
             <Field label="站点副标题" hint="一句话描述站点定位">
@@ -127,7 +128,7 @@ export default function AdminSettingsPage() {
                 onChange={(e) => update("siteSubtitle", e.target.value)}
                 maxLength={200}
                 className="form-input"
-                placeholder="博客 · 会员 · 工具"
+                placeholder="记录开发、运维与独立产品实践"
               />
             </Field>
             <Field label="站点描述" hint="SEO 描述，~160 字符最佳">
@@ -137,7 +138,7 @@ export default function AdminSettingsPage() {
                 rows={3}
                 maxLength={1000}
                 className="form-input form-textarea"
-                placeholder="个人技术博客、会员付费内容与卡密运营平台"
+                placeholder="个人技术博客，记录开发、运维与独立产品实践"
               />
             </Field>
             <Field label="站点 URL" hint="带 https://，用于绝对链接生成">
@@ -146,7 +147,7 @@ export default function AdminSettingsPage() {
                 value={settings.siteUrl}
                 onChange={(e) => update("siteUrl", e.target.value)}
                 className="form-input mono"
-                placeholder="https://example.com"
+                placeholder="https://cloudmantoua.top"
               />
             </Field>
             <Field label="管理员邮箱" hint="接收通知、找回密码">
@@ -156,6 +157,35 @@ export default function AdminSettingsPage() {
                 onChange={(e) => update("adminEmail", e.target.value)}
                 className="form-input mono"
                 placeholder="admin@example.com"
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section className="data-panel">
+          <div className="data-panel-header">
+            <span className="data-panel-title">首页展示</span>
+            <span className="data-panel-meta">打字机文案</span>
+          </div>
+          <div className="settings-form">
+            <Field label="首页副标题" hint="显示在首页顶部问候语，留空则用默认文案">
+              <input
+                type="text"
+                value={settings.siteSubtitle}
+                onChange={(e) => update("siteSubtitle", e.target.value)}
+                maxLength={200}
+                className="form-input"
+                placeholder="例如：独立开发 · 技术博客"
+              />
+            </Field>
+            <Field label="打字机轮播句" hint="每行一句，最多 12 条，保存后前台首页即时生效">
+              <textarea
+                value={settings.homeTypingPhrases}
+                onChange={(e) => update("homeTypingPhrases", e.target.value)}
+                rows={6}
+                maxLength={8000}
+                className="form-input form-textarea mono"
+                placeholder={"记录开发、运维、独立产品的真实实践。\n公开文章免费阅读。"}
               />
             </Field>
           </div>

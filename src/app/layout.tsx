@@ -1,35 +1,22 @@
 import type { Metadata } from "next";
 import AuthProvider from "@/components/providers/AuthProvider";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildRootMetadata, getSeoContext } from "@/lib/seo";
 import "./globals.css";
 import "@/styles/cards.css";
 
-export const metadata: Metadata = {
-  title: {
-    default: "CloudMantou — 博客会员平台",
-    template: "%s | CloudMantou",
-  },
-  description: "个人博客、会员付费内容、自动卡密交付与运营后台一体化平台。",
-  icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-  },
-  openGraph: {
-    type: "website",
-    locale: "zh_CN",
-    siteName: "CloudMantou",
-    title: "CloudMantou — 博客会员平台",
-    description: "个人博客、会员付费内容、自动卡密交付与运营后台一体化平台。",
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const ctx = await getSeoContext();
+  return buildRootMetadata(ctx);
+}
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const ctx = await getSeoContext();
+
   return (
     <html lang="zh-CN">
       <body>
+        <JsonLd ctx={ctx} />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -1,8 +1,9 @@
 import { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { getSeoContext } from "@/lib/seo";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://cloudmantou.com";
+  const { url: baseUrl } = await getSeoContext();
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [

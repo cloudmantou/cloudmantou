@@ -7,8 +7,8 @@ export default function AuthLayout({
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
-          <h1 className="auth-logo">☁️ CloudMantou</h1>
-          <p className="auth-subtitle">博客会员平台</p>
+          <h1 className="auth-logo">🥟 馒头的博客</h1>
+          <p className="auth-subtitle">个人技术博客</p>
         </div>
         {children}
       </div>

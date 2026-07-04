@@ -15,7 +15,7 @@ export default function MaintenancePage() {
       <div>
         <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 12 }}>站点维护中</h1>
         <p style={{ color: "var(--text-secondary, #9ca3af)", lineHeight: 1.7 }}>
-          CloudMantou 正在进行维护，请稍后再访问。
+          站点正在进行维护，请稍后再访问。
         </p>
       </div>
     </div>

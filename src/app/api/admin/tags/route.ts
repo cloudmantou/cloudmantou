@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
     }
 
     const tag = await prisma.tag.create({ data });
-    return ok({ id: tag.id });
+    return ok({
+      id: tag.id,
+      name: tag.name,
+      slug: tag.slug,
+      color: tag.color,
+    });
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);

@@ -256,6 +256,70 @@
 
 .admin-content {
   padding: 28px 32px;
+  position: relative;
+}
+
+.admin-content.is-navigating {
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.admin-route-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: admin-route-progress 900ms ease-in-out infinite;
+  z-index: 2;
+}
+
+.admin-nav-item.pending {
+  opacity: 0.7;
+}
+
+.admin-route-loading {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-route-loading-bar {
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: admin-route-progress 900ms ease-in-out infinite;
+}
+
+.admin-route-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-route-loading-card,
+.admin-route-loading-panel {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 92px;
+  animation: admin-skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.admin-route-loading-panel {
+  grid-column: 1 / -1;
+  min-height: 220px;
+}
+
+@keyframes admin-route-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes admin-skeleton-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
 }
 
 .admin-mobile-toggle {
