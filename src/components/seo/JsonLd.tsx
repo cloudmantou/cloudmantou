@@ -22,7 +22,8 @@ export function JsonLd({ ctx, extra = [], nonce }: Props) {
   return (
     <script
       type="application/ld+json"
-      nonce={nonce}
+      {...(nonce ? { nonce } : {})}
+      suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: JSON.stringify(graphs) }}
     />
   );

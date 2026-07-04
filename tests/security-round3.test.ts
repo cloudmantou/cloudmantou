@@ -19,9 +19,12 @@ describe("buildContentSecurityPolicy", () => {
     expect(scriptSrc).not.toContain("unsafe-eval");
   });
 
-  it("开发环境保留 inline script 以兼容 HMR", () => {
+  it("开发环境保留 inline/eval 以兼容 HMR 与 React DevTools", () => {
     const csp = buildContentSecurityPolicy("abc123", true);
-    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+    const scriptSrc = csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";
+    expect(scriptSrc).toContain("'unsafe-inline'");
+    expect(scriptSrc).toContain("'unsafe-eval'");
+    expect(scriptSrc).not.toContain("'nonce-");
   });
 });
 

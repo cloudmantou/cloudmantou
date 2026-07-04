@@ -19,13 +19,17 @@ export function generateCspNonce(): string {
   return btoa(crypto.randomUUID());
 }
 
-/** 全站 CSP；生产 script 使用 nonce，开发保留 inline 以兼容 HMR */
+export function usesScriptNonce(dev = process.env.NODE_ENV === "development"): boolean {
+  return !dev;
+}
+
+/** 全站 CSP；生产 script 使用 nonce，开发保留 inline/eval 以兼容 HMR 与 React DevTools */
 export function buildContentSecurityPolicy(
   nonce: string,
   dev = process.env.NODE_ENV === "development"
 ): string {
   const scriptSrc = dev
-    ? "script-src 'self' 'unsafe-inline'"
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
     : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
 
   return [
