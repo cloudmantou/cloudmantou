@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
 import { getInitialCommentStatus } from "@/lib/site-settings";
+import { onDailyRecordCommentCreated } from "@/lib/comment-count";
 import { z } from "zod";
 
 const createCommentSchema = z.object({
@@ -115,27 +116,24 @@ export async function POST(
 
     const initialStatus = await getInitialCommentStatus();
 
-    const comment = await prisma.dailyRecordComment.create({
-      data: {
-        recordId: record.id,
-        userId: session.user.id,
-        parentId: parentId || null,
-        content,
-        status: initialStatus,
-      },
-      include: {
-        user: {
-          select: { id: true, username: true, nickname: true, avatar: true },
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.dailyRecordComment.create({
+        data: {
+          recordId: record.id,
+          userId: session.user.id,
+          parentId: parentId || null,
+          content,
+          status: initialStatus,
         },
-      },
-    });
-
-    if (initialStatus === "APPROVED") {
-      await prisma.dailyRecord.update({
-        where: { id: record.id },
-        data: { commentCount: { increment: 1 } },
+        include: {
+          user: {
+            select: { id: true, username: true, nickname: true, avatar: true },
+          },
+        },
       });
-    }
+      await onDailyRecordCommentCreated(tx, record.id, initialStatus);
+      return created;
+    });
 
     return ok({
       id: comment.id,

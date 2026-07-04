@@ -8,32 +8,47 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const session = await requireAuth();
     const { id: recordId } = await params;
 
-    const record = await prisma.dailyRecord.findUnique({ where: { id: recordId } });
+    const record = await prisma.dailyRecord.findUnique({
+      where: { id: recordId },
+      select: { id: true },
+    });
     if (!record) return fail("记录不存在", 40400, 404);
 
-    const existing = await prisma.dailyRecordLike.findUnique({
-      where: { userId_recordId: { userId: session.user.id, recordId } },
-    });
+    const userId = session.user.id;
 
-    if (existing) {
-      // Unlike
-      await prisma.dailyRecordLike.delete({ where: { id: existing.id } });
-      await prisma.dailyRecord.update({
-        where: { id: recordId },
-        data: { likeCount: { decrement: 1 } },
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.dailyRecordLike.findUnique({
+        where: { userId_recordId: { userId, recordId } },
       });
-      return ok({ liked: false, likeCount: Math.max(0, record.likeCount - 1) });
-    } else {
-      // Like
-      await prisma.dailyRecordLike.create({
-        data: { userId: session.user.id, recordId },
+
+      if (existing) {
+        await tx.dailyRecordLike.delete({ where: { id: existing.id } });
+        await tx.dailyRecord.update({
+          where: { id: recordId },
+          data: { likeCount: { decrement: 1 } },
+        });
+        const updated = await tx.dailyRecord.findUnique({
+          where: { id: recordId },
+          select: { likeCount: true },
+        });
+        return { liked: false, likeCount: Math.max(0, updated?.likeCount ?? 0) };
+      }
+
+      await tx.dailyRecordLike.create({
+        data: { userId, recordId },
       });
-      await prisma.dailyRecord.update({
+      await tx.dailyRecord.update({
         where: { id: recordId },
         data: { likeCount: { increment: 1 } },
       });
-      return ok({ liked: true, likeCount: record.likeCount + 1 });
-    }
+      const updated = await tx.dailyRecord.findUnique({
+        where: { id: recordId },
+        select: { likeCount: true },
+      });
+      return { liked: true, likeCount: updated?.likeCount ?? 0 };
+    });
+
+    return ok(result);
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);

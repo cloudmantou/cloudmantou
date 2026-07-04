@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize from "rehype-sanitize";
+import { isSafeExternalHref, isSafeMarkdownImageSrc } from "@/lib/safe-image-url";
 
 type MarkdownRendererProps = {
   content: string;
@@ -19,7 +20,7 @@ export function MarkdownRenderer({
         rehypePlugins={[rehypeHighlight, rehypeSanitize]}
         components={{
           img: ({ src, alt }) => {
-            if (!src?.trim()) return null;
+            if (!src?.trim() || !isSafeMarkdownImageSrc(src)) return null;
             return (
               <figure className="md-figure">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -30,11 +31,21 @@ export function MarkdownRenderer({
               </figure>
             );
           },
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            if (!href || !isSafeExternalHref(href)) {
+              return <span>{children}</span>;
+            }
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                referrerPolicy="no-referrer"
+              >
+                {children}
+              </a>
+            );
+          },
         }}
       >
         {content}

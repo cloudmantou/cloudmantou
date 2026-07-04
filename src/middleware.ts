@@ -25,6 +25,7 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/admin") &&
     !pathname.startsWith("/api/site/settings/public") &&
     !pathname.startsWith("/api/payment/notify") &&
+    !pathname.startsWith("/api/cron") &&
     !pathname.startsWith("/api/auth") &&
     pathname !== "/maintenance"
   ) {

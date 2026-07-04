@@ -67,3 +67,73 @@ export async function onCommentDeleted(
     await applyPostCommentCountDelta(tx, postId, -1);
   }
 }
+
+// ===== Daily Record 评论计数 =====
+
+export async function countApprovedDailyRecordComments(
+  recordId: string,
+  tx: Tx = prisma
+): Promise<number> {
+  return tx.dailyRecordComment.count({
+    where: { recordId, parentId: null, status: "APPROVED" },
+  });
+}
+
+export async function reconcileDailyRecordCommentCount(
+  recordId: string,
+  tx: Tx = prisma
+): Promise<number> {
+  const count = await countApprovedDailyRecordComments(recordId, tx);
+  await tx.dailyRecord.update({
+    where: { id: recordId },
+    data: { commentCount: count },
+  });
+  return count;
+}
+
+export async function onDailyRecordCommentCreated(
+  tx: Tx,
+  recordId: string,
+  status: CommentStatus
+): Promise<void> {
+  if (status === "APPROVED") {
+    await tx.dailyRecord.update({
+      where: { id: recordId },
+      data: { commentCount: { increment: 1 } },
+    });
+  }
+}
+
+export async function onDailyRecordCommentStatusChange(
+  tx: Tx,
+  recordId: string,
+  previousStatus: CommentStatus,
+  nextStatus: CommentStatus
+): Promise<void> {
+  const delta = commentCountDelta(previousStatus, nextStatus);
+  if (delta === 0) return;
+  if (delta > 0) {
+    await tx.dailyRecord.update({
+      where: { id: recordId },
+      data: { commentCount: { increment: delta } },
+    });
+    return;
+  }
+  await tx.dailyRecord.update({
+    where: { id: recordId },
+    data: { commentCount: { decrement: Math.abs(delta) } },
+  });
+}
+
+export async function onDailyRecordCommentDeleted(
+  tx: Tx,
+  recordId: string,
+  status: CommentStatus
+): Promise<void> {
+  if (status === "APPROVED") {
+    await tx.dailyRecord.update({
+      where: { id: recordId },
+      data: { commentCount: { decrement: 1 } },
+    });
+  }
+}

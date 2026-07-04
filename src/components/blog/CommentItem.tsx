@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { MessageCircle, User } from "lucide-react";
 import { CommentForm } from "./CommentForm";
+import { isSafeAvatarSrc } from "@/lib/safe-image-url";
 
 export type CommentData = {
   id: string;
@@ -55,14 +56,13 @@ export function CommentItem({ comment, slug, depth = 0 }: CommentItemProps) {
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs"
             style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
           >
-            {comment.user.avatar ? (
+            {isSafeAvatarSrc(comment.user.avatar) ? (
               <Image
-                src={comment.user.avatar}
+                src={comment.user.avatar!}
                 alt=""
                 width={28}
                 height={28}
                 className="rounded-full object-cover"
-                unoptimized
               />
             ) : (
               <User size={14} aria-hidden="true" />

@@ -5,7 +5,12 @@ import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { queryAlipayTrade } from "@/lib/payment-providers";
 import { expireStalePendingOrders, ensureOrderPayable } from "@/lib/order-lifecycle";
-import { finalizeAlipayOrder, verifyAlipaySign, verifyAmount } from "@/lib/payment";
+import {
+  finalizeAlipayOrder,
+  isValidAlipayTradeNo,
+  verifyAlipaySign,
+  verifyAmount,
+} from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +73,10 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
         return fail("支付金额与订单不一致", 40000, 400);
       }
 
+      if (!isValidAlipayTradeNo(returnParams.trade_no)) {
+        return fail("无效的交易号", 40000, 400);
+      }
+
       await finalizeAlipayOrder({
         order,
         tradeNo: returnParams.trade_no,
@@ -90,6 +99,10 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
       tradeStatus: query.tradeStatus,
       message: query.message,
     });
+  }
+
+  if (!isValidAlipayTradeNo(query.tradeNo)) {
+    return fail("无效的交易号", 40000, 400);
   }
 
   if (query.totalAmount && !verifyAmount(order.amount, query.totalAmount)) {

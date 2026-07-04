@@ -8,6 +8,13 @@ import {
   pairedStatusesForPaid,
 } from "@/lib/payment-state";
 
+/** 支付宝交易号：16–28 位字母数字 */
+export const ALIPAY_TRADE_NO_RE = /^[0-9A-Za-z]{16,28}$/;
+
+export function isValidAlipayTradeNo(tradeNo: string): boolean {
+  return ALIPAY_TRADE_NO_RE.test(tradeNo.trim());
+}
+
 // ===== 支付宝签名验证 =====
 
 export function verifyAlipaySign(

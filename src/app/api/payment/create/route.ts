@@ -44,9 +44,7 @@ export async function POST(req: NextRequest) {
     const scene = resolveScene(req, parsed.data.scene);
     const config = await getPaymentRuntimeConfig();
 
-    void expireStalePendingOrders({ userId: session.user.id }).catch((err) => {
-      console.warn("[Payment Create] stale order cleanup failed:", err);
-    });
+    await expireStalePendingOrders({ userId: session.user.id });
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },

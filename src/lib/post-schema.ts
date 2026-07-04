@@ -1,24 +1,13 @@
 import { z } from "zod";
+import { isSafeCoverImageUrl } from "@/lib/safe-image-url";
 
-/** 封面：支持绝对 URL、站内相对路径、data URL */
+/** 封面：/uploads/、受限 data URL（禁 SVG）、或 https 外链 */
 export const coverImageSchema = z
   .string()
   .max(2000)
   .optional()
   .nullable()
-  .refine(
-    (val) => {
-      if (!val) return true;
-      if (val.startsWith("/") || val.startsWith("data:image/")) return true;
-      try {
-        new URL(val);
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: "封面图地址无效" }
-  );
+  .refine((val) => !val || isSafeCoverImageUrl(val), { message: "封面图地址无效" });
 
 export const postSlugSchema = z
   .string()

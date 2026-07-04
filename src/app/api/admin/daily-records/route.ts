@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { dailyRecordCreateSchema } from "@/lib/daily-record-schema";
+import { normalizeTagSlug } from "@/lib/tag-slug";
 
 export async function GET(req: NextRequest) {
   try {
@@ -73,12 +74,14 @@ export async function POST(req: NextRequest) {
     const tagConnections: { tagId: string }[] = [];
     if (tagNames && tagNames.length > 0) {
       for (const name of tagNames) {
-        const slug = name.replace(/^#/, "").toLowerCase().replace(/\s+/g, "-");
-        const tag = await prisma.tag.upsert({
-          where: { slug },
-          update: {},
-          create: { name: name.replace(/^#/, ""), slug },
-        });
+        const slug = normalizeTagSlug(name);
+        if (!slug) {
+          return fail("标签格式无效", 42200, 422);
+        }
+        const tag = await prisma.tag.findUnique({ where: { slug } });
+        if (!tag) {
+          return fail(`标签「${name.replace(/^#/, "")}」不存在，请先在标签管理创建`, 42200, 422);
+        }
         tagConnections.push({ tagId: tag.id });
       }
     }
