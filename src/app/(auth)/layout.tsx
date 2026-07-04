@@ -1,3 +1,5 @@
+import { HomeBackdrop } from "@/components/home/HomeBackdrop";
+
 export default function AuthLayout({
   children,
 }: {
@@ -5,6 +7,7 @@ export default function AuthLayout({
 }) {
   return (
     <div className="auth-page">
+      <HomeBackdrop />
       <div className="auth-container">
         <div className="auth-header">
           <h1 className="auth-logo">🥟 馒头的博客</h1>

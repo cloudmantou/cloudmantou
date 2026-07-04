@@ -20,7 +20,7 @@ import {
 } from "@/components/layout/PlatformSidebar";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { ArticleOverlay } from "@/components/blog/ArticleOverlay";
-import { HomeBackdrop } from "@/components/home/HomeBackdrop";
+
 import { ProductCard } from "@/components/shop/ProductCard";
 import { ProductDetailModal } from "@/components/shop/ProductDetailModal";
 import { MetricCard } from "@/components/ui/MetricCard";
@@ -139,14 +139,15 @@ function PlatformShellInner() {
   }, []);
 
   useEffect(() => {
-    // Load categories
+    if (section !== "blog" && section !== "home") return;
     fetch("/api/categories")
       .then((r) => r.json())
       .then((d) => setCategories(d.data || []))
       .catch(() => {});
-  }, []);
+  }, [section]);
 
   useEffect(() => {
+    if (section !== "blog" && section !== "home") return;
     const params = new URLSearchParams({ pageSize: "20" });
     if (activeCategory) {
       const cat = categories.find((c) => c.slug === activeCategory);
@@ -159,17 +160,17 @@ function PlatformShellInner() {
         setBlogTotal(d.pagination?.total || 0);
       })
       .catch(() => {});
-  }, [activeCategory, categories]);
+  }, [activeCategory, categories, section]);
 
-  // Load daily records
   useEffect(() => {
+    if (section !== "shop" && section !== "home") return;
     fetch("/api/products")
       .then((r) => r.json())
       .then((d) => {
         if (Array.isArray(d.data)) setShopProducts(d.data);
       })
       .catch(() => {});
-  }, []);
+  }, [section]);
 
   useEffect(() => {
     const fromUrl = searchParams.get("section");
@@ -288,7 +289,6 @@ function PlatformShellInner() {
       >
           {section === "home" ? (
             <>
-            <HomeBackdrop />
             <section className="page active home-hero" aria-labelledby="home-title">
               <div className="home-hero-content">
               <div className="home-greeting" aria-hidden="true">
@@ -300,7 +300,7 @@ function PlatformShellInner() {
                 聊<span>独立产品</span>。
               </h1>
               <p className="home-sub">
-                <TypingEffect phrases={typingPhrases} />
+                <TypingEffect phrases={typingPhrases} className="home-typing" />
               </p>
 
               <div className="quick-actions">

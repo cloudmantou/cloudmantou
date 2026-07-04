@@ -24,6 +24,7 @@ import clsx from "clsx";
 import { siteConfig } from "@/config/site";
 import { isAdminRole } from "@/lib/roles";
 import { SearchDialog } from "@/components/layout/SearchDialog";
+import { HomeBackdrop } from "@/components/home/HomeBackdrop";
 
 export type PlatformSection = "home" | "blog" | "shop" | "daily" | "favorites";
 
@@ -171,8 +172,15 @@ export function PlatformSidebar({
         aria-hidden="true"
       />
 
+      <HomeBackdrop />
       <div className="layout">
       <aside className={clsx("sidebar", mobileOpen && "open")}>
+        <div className="sidebar-ambient" aria-hidden="true" />
+        <div className="sidebar-grid" aria-hidden="true" />
+        <div className="sidebar-scanlines" aria-hidden="true" />
+        <div className="sidebar-edge-glow" aria-hidden="true" />
+        <div className="sidebar-corner sidebar-corner--tl" aria-hidden="true" />
+        <div className="sidebar-corner sidebar-corner--br" aria-hidden="true" />
         <div className="avatar-wrap" aria-hidden="true">
           <span className="avatar-ring" />
           <span className="avatar">馒</span>
@@ -200,6 +208,7 @@ export function PlatformSidebar({
                 key={item.href}
                 className={clsx("nav-item nav-link", active && "active")}
                 href={item.href}
+                prefetch
                 onClick={closeMobile}
               >
                 <Icon size={16} aria-hidden="true" />

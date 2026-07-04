@@ -166,7 +166,7 @@ export function UserDashboard() {
   };
 
   return (
-    <>
+    <div className="dashboard-page">
       <div className="dashboard-hero">
         <div>
           <div className="home-greeting" aria-hidden="true">
@@ -454,6 +454,6 @@ export function UserDashboard() {
           </section>
         </>
       ) : null}
-    </>
+    </div>
   );
 }

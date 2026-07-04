@@ -48,6 +48,22 @@ const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   serverExternalPackages: ["ioredis", "sharp"],
+  webpack(config, { dev }) {
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: [
+          "**/node_modules/**",
+          "**/.git/**",
+          "**/.next/**",
+          "**/.playwright-cli/**",
+          "**/current-ui-preview*.png",
+          "**/homepage-*.png",
+        ],
+      };
+    }
+    return config;
+  },
   async headers() {
     return [
       {

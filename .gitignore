@@ -23,6 +23,7 @@ tsconfig.tsbuildinfo
 .codebuddy/
 .workbuddy/
 .playwright-mcp/
+.playwright-cli/
 
 # 本地截图（开发过程中截的临时图）
 *.home-shot.png
