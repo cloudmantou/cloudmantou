@@ -9,9 +9,9 @@ const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   type: z.enum(["ACCOUNT", "SECRET", "NOTE"]).optional(),
   account: z.string().max(500).optional().nullable(),
-  secret: z.string().max(8000).optional().nullable(),
+  secret: z.string().max(8_000).optional().nullable(),
   url: z.string().url().optional().nullable().or(z.literal("")),
-  content: z.string().max(200_000).optional().nullable(),
+  content: z.string().max(16_384).optional().nullable(),
   remark: z.string().max(500).optional().nullable(),
   pinned: z.boolean().optional(),
 });

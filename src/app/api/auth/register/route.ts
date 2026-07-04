@@ -36,7 +36,8 @@ export async function POST(req: Request) {
       return fail(firstError.message, 40000, 400);
     }
 
-    const { email, username, password, nickname } = parsed.data;
+    const { username, password, nickname } = parsed.data;
+    const email = parsed.data.email.trim().toLowerCase();
 
     // 检查邮箱是否已注册
     const existingEmail = await prisma.user.findUnique({

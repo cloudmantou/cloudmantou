@@ -20,7 +20,12 @@ export async function GET(req: NextRequest) {
         include: {
           author: { select: { id: true, username: true, nickname: true, avatar: true } },
           tags: { include: { tag: { select: { name: true } } } },
-          _count: { select: { likes: true } },
+          _count: {
+            select: {
+              likes: true,
+              comments: { where: { status: "APPROVED", parentId: null } },
+            },
+          },
         },
         orderBy: [{ isTop: "desc" }, { createdAt: "desc" }],
         skip: (page - 1) * pageSize,
@@ -34,7 +39,7 @@ export async function GET(req: NextRequest) {
       photos: r.photos ? JSON.parse(r.photos) : [],
       tagNames: r.tags.map((t) => t.tag.name),
       likesCount: r._count.likes,
-      commentsCount: r.commentCount,
+      commentsCount: r._count.comments,
       tags: undefined,
       _count: undefined,
     }));

@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { rateLimit, getClientIP } from "@/lib/rate-limit";
 import { checkRateLimit } from "@/lib/rate-limit-server";
+import { dailyPhotoUrlSchema } from "@/lib/daily-record-schema";
 import { NextRequest } from "next/server";
 
 /**
@@ -192,5 +193,29 @@ describe("getClientIP — 客户端 IP 提取", () => {
   it("无 IP 头时返回 unknown", () => {
     const req = new NextRequest("http://localhost");
     expect(getClientIP(req)).toBe("unknown");
+  });
+});
+
+describe("dailyPhotoUrlSchema — 日常图片地址校验", () => {
+  it("允许本站 /uploads 路径", () => {
+    expect(
+      dailyPhotoUrlSchema.safeParse("/uploads/2026/07/abc.webp").success
+    ).toBe(true);
+  });
+
+  it("允许 https 外链", () => {
+    expect(
+      dailyPhotoUrlSchema.safeParse("https://cdn.example.com/a.webp").success
+    ).toBe(true);
+  });
+
+  it("拒绝 javascript: 等危险协议", () => {
+    expect(
+      dailyPhotoUrlSchema.safeParse("javascript:alert(1)").success
+    ).toBe(false);
+  });
+
+  it("拒绝任意相对路径", () => {
+    expect(dailyPhotoUrlSchema.safeParse("/evil/path.jpg").success).toBe(false);
   });
 });

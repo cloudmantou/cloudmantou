@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getPostAccess } from "@/lib/post-access";
+import { countApprovedPostComments } from "@/lib/comment-count";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { buildBlogPostingJsonLd, buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { PostContent } from "./PostContent";
@@ -111,6 +112,7 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   const tags = post.tags.map((pt) => pt.tag);
+  const approvedCommentCount = await countApprovedPostComments(post.id);
 
   // 统一访问权限判断
   const access = await getPostAccess(
@@ -133,8 +135,8 @@ export default async function PostPage({ params }: PageProps) {
 
   const commentsData = {
     comments: post.comments.map(formatComment),
-    totalCount: post.commentCount,
-    hasMore: post.commentCount > 10,
+    totalCount: approvedCommentCount,
+    hasMore: approvedCommentCount > 10,
     nextCursor:
       post.comments.length === 10
         ? post.comments[post.comments.length - 1].createdAt.toISOString()
@@ -177,7 +179,7 @@ export default async function PostPage({ params }: PageProps) {
               publishedAt: post.publishedAt?.toISOString() ?? null,
               viewCount: post.viewCount,
               likeCount: post.likeCount,
-              commentCount: post.commentCount,
+              commentCount: approvedCommentCount,
               author: post.author,
               category: post.category,
               tags,

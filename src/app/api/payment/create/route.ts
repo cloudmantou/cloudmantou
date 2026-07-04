@@ -6,6 +6,7 @@ import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { createWechatPayment } from "@/lib/payment-providers";
 import { ensureOrderPayable, expireStalePendingOrders } from "@/lib/order-lifecycle";
+import { getClientIP } from "@/lib/rate-limit";
 import {
   detectPaymentScene,
   resolveAlipayMode,
@@ -24,12 +25,6 @@ function resolveScene(req: NextRequest, explicit?: string): PaymentScene {
     return explicit as PaymentScene;
   }
   return detectPaymentScene(req.headers.get("user-agent") || "");
-}
-
-function clientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "127.0.0.1";
-  return req.headers.get("x-real-ip") || "127.0.0.1";
 }
 
 export async function POST(req: NextRequest) {
@@ -73,6 +68,10 @@ export async function POST(req: NextRequest) {
 
     if (order.status !== "PENDING") {
       return fail("订单状态不可支付", 40000, 400);
+    }
+
+    if (order.payment && order.payment.channel !== channel) {
+      return fail("该订单已绑定其他支付渠道，请使用原渠道完成支付或重新下单", 40000, 400);
     }
 
     const amount = Number(order.amount);
@@ -151,7 +150,7 @@ export async function POST(req: NextRequest) {
         title: order.title,
         amount,
         notifyUrl,
-        clientIp: clientIp(req),
+        clientIp: getClientIP(req),
         returnUrl: mode === "mweb" ? returnUrl : undefined,
       });
     }

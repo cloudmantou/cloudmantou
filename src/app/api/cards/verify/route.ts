@@ -171,7 +171,6 @@ export async function POST(req: NextRequest) {
 
     return ok({
       cardType: card.type,
-      value: card.value,
       benefit: result,
     });
   } catch (error: any) {

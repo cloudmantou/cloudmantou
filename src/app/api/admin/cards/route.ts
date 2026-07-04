@@ -175,6 +175,13 @@ export async function POST(req: NextRequest) {
         } while (cardNos.has(normalized));
       }
       if (cardNos.has(normalized)) return false;
+
+      const existing = await prisma.card.findFirst({
+        where: { cardNo: normalized },
+        select: { id: true },
+      });
+      if (existing) return false;
+
       cardNos.add(normalized);
 
       const hash = await hashCardSecret(plainSecret);

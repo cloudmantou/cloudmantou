@@ -25,46 +25,53 @@ export function assertOrderPayable(status: OrderStatus, createdAt: Date, now = n
 /**
  * 将超时 PENDING 订单标记为 EXPIRED，并关闭关联支付单。
  */
+const STALE_ORDER_BATCH_SIZE = 100;
+
 export async function expireStalePendingOrders(options?: {
   userId?: string;
   now?: Date;
 }): Promise<number> {
   const now = options?.now ?? new Date();
   const cutoff = new Date(now.getTime() - ORDER_PENDING_TTL_MS);
-
-  const stale = await prisma.order.findMany({
-    where: {
-      status: "PENDING",
-      createdAt: { lt: cutoff },
-      ...(options?.userId ? { userId: options.userId } : {}),
-    },
-    select: { id: true, status: true, payment: { select: { id: true, status: true } } },
-    take: 100,
-  });
-
-  if (stale.length === 0) return 0;
-
   const { orderStatus, paymentStatus } = pairedStatusesForExpired();
+  let totalExpired = 0;
 
-  await prisma.$transaction(async (tx) => {
-    for (const order of stale) {
-      assertOrderTransition(order.status, orderStatus);
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: orderStatus },
-      });
+  while (true) {
+    const stale = await prisma.order.findMany({
+      where: {
+        status: "PENDING",
+        createdAt: { lt: cutoff },
+        ...(options?.userId ? { userId: options.userId } : {}),
+      },
+      select: { id: true, status: true, payment: { select: { id: true, status: true } } },
+      take: STALE_ORDER_BATCH_SIZE,
+    });
 
-      if (order.payment) {
-        assertPaymentTransition(order.payment.status, paymentStatus);
-        await tx.payment.update({
-          where: { id: order.payment.id },
-          data: { status: paymentStatus },
+    if (stale.length === 0) break;
+
+    await prisma.$transaction(async (tx) => {
+      for (const order of stale) {
+        assertOrderTransition(order.status, orderStatus);
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: orderStatus },
         });
-      }
-    }
-  });
 
-  return stale.length;
+        if (order.payment) {
+          assertPaymentTransition(order.payment.status, paymentStatus);
+          await tx.payment.update({
+            where: { id: order.payment.id },
+            data: { status: paymentStatus },
+          });
+        }
+      }
+    });
+
+    totalExpired += stale.length;
+    if (stale.length < STALE_ORDER_BATCH_SIZE) break;
+  }
+
+  return totalExpired;
 }
 
 /**

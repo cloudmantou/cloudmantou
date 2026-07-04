@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { getPostAccess } from "@/lib/post-access";
+import { countApprovedPostComments } from "@/lib/comment-count";
 
 export async function GET(
   _req: NextRequest,
@@ -56,6 +57,7 @@ export async function GET(
     }
 
     const tags = post.tags.map((pt) => pt.tag);
+    const approvedCommentCount = await countApprovedPostComments(post.id);
 
     // 统一访问权限判断（和 SSR 页面逻辑一致）
     const access = await getPostAccess(
@@ -79,7 +81,7 @@ export async function GET(
       updatedAt: post.updatedAt,
       viewCount: post.viewCount + 1,
       likeCount: post.likeCount,
-      commentCount: post.commentCount,
+      commentCount: approvedCommentCount,
       author: post.author,
       category: post.category,
       tags,
