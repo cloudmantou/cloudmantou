@@ -5,6 +5,12 @@ import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import crypto from "crypto";
+import { decryptCardSecret } from "@/lib/card-secret-storage";
+import { ensureCardDeliveryForPaidOrder } from "@/lib/card-delivery";
+import {
+  isMembershipProductAvailable,
+  type MembershipProductType,
+} from "@/lib/membership-catalog";
 
 // ===== 服务端价格目录（不可被客户端覆盖）=====
 const PRODUCT_CATALOG: Record<string, { title: string; price: number }> = {
@@ -17,6 +23,52 @@ const createOrderSchema = z.object({
   productType: z.enum(["VIP_MONTH", "VIP_QUARTER", "VIP_YEAR", "PAID_POST", "CARD_PACKAGE"]),
   productId: z.string().optional(),
 });
+
+function buildFulfillment(order: {
+  productType: string;
+  status: string;
+  delivery: { cardNo: string; cardSecretEnc: string; status: string } | null;
+}) {
+  if (order.status !== "PAID") {
+    return { kind: "none" as const, message: null, card: null };
+  }
+
+  if (order.productType === "CARD_PACKAGE") {
+    if (order.delivery) {
+      return {
+        kind: "card" as const,
+        message: "卡密已发放，请妥善保存",
+        card: {
+          cardNo: order.delivery.cardNo,
+          cardSecret: decryptCardSecret(order.delivery.cardSecretEnc),
+        },
+      };
+    }
+    return { kind: "card" as const, message: "卡密发放中，请稍后刷新", card: null };
+  }
+
+  if (
+    order.productType === "VIP_MONTH" ||
+    order.productType === "VIP_QUARTER" ||
+    order.productType === "VIP_YEAR"
+  ) {
+    return {
+      kind: "membership" as const,
+      message: "会员已自动开通，无需卡密",
+      card: null,
+    };
+  }
+
+  if (order.productType === "PAID_POST") {
+    return {
+      kind: "article" as const,
+      message: "付费文章已解锁",
+      card: null,
+    };
+  }
+
+  return { kind: "none" as const, message: null, card: null };
+}
 
 function generateOrderNo(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -46,6 +98,7 @@ export async function GET(req: NextRequest) {
         where,
         include: {
           payment: { select: { channel: true, status: true, tradeNo: true } },
+          delivery: true,
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -54,12 +107,47 @@ export async function GET(req: NextRequest) {
       prisma.order.count({ where }),
     ]);
 
+    for (const order of orders) {
+      if (order.productType === "CARD_PACKAGE" && order.status === "PAID" && !order.delivery) {
+        try {
+          await ensureCardDeliveryForPaidOrder(order);
+        } catch (deliveryError) {
+          console.error("[Orders List] card delivery backfill failed:", order.orderNo, deliveryError);
+        }
+      }
+    }
+
+    const refreshed =
+      orders.some((o) => o.productType === "CARD_PACKAGE" && o.status === "PAID" && !o.delivery)
+        ? await prisma.order.findMany({
+            where: { id: { in: orders.map((o) => o.id) } },
+            include: {
+              payment: { select: { channel: true, status: true, tradeNo: true } },
+              delivery: true,
+            },
+          })
+        : orders;
+
+    const orderMap = new Map(refreshed.map((o) => [o.id, o]));
+
     return ok(
-      orders.map((o) => ({
-        ...o,
-        amount: Number(o.amount),
-        payment: o.payment ? { ...o.payment } : null,
-      })),
+      orders.map((o) => {
+        const row = orderMap.get(o.id) || o;
+        const fulfillment = buildFulfillment(row);
+        return {
+          id: row.id,
+          orderNo: row.orderNo,
+          title: row.title,
+          amount: Number(row.amount),
+          status: row.status,
+          productType: row.productType,
+          productId: row.productId,
+          createdAt: row.createdAt,
+          paidAt: row.paidAt,
+          payment: row.payment ? { ...row.payment } : null,
+          fulfillment,
+        };
+      }),
       { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     );
   } catch (error) {
@@ -110,13 +198,8 @@ export async function POST(req: NextRequest) {
       if (!cardPackage) {
         return fail("卡密商品不存在或未发布", 40400, 404);
       }
-      const stock = await prisma.card.count({
-        where: {
-          type: cardPackage.cardType,
-          value: cardPackage.cardValue,
-          status: "ACTIVE",
-        },
-      });
+      const { countActiveCardStock } = await import("@/lib/card-packages");
+      const stock = await countActiveCardStock(prisma, cardPackage.id);
       if (stock <= 0) {
         return fail("该卡密商品库存不足", 40000, 400);
       }
@@ -126,6 +209,14 @@ export async function POST(req: NextRequest) {
       const catalog = PRODUCT_CATALOG[productType];
       if (!catalog) {
         return fail("未知商品类型", 40000, 400);
+      }
+      if (productType === "VIP_MONTH" || productType === "VIP_YEAR") {
+        const available = await isMembershipProductAvailable(
+          productType as MembershipProductType
+        );
+        if (!available) {
+          return fail("该会员套餐未上架", 40000, 400);
+        }
       }
       title = catalog.title;
       amount = catalog.price;

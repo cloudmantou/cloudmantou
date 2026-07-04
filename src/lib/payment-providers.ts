@@ -84,6 +84,87 @@ export function createAlipayPayment(input: {
   return { type: "form", html, mode: input.mode === "page" ? "alipay_pc" : "alipay_h5" };
 }
 
+export type AlipayTradeQueryResult = {
+  paid: boolean;
+  tradeNo?: string;
+  totalAmount?: string;
+  tradeStatus?: string;
+  raw: string;
+  message?: string;
+};
+
+export async function queryAlipayTrade(input: {
+  config: AlipayGatewayConfig;
+  orderNo: string;
+}): Promise<AlipayTradeQueryResult> {
+  const gatewayUrl = getAlipayGatewayUrl(input.config.env);
+  const privateKey = input.config.privateKey.includes("BEGIN")
+    ? input.config.privateKey
+    : normalizePem(input.config.privateKey, "private");
+
+  const params: Record<string, string> = {
+    app_id: input.config.appId,
+    method: "alipay.trade.query",
+    format: "JSON",
+    charset: "utf-8",
+    sign_type: "RSA2",
+    timestamp: new Date().toISOString().replace("T", " ").slice(0, 19),
+    version: "1.0",
+    biz_content: JSON.stringify({ out_trade_no: input.orderNo }),
+  };
+  params.sign = signAlipay(params, privateKey);
+
+  const response = await fetch(gatewayUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
+    body: new URLSearchParams(params).toString(),
+  });
+
+  const raw = await response.text();
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { paid: false, raw, message: "支付宝查单响应解析失败" };
+  }
+
+  const tradeResponse = payload.alipay_trade_query_response as
+    | {
+        code?: string;
+        msg?: string;
+        sub_msg?: string;
+        trade_status?: string;
+        trade_no?: string;
+        total_amount?: string;
+      }
+    | undefined;
+
+  if (!tradeResponse) {
+    return { paid: false, raw, message: "支付宝查单响应缺少 trade_query 节点" };
+  }
+
+  if (tradeResponse.code !== "10000") {
+    return {
+      paid: false,
+      raw,
+      message: tradeResponse.sub_msg || tradeResponse.msg || "支付宝查单失败",
+      tradeStatus: tradeResponse.trade_status,
+    };
+  }
+
+  const paid =
+    tradeResponse.trade_status === "TRADE_SUCCESS" ||
+    tradeResponse.trade_status === "TRADE_FINISHED";
+
+  return {
+    paid,
+    tradeNo: tradeResponse.trade_no,
+    totalAmount: tradeResponse.total_amount,
+    tradeStatus: tradeResponse.trade_status,
+    raw,
+  };
+}
+
 function signWechatV2(params: Record<string, string>, apiKey: string): string {
   const sorted = Object.keys(params)
     .filter((k) => k !== "sign" && params[k] !== "" && params[k] != null)
@@ -140,7 +221,7 @@ export async function createWechatPayment(input: {
       h5_info: {
         type: "Wap",
         wap_url: input.returnUrl || input.notifyUrl.replace(/\/api\/payment\/notify\/wechat$/, ""),
-        wap_name: "CloudMantou",
+        wap_name: "馒头助手",
       },
     });
   }

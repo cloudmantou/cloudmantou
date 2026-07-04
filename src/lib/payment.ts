@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { deliverCardPackageOrder } from "@/lib/card-delivery";
 
 // ===== 支付宝签名验证 =====
 
@@ -178,6 +179,66 @@ function calculateVipExpiry(
   return expiresAt;
 }
 
+type OrderForFinalize = {
+  id: string;
+  userId: string;
+  productType: string;
+  productId: string | null;
+  status: string;
+  amount: Decimal;
+  payment: { id: string } | null;
+};
+
+/** 将支付宝订单标记为已支付并发放权益（异步通知与主动查单共用） */
+export async function finalizeAlipayOrder(input: {
+  order: OrderForFinalize;
+  tradeNo: string;
+  rawCallback: string;
+}): Promise<boolean> {
+  const { order, tradeNo, rawCallback } = input;
+
+  if (order.status === "PAID") {
+    return true;
+  }
+
+  if (order.status !== "PENDING") {
+    return false;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: order.id, status: "PENDING" },
+      data: { status: "PAID", paidAt: new Date() },
+    });
+
+    if (updated.count === 0) {
+      return;
+    }
+
+    const paymentData = {
+      orderId: order.id,
+      channel: "ALIPAY" as const,
+      amount: order.amount,
+      tradeNo,
+      status: "SUCCESS" as const,
+      rawCallback,
+    };
+
+    if (order.payment) {
+      await tx.payment.update({
+        where: { orderId: order.id },
+        data: paymentData,
+      });
+    } else {
+      await tx.payment.create({ data: paymentData });
+    }
+
+    await grantEntitlement(tx, order);
+  });
+
+  return true;
+}
+
 export async function grantEntitlement(
   tx: any,
   order: { id: string; userId: string; productType: string; productId: string | null }
@@ -237,7 +298,7 @@ export async function grantEntitlement(
       }
       break;
     case "CARD_PACKAGE":
-      // 卡密套餐交付由发卡流程单独处理
+      await deliverCardPackageOrder(tx, order);
       break;
   }
 }

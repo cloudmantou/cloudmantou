@@ -8,6 +8,7 @@ import type { Product } from "@/types";
 type ProductDetailModalProps = {
   product: Product | null;
   open: boolean;
+  loggedIn?: boolean;
   onClose: () => void;
   onBuy: (product: Product) => void;
 };
@@ -19,7 +20,7 @@ const categoryLabel: Record<Product["category"], string> = {
   service: "增值服务",
 };
 
-export function ProductDetailModal({ product, open, onClose, onBuy }: ProductDetailModalProps) {
+export function ProductDetailModal({ product, open, loggedIn = true, onClose, onBuy }: ProductDetailModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -107,7 +108,7 @@ export function ProductDetailModal({ product, open, onClose, onBuy }: ProductDet
               onClick={() => onBuy(product)}
             >
               <ShoppingCart size={14} aria-hidden="true" />
-              {canBuy ? "立即购买" : "暂未开放"}
+              {!loggedIn ? "登录购买" : canBuy ? "立即购买" : "暂未开放"}
             </button>
           </div>
         </div>

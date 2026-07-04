@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import {
-  ArrowLeft,
   BookOpen,
+  Copy,
   CreditCard,
   Crown,
   KeyRound,
@@ -29,6 +30,12 @@ type UserProfile = {
   createdAt: string;
 };
 
+type OrderFulfillment = {
+  kind: "none" | "card" | "membership" | "article";
+  message: string | null;
+  card: { cardNo: string; cardSecret: string } | null;
+};
+
 type OrderItem = {
   id: string;
   orderNo: string;
@@ -39,6 +46,7 @@ type OrderItem = {
   createdAt: string;
   paidAt: string | null;
   payment: { channel: string; status: string; tradeNo: string | null } | null;
+  fulfillment?: OrderFulfillment;
 };
 
 const ORDER_STATUS: Record<string, { label: string; tone: string }> = {
@@ -65,14 +73,17 @@ function formatDate(value: string | null) {
 }
 
 export function UserDashboard() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
   const [cardNo, setCardNo] = useState("");
   const [cardSecret, setCardSecret] = useState("");
   const [redeeming, setRedeeming] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [paidNotice, setPaidNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
@@ -84,11 +95,15 @@ export function UserDashboard() {
 
   const loadOrders = useCallback(async () => {
     setOrdersLoading(true);
+    setOrdersError("");
     try {
       const res = await fetch("/api/orders?pageSize=10");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "加载订单失败");
-      setOrders(data.data || []);
+      setOrders(Array.isArray(data.data) ? data.data : []);
+    } catch (e) {
+      setOrders([]);
+      setOrdersError(e instanceof Error ? e.message : "加载订单失败");
     } finally {
       setOrdersLoading(false);
     }
@@ -98,8 +113,22 @@ export function UserDashboard() {
     loadProfile()
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-    loadOrders().catch(() => {});
+    loadOrders();
   }, [loadProfile, loadOrders]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const scrollToOrders = () => {
+      const el = document.getElementById("orders");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    if (window.location.hash === "#orders" || searchParams.get("paid") === "1") {
+      window.requestAnimationFrame(scrollToOrders);
+    }
+    if (searchParams.get("paid") === "1") {
+      setPaidNotice("支付成功，可在下方订单中查看卡密与交付信息。");
+    }
+  }, [searchParams]);
 
   const handleRedeem = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -128,13 +157,16 @@ export function UserDashboard() {
 
   const displayName = profile?.nickname || profile?.username || "会员";
 
+  const copyText = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <>
-      <Link href="/" className="inline-link nav-link">
-        <ArrowLeft size={15} aria-hidden="true" />
-        返回首页
-      </Link>
-
       <div className="dashboard-hero">
         <div>
           <div className="home-greeting" aria-hidden="true">
@@ -210,7 +242,7 @@ export function UserDashboard() {
                   <KeyRound size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px" }} />
                   卡密兑换
                 </span>
-                <span className="data-panel-meta">VIP / 文章券 / 余额</span>
+                <span className="data-panel-meta">本站权益 / 外部卡密</span>
               </div>
               <div style={{ padding: 18 }}>
                 <form onSubmit={handleRedeem}>
@@ -251,7 +283,7 @@ export function UserDashboard() {
                   </p>
                 ) : (
                   <p className="text-sm" style={{ color: "var(--text-muted)", margin: 0 }}>
-                    文章券兑换后，在付费文章页点击「使用文章券解锁」才会扣减额度。
+                    本站 VIP、文章券、余额卡密会写入账户权益；外部/通用卡密仅完成核销并显示兑换说明，不会自动解锁本站文章。
                   </p>
                 )}
               </div>
@@ -280,7 +312,7 @@ export function UserDashboard() {
             </section>
           </div>
 
-          <section className="data-panel">
+          <section className="data-panel" id="orders">
             <div className="data-panel-header">
               <span className="data-panel-title">
                 <Receipt size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px" }} />
@@ -288,8 +320,33 @@ export function UserDashboard() {
               </span>
               <span className="data-panel-meta">最近 10 笔</span>
             </div>
+            {paidNotice ? (
+              <div
+                style={{
+                  padding: "12px 18px",
+                  borderBottom: "1px solid var(--border)",
+                  color: "var(--teal)",
+                  fontSize: 13,
+                }}
+              >
+                <Sparkles size={14} style={{ display: "inline", marginRight: 6, verticalAlign: "-2px" }} />
+                {paidNotice}
+              </div>
+            ) : null}
             {ordersLoading ? (
               <div className="data-panel-loading">加载订单…</div>
+            ) : ordersError ? (
+              <div className="data-panel-loading" style={{ color: "var(--rose)" }}>
+                {ordersError}
+                <button
+                  type="button"
+                  className="quick-btn ghost"
+                  style={{ marginTop: 12 }}
+                  onClick={() => loadOrders()}
+                >
+                  重试
+                </button>
+              </div>
             ) : orders.length === 0 ? (
               <div className="data-panel-loading">暂无订单，去首页购买会员套餐吧。</div>
             ) : (
@@ -301,6 +358,7 @@ export function UserDashboard() {
                       <th>商品</th>
                       <th>金额</th>
                       <th>状态</th>
+                      <th>交付</th>
                       <th>时间</th>
                     </tr>
                   </thead>
@@ -310,6 +368,7 @@ export function UserDashboard() {
                         label: order.status,
                         tone: "text-muted",
                       };
+                      const fulfillment = order.fulfillment;
                       return (
                         <tr key={order.id}>
                           <td>
@@ -319,6 +378,47 @@ export function UserDashboard() {
                           <td>{formatMoney(order.amount)}</td>
                           <td>
                             <span className={status.tone}>{status.label}</span>
+                          </td>
+                          <td>
+                            {order.status === "PAID" && fulfillment?.kind === "card" && fulfillment.card ? (
+                              <div className="order-delivery-card">
+                                <div>
+                                  <span className="order-delivery-label">卡号</span>
+                                  <code>{fulfillment.card.cardNo}</code>
+                                  <button
+                                    type="button"
+                                    className="order-copy-btn"
+                                    onClick={() => copyText(fulfillment.card!.cardNo)}
+                                    aria-label="复制卡号"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
+                                <div>
+                                  <span className="order-delivery-label">卡密</span>
+                                  <code>{fulfillment.card.cardSecret}</code>
+                                  <button
+                                    type="button"
+                                    className="order-copy-btn"
+                                    onClick={() => copyText(fulfillment.card!.cardSecret)}
+                                    aria-label="复制卡密"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : order.status === "PAID" && fulfillment?.message ? (
+                              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                                {fulfillment.message}
+                                {fulfillment.kind === "membership" && profile?.vipExpireAt ? (
+                                  <span style={{ display: "block", color: "var(--teal)", marginTop: 4 }}>
+                                    到期 {formatDate(profile.vipExpireAt)}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
                           </td>
                           <td>{formatDate(order.createdAt)}</td>
                         </tr>
@@ -342,7 +442,10 @@ export function UserDashboard() {
                 · 会员订阅：支付成功后自动延长 VIP 有效期，可阅读全部会员文章。
               </p>
               <p style={{ margin: "0 0 8px" }}>
-                · 文章券：兑换后获得 {profile.articleCredits} 篇待使用额度，需在文章页手动解锁。
+                · 文章券：仅适用于本站付费文章，兑换后获得 {profile.articleCredits} 篇待使用额度。
+              </p>
+              <p style={{ margin: "0 0 8px" }}>
+                · 外部/通用卡密：来自其他渠道或第三方服务，兑换成功不代表解锁本站内容。
               </p>
               <p style={{ margin: 0 }}>
                 · 已解锁 {profile.unlockedPosts} 篇付费文章，注册于 {formatDate(profile.createdAt)}。

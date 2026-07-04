@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
-import { createAlipayPayment, createWechatPayment } from "@/lib/payment-providers";
+import { createWechatPayment } from "@/lib/payment-providers";
 import {
   detectPaymentScene,
   resolveAlipayMode,
@@ -102,14 +102,29 @@ export async function POST(req: NextRequest) {
         return fail("支付宝未配置或未启用", 40000, 400);
       }
       const mode = resolveAlipayMode(scene);
-      launch = createAlipayPayment({
-        config: config.alipay,
-        mode,
+      await prisma.payment.upsert({
+        where: { orderId: order.id },
+        create: {
+          orderId: order.id,
+          channel,
+          amount: order.amount,
+          status: "WAITING",
+        },
+        update: {
+          channel,
+          amount: order.amount,
+          status: "WAITING",
+        },
+      });
+
+      return ok({
+        type: "navigate",
+        url: `/payment/alipay-launch?orderId=${encodeURIComponent(order.id)}&scene=${encodeURIComponent(scene)}`,
+        mode: mode === "page" ? "alipay_pc" : "alipay_h5",
+        scene,
         orderNo: order.orderNo,
-        title: order.title,
         amount,
-        notifyUrl,
-        returnUrl,
+        title: order.title,
       });
     } else {
       if (!config.wechat?.enabled) {

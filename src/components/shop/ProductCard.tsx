@@ -5,11 +5,12 @@ import type { Product } from "@/types";
 type ProductCardProps = {
   product: Product;
   index?: number;
+  loggedIn?: boolean;
   onBuy: (product: Product) => void;
   onSelect?: (product: Product) => void;
 };
 
-export function ProductCard({ product, index = 0, onBuy, onSelect }: ProductCardProps) {
+export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSelect }: ProductCardProps) {
   const showDetail = product.category === "card" || Boolean(product.intro);
 
   const openDetail = () => {
@@ -58,7 +59,7 @@ export function ProductCard({ product, index = 0, onBuy, onSelect }: ProductCard
           }}
         >
           <ShoppingCart size={14} aria-hidden="true" />
-          立即购买
+          {loggedIn ? "立即购买" : "登录购买"}
         </button>
       </div>
     </article>

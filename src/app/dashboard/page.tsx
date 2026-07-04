@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { UserDashboard } from "@/components/dashboard/UserDashboard";
+import { MarketingShell } from "@/components/layout/MarketingShell";
 
 export const metadata: Metadata = {
   title: "会员中心",
@@ -7,10 +9,10 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   return (
-    <div className="standalone-page">
-      <div className="standalone-shell">
+    <MarketingShell>
+      <Suspense fallback={null}>
         <UserDashboard />
-      </div>
-    </div>
+      </Suspense>
+    </MarketingShell>
   );
 }

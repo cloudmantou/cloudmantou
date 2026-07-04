@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
-import { verifyAlipaySign, verifyAmount, grantEntitlement } from "@/lib/payment";
+import { verifyAlipaySign, verifyAmount, finalizeAlipayOrder } from "@/lib/payment";
 
 /**
  * 支付宝异步通知回调
@@ -87,33 +87,10 @@ export async function POST(req: NextRequest) {
       return new Response("success", { status: 200 });
     }
 
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.order.updateMany({
-        where: { id: order.id, status: "PENDING" },
-        data: { status: "PAID", paidAt: new Date() },
-      });
-
-      if (updated.count === 0) return;
-
-      const paymentData = {
-        orderId: order.id,
-        channel: "ALIPAY" as const,
-        amount: order.amount,
-        tradeNo: trade_no,
-        status: "SUCCESS" as const,
-        rawCallback: rawBody,
-      };
-
-      if (order.payment) {
-        await tx.payment.update({
-          where: { orderId: order.id },
-          data: paymentData,
-        });
-      } else {
-        await tx.payment.create({ data: paymentData });
-      }
-
-      await grantEntitlement(tx, order);
+    await finalizeAlipayOrder({
+      order,
+      tradeNo: trade_no,
+      rawCallback: rawBody,
     });
 
     return new Response("success", { status: 200 });

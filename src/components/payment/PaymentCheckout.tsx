@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Loader2, Smartphone, Monitor, X } from "lucide-react";
 import clsx from "clsx";
 import QRCode from "qrcode";
@@ -35,7 +37,11 @@ function sceneText(scene: PaymentScene) {
   return "手机 H5 支付";
 }
 
+const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
+
 export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const [scene, setScene] = useState<PaymentScene>("pc");
   const [loading, setLoading] = useState<"ALIPAY" | "WECHAT" | null>(null);
   const [error, setError] = useState("");
@@ -43,16 +49,27 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
 
+  const finishPaid = useCallback(() => {
+    onPaid?.();
+    onClose();
+    router.push(DASHBOARD_ORDERS_URL);
+  }, [onClose, onPaid, router]);
+
   useEffect(() => {
-    if (open) {
-      setScene(detectScene());
-      setError("");
-      setQrUrl(null);
-      setQrImage(null);
-      setPolling(false);
-      setLoading(null);
+    if (!open) return;
+    if (sessionStatus === "unauthenticated") {
+      onClose();
+      router.push(`/login?callbackUrl=${encodeURIComponent(DASHBOARD_ORDERS_URL)}`);
+      return;
     }
-  }, [open, order?.id]);
+    if (sessionStatus === "loading") return;
+    setScene(detectScene());
+    setError("");
+    setQrUrl(null);
+    setQrImage(null);
+    setPolling(false);
+    setLoading(null);
+  }, [open, order?.id, sessionStatus, onClose, router]);
 
   useEffect(() => {
     if (!qrUrl) {
@@ -77,12 +94,16 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     const started = Date.now();
     const tick = async () => {
       try {
+        await fetch("/api/payment/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNo }),
+        });
         const res = await fetch(`/api/payment/status?orderNo=${encodeURIComponent(orderNo)}`);
         const data = await res.json();
         if (data.data?.status === "PAID") {
           setPolling(false);
-          onPaid?.();
-          onClose();
+          finishPaid();
           return;
         }
       } catch {
@@ -95,7 +116,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
       }
     };
     tick();
-  }, [onClose, onPaid]);
+  }, [finishPaid]);
 
   const launchPay = async (channel: "ALIPAY" | "WECHAT") => {
     if (!order) return;
@@ -122,25 +143,19 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
         });
         const testData = await testRes.json();
         if (!testRes.ok) throw new Error(testData.message || "模拟支付失败");
-        onPaid?.();
-        onClose();
+        finishPaid();
         return;
       }
 
+      if (payload.type === "navigate" && payload.url) {
+        window.location.href = payload.url;
+        return;
+      }
+
+      // 兼容旧版 form 响应：走服务端跳转页，避免 about:blank 继承站点 CSP
       if (payload.type === "form" && payload.html) {
-        const win = window.open("", "_blank");
-        if (win) {
-          win.document.write(payload.html);
-          win.document.close();
-        } else {
-          const container = document.createElement("div");
-          container.innerHTML = payload.html;
-          document.body.appendChild(container);
-          const form = container.querySelector("form");
-          form?.submit();
-          document.body.removeChild(container);
-        }
-        pollStatus(order.orderNo);
+        const fallbackUrl = `/payment/alipay-launch?orderId=${encodeURIComponent(order.id)}&scene=${encodeURIComponent(scene)}`;
+        window.location.href = fallbackUrl;
         return;
       }
 
@@ -165,7 +180,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
 
   const wechatDisabled = scene === "wechat_inapp";
 
-  if (!open || !order) return null;
+  if (!open || !order || sessionStatus !== "authenticated" || !session) return null;
 
   return (
     <div className="payment-checkout-overlay" role="dialog" aria-modal="true" aria-label="收银台">
