@@ -141,7 +141,7 @@ button {
   width: var(--sidebar-w);
   flex-direction: column;
   padding: 28px 18px 22px;
-  overflow-y: auto;
+  overflow: hidden;
   background:
     linear-gradient(165deg, rgba(12, 15, 32, 0.82) 0%, rgba(7, 9, 22, 0.88) 55%, rgba(5, 7, 18, 0.9) 100%);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -339,8 +339,16 @@ button {
   animation: pulse 2s ease infinite;
 }
 
-.side-nav {
+.sidebar-scroll {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-right: -6px;
+  padding-right: 6px;
+}
+
+.side-nav {
+  padding-bottom: 8px;
 }
 
 .nav-section-label {
@@ -412,21 +420,17 @@ button {
 .sidebar-footer {
   position: relative;
   z-index: 2;
-  margin-top: auto;
   flex-shrink: 0;
-  padding-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(77, 217, 182, 0.12);
 }
 
 .social-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.social-row:first-child {
   margin-top: 0;
+  padding-top: 0;
 }
 
 .social-link,
@@ -529,25 +533,6 @@ button {
   border-color: var(--rose);
   color: var(--rose);
   background: var(--rose-dim);
-}
-
-.sidebar-login-btn {
-  display: block;
-  width: 100%;
-  text-align: center;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  background: var(--accent-dim);
-  transition: all 180ms ease;
-}
-
-.sidebar-login-btn:hover {
-  background: var(--accent);
-  color: var(--bg);
 }
 
 .main {
@@ -4550,6 +4535,15 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.contact-copy-hint {
+  margin: 8px 0 0;
+  color: var(--accent);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  word-break: break-all;
 }
 
 .social-link-custom-icon {

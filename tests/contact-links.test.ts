@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  extractEmailFromHref,
   getPublicContactLinks,
   parseContactLinks,
   sanitizeContactLink,
@@ -50,6 +51,14 @@ describe("contact-links", () => {
     expect(link?.href).toBeUndefined();
     expect(link?.iconUrl).toBeUndefined();
     expect(link?.qrImageUrl).toBe("/uploads/ok.webp");
+  });
+
+  it("extracts plain email from mailto href", () => {
+    expect(extractEmailFromHref("mailto:hello@example.com")).toBe("hello@example.com");
+    expect(extractEmailFromHref("mailto:modianwuhen@gmail.com?subject=Hi")).toBe(
+      "modianwuhen@gmail.com"
+    );
+    expect(extractEmailFromHref("not-an-email")).toBeNull();
   });
 
   it("returns only enabled links for public API", () => {

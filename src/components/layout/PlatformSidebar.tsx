@@ -14,7 +14,6 @@ import {
   PenLine,
   Settings,
   ShieldCheck,
-  UserPlus,
   UserRound,
   X,
 } from "lucide-react";
@@ -79,18 +78,11 @@ export function PlatformSidebar({
 
   const workspaceItems: WorkspaceLink[] = [];
   if (!session) {
-    workspaceItems.push(
-      {
-        href: "/login?callbackUrl=/",
-        label: "登录",
-        icon: LogIn,
-      },
-      {
-        href: "/register",
-        label: "注册",
-        icon: UserPlus,
-      }
-    );
+    workspaceItems.push({
+      href: "/login?callbackUrl=/",
+      label: "登录",
+      icon: LogIn,
+    });
   }
   if (session && !isAdmin) {
     workspaceItems.push({
@@ -186,53 +178,55 @@ export function PlatformSidebar({
         <div className="sidebar-scanlines" aria-hidden="true" />
         <div className="sidebar-edge-glow" aria-hidden="true" />
         <div className="sidebar-corner sidebar-corner--tl" aria-hidden="true" />
-        <div className="avatar-wrap" aria-hidden="true">
-          <span className="avatar-ring" />
-          <span className="avatar">馒</span>
-        </div>
-        <div className="sidebar-name">{siteConfig.name}</div>
-        <div className="sidebar-tag">
-          <span className="pulse-dot" />
-          {siteConfig.subtitle}
-        </div>
+        <div className="sidebar-scroll">
+          <div className="avatar-wrap" aria-hidden="true">
+            <span className="avatar-ring" />
+            <span className="avatar">馒</span>
+          </div>
+          <div className="sidebar-name">{siteConfig.name}</div>
+          <div className="sidebar-tag">
+            <span className="pulse-dot" />
+            {siteConfig.subtitle}
+          </div>
 
-        <div className="mb-4">
-          <SearchDialog />
+          <div className="mb-4">
+            <SearchDialog />
+          </div>
+
+          <nav className="side-nav" aria-label="主导航">
+            <div className="nav-section-label">Navigation</div>
+            {sectionItems.map(renderSectionItem)}
+
+            <div className="nav-section-label">Workspace</div>
+            {workspaceItems.map((item) => {
+              const Icon = item.icon;
+              const active = item.match ? item.match(pathname) : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  className={clsx("nav-item nav-link", active && "active")}
+                  href={item.href}
+                  prefetch
+                  onClick={closeMobile}
+                >
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+            <button
+              className="nav-item"
+              type="button"
+              onClick={() => {
+                onToast?.("在线工具将在后台模块接入");
+                closeMobile();
+              }}
+            >
+              <Settings size={16} aria-hidden="true" />
+              <span>在线工具</span>
+            </button>
+          </nav>
         </div>
-
-        <nav className="side-nav" aria-label="主导航">
-          <div className="nav-section-label">Navigation</div>
-          {sectionItems.map(renderSectionItem)}
-
-          <div className="nav-section-label">Workspace</div>
-          {workspaceItems.map((item) => {
-            const Icon = item.icon;
-            const active = item.match ? item.match(pathname) : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                className={clsx("nav-item nav-link", active && "active")}
-                href={item.href}
-                prefetch
-                onClick={closeMobile}
-              >
-                <Icon size={16} aria-hidden="true" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-          <button
-            className="nav-item"
-            type="button"
-            onClick={() => {
-              onToast?.("在线工具将在后台模块接入");
-              closeMobile();
-            }}
-          >
-            <Settings size={16} aria-hidden="true" />
-            <span>在线工具</span>
-          </button>
-        </nav>
 
         <div className="sidebar-footer">
           <ContactLinksRow />

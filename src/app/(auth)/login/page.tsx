@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -20,22 +21,28 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, callbackUrl }),
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+        callbackUrl,
       });
 
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(json?.message || "用户名或密码错误");
+      if (result?.error) {
+        setError(result.error === "CredentialsSignin" ? "用户名或密码错误" : "登录失败，请稍后重试");
         return;
       }
 
-      router.push(json?.data?.callbackUrl || callbackUrl);
+      if (!result?.ok) {
+        setError("登录失败，请稍后重试");
+        return;
+      }
+
+      router.push(callbackUrl);
       router.refresh();
-    } catch {
-      setError("登录失败，请稍后重试");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      setError(message.includes("频繁") ? message : "登录失败，请稍后重试");
     } finally {
       setLoading(false);
     }

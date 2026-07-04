@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Github, Link2, Mail, MessageCircle, QrCode, Send, X } from "lucide-react";
-import type { ContactLink, ContactLinkKind } from "@/lib/contact-links";
+import { extractEmailFromHref, type ContactLink, type ContactLinkKind } from "@/lib/contact-links";
 
 const kindIcons: Record<ContactLinkKind, typeof Mail> = {
   wechat_official: QrCode,
@@ -17,6 +17,26 @@ const kindIcons: Record<ContactLinkKind, typeof Mail> = {
 export function ContactLinksRow() {
   const [links, setLinks] = useState<ContactLink[]>([]);
   const [activeQr, setActiveQr] = useState<ContactLink | null>(null);
+  const [copyHint, setCopyHint] = useState<string | null>(null);
+  const copyHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCopyHint = (message: string) => {
+    if (copyHintTimer.current) clearTimeout(copyHintTimer.current);
+    setCopyHint(message);
+    copyHintTimer.current = setTimeout(() => setCopyHint(null), 2200);
+  };
+
+  const copyEmail = async (href: string) => {
+    const email = extractEmailFromHref(href);
+    if (!email) return;
+
+    try {
+      await navigator.clipboard.writeText(email);
+      showCopyHint(`已复制 ${email}`);
+    } catch {
+      showCopyHint("复制失败，请手动复制");
+    }
+  };
 
   useEffect(() => {
     fetch("/api/site/contact-links")
@@ -25,6 +45,12 @@ export function ContactLinksRow() {
         if (Array.isArray(d.data)) setLinks(d.data);
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyHintTimer.current) clearTimeout(copyHintTimer.current);
+    };
   }, []);
 
   if (links.length === 0) return null;
@@ -63,6 +89,22 @@ export function ContactLinksRow() {
           }
 
           if (link.href) {
+            if (link.kind === "email") {
+              const email = extractEmailFromHref(link.href);
+              return (
+                <button
+                  key={link.id}
+                  type="button"
+                  className="social-link"
+                  aria-label={`复制${link.label}`}
+                  title={email ? `点击复制：${email}` : link.label}
+                  onClick={() => copyEmail(link.href!)}
+                >
+                  {content}
+                </button>
+              );
+            }
+
             const external = link.href.startsWith("http");
             return (
               <a
@@ -81,6 +123,12 @@ export function ContactLinksRow() {
           return null;
         })}
       </div>
+
+      {copyHint ? (
+        <p className="contact-copy-hint" role="status" aria-live="polite">
+          {copyHint}
+        </p>
+      ) : null}
 
       {activeQr?.qrImageUrl ? (
         <div className="contact-qr-overlay" role="dialog" aria-modal="true" aria-label={activeQr.label}>

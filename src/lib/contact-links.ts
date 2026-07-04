@@ -118,3 +118,14 @@ export function serializeContactLinks(links: ContactLink[]): string {
 export function getPublicContactLinks(links: ContactLink[]): ContactLink[] {
   return links.filter((link) => link.enabled);
 }
+
+export function extractEmailFromHref(href: string): string | null {
+  const trimmed = href.trim();
+  if (!trimmed) return null;
+
+  const address = trimmed.toLowerCase().startsWith("mailto:")
+    ? trimmed.slice(7).split("?")[0].trim()
+    : trimmed;
+
+  return address.includes("@") ? address : null;
+}
