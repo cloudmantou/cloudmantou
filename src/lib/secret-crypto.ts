@@ -4,11 +4,14 @@ const PREFIX = "enc:v1:";
 const ALGO = "aes-256-gcm";
 const IV_BYTES = 12;
 
-const SETTINGS_ENCRYPTION_KEY = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
-if (!SETTINGS_ENCRYPTION_KEY) {
-  throw new Error(
-    "SETTINGS_ENCRYPTION_KEY is required — set it in .env (generate with: openssl rand -hex 32)"
-  );
+function requireSettingsEncryptionKey(): string {
+  const key = process.env.SETTINGS_ENCRYPTION_KEY?.trim();
+  if (!key) {
+    throw new Error(
+      "SETTINGS_ENCRYPTION_KEY is required — set it in .env (generate with: openssl rand -hex 32)"
+    );
+  }
+  return key;
 }
 
 const SENSITIVE_GATEWAY_FIELDS = new Set([
@@ -22,7 +25,7 @@ const SENSITIVE_GATEWAY_FIELDS = new Set([
 ]);
 
 function getEncryptionKey(): Buffer {
-  return crypto.createHash("sha256").update(SETTINGS_ENCRYPTION_KEY!, "utf8").digest();
+  return crypto.createHash("sha256").update(requireSettingsEncryptionKey(), "utf8").digest();
 }
 
 export function isEncryptedSecret(value: string): boolean {

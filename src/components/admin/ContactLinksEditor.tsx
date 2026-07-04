@@ -212,7 +212,7 @@ function UploadSlot({
   label: string;
   imageUrl?: string;
   uploading: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.Ref<HTMLInputElement>;
   onPick: () => void;
   onClear: () => void;
   onFile: (file: File) => void;

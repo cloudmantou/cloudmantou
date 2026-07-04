@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
-const CARD_SECRET_SALT = process.env.CARD_SECRET_SALT;
-if (!CARD_SECRET_SALT) {
-  throw new Error("CARD_SECRET_SALT is required — set it in .env (generate with: openssl rand -hex 32)");
+function requireCardSecretSalt(): string {
+  const salt = process.env.CARD_SECRET_SALT?.trim();
+  if (!salt) {
+    throw new Error("CARD_SECRET_SALT is required — set it in .env (generate with: openssl rand -hex 32)");
+  }
+  return salt;
 }
 
 // bcrypt rounds — 与密码哈希保持一致的性能标准
@@ -15,7 +18,7 @@ const BCRYPT_ROUNDS = 12;
  * 使用 bcrypt 慢哈希替代原 SHA-256，防止暴力破解和彩虹表攻击
  */
 export async function hashCardSecret(secret: string): Promise<string> {
-  return bcrypt.hash(secret + CARD_SECRET_SALT, BCRYPT_ROUNDS);
+  return bcrypt.hash(secret + requireCardSecretSalt(), BCRYPT_ROUNDS);
 }
 
 /**
@@ -30,13 +33,13 @@ export async function hashCardSecret(secret: string): Promise<string> {
 export async function verifyCardSecret(secret: string, hash: string): Promise<boolean> {
   // bcrypt 哈希以 $2 开头
   if (hash.startsWith("$2")) {
-    return bcrypt.compare(secret + CARD_SECRET_SALT, hash);
+    return bcrypt.compare(secret + requireCardSecretSalt(), hash);
   }
 
   // 回退到旧 SHA-256 比对（存量数据兼容）
   const legacyHash = crypto
     .createHash("sha256")
-    .update(secret + CARD_SECRET_SALT)
+    .update(secret + requireCardSecretSalt())
     .digest("hex");
   return legacyHash === hash;
 }
