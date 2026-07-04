@@ -14,6 +14,7 @@ import {
   PenLine,
   Settings,
   ShieldCheck,
+  UserPlus,
   UserRound,
   X,
 } from "lucide-react";
@@ -78,11 +79,18 @@ export function PlatformSidebar({
 
   const workspaceItems: WorkspaceLink[] = [];
   if (!session) {
-    workspaceItems.push({
-      href: "/login?callbackUrl=/",
-      label: "登录",
-      icon: LogIn,
-    });
+    workspaceItems.push(
+      {
+        href: "/login?callbackUrl=/",
+        label: "登录",
+        icon: LogIn,
+      },
+      {
+        href: "/register",
+        label: "注册",
+        icon: UserPlus,
+      }
+    );
   }
   if (session && !isAdmin) {
     workspaceItems.push({
@@ -244,13 +252,7 @@ export function PlatformSidebar({
                 退出
               </button>
             </div>
-          ) : (
-            <div className="sidebar-user">
-              <Link href="/login?callbackUrl=/" className="sidebar-login-btn" onClick={closeMobile}>
-                登录 / 注册
-              </Link>
-            </div>
-          )}
+          ) : null}
         </div>
       </aside>
 
