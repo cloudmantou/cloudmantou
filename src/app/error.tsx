@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-export default function GlobalError({
+export default function Error({
   error,
   reset,
 }: {
@@ -11,17 +11,15 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[Global Error]", error);
+    console.error("[Route Error]", error);
   }, [error]);
 
   return (
-    <html lang="zh-CN">
-      <body>
-        <div
-          className="min-h-screen flex items-center justify-center px-4"
-          style={{ background: "var(--bg)", color: "var(--text)" }}
-        >
-          <div className="text-center max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--bg)", color: "var(--text)" }}
+    >
+      <div className="text-center max-w-md">
         <AlertTriangle
           size={48}
           className="mx-auto mb-4"
@@ -53,9 +51,7 @@ export default function GlobalError({
           <RefreshCw size={14} aria-hidden="true" />
           重新加载
         </button>
-          </div>
-        </div>
-      </body>
-    </html>
+      </div>
+    </div>
   );
 }
