@@ -6,7 +6,6 @@ import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import crypto from "crypto";
 import { decryptCardSecret } from "@/lib/card-secret-storage";
-import { ensureCardDeliveryForPaidOrder } from "@/lib/card-delivery";
 import {
   isMembershipProductAvailable,
   type MembershipProductType,
@@ -107,44 +106,20 @@ export async function GET(req: NextRequest) {
       prisma.order.count({ where }),
     ]);
 
-    for (const order of orders) {
-      if (order.productType === "CARD_PACKAGE" && order.status === "PAID" && !order.delivery) {
-        try {
-          await ensureCardDeliveryForPaidOrder(order);
-        } catch (deliveryError) {
-          console.error("[Orders List] card delivery backfill failed:", order.orderNo, deliveryError);
-        }
-      }
-    }
-
-    const refreshed =
-      orders.some((o) => o.productType === "CARD_PACKAGE" && o.status === "PAID" && !o.delivery)
-        ? await prisma.order.findMany({
-            where: { id: { in: orders.map((o) => o.id) } },
-            include: {
-              payment: { select: { channel: true, status: true, tradeNo: true } },
-              delivery: true,
-            },
-          })
-        : orders;
-
-    const orderMap = new Map(refreshed.map((o) => [o.id, o]));
-
     return ok(
       orders.map((o) => {
-        const row = orderMap.get(o.id) || o;
-        const fulfillment = buildFulfillment(row);
+        const fulfillment = buildFulfillment(o);
         return {
-          id: row.id,
-          orderNo: row.orderNo,
-          title: row.title,
-          amount: Number(row.amount),
-          status: row.status,
-          productType: row.productType,
-          productId: row.productId,
-          createdAt: row.createdAt,
-          paidAt: row.paidAt,
-          payment: row.payment ? { ...row.payment } : null,
+          id: o.id,
+          orderNo: o.orderNo,
+          title: o.title,
+          amount: Number(o.amount),
+          status: o.status,
+          productType: o.productType,
+          productId: o.productId,
+          createdAt: o.createdAt,
+          paidAt: o.paidAt,
+          payment: o.payment ? { ...o.payment } : null,
           fulfillment,
         };
       }),

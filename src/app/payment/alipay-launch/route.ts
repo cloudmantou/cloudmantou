@@ -4,11 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { createAlipayPayment } from "@/lib/payment-providers";
 import { detectPaymentScene, resolveAlipayMode, type PaymentScene } from "@/lib/payment-scene";
+import { ALIPAY_LAUNCH_CSP } from "@/config/csp";
 
 export const dynamic = "force-dynamic";
-
-const LAUNCH_CSP =
-  "default-src 'none'; script-src 'unsafe-inline'; form-action https:; base-uri 'none'";
 
 function resolveScene(req: NextRequest, explicit: string | null): PaymentScene {
   if (explicit && explicit !== "auto") {
@@ -56,16 +54,6 @@ export async function GET(req: NextRequest) {
   const notifyUrl = `${config.siteUrl}/api/payment/notify/alipay`;
   const returnUrl = `${config.siteUrl}/payment/result?orderNo=${encodeURIComponent(order.orderNo)}`;
 
-  const launch = createAlipayPayment({
-    config: config.alipay,
-    mode: resolveAlipayMode(scene),
-    orderNo: order.orderNo,
-    title: order.title,
-    amount,
-    notifyUrl,
-    returnUrl,
-  });
-
   await prisma.payment.upsert({
     where: { orderId: order.id },
     create: {
@@ -81,6 +69,16 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  const launch = createAlipayPayment({
+    config: config.alipay,
+    mode: resolveAlipayMode(scene),
+    orderNo: order.orderNo,
+    title: order.title,
+    amount,
+    notifyUrl,
+    returnUrl,
+  });
+
   if (launch.type !== "form") {
     return new NextResponse("支付宝下单失败", { status: 500 });
   }
@@ -89,7 +87,7 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": LAUNCH_CSP,
+      "Content-Security-Policy": ALIPAY_LAUNCH_CSP,
       "Cache-Control": "no-store",
     },
   });

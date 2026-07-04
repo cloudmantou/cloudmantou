@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import {
   getAlipayGatewayUrl,
+  isPemEncoded,
   normalizePem,
   type AlipayGatewayConfig,
   type WechatGatewayConfig,
@@ -74,10 +75,9 @@ export function createAlipayPayment(input: {
     biz_content: bizContent,
   };
 
-  const privateKey =
-    input.config.privateKey.includes("BEGIN")
-      ? input.config.privateKey
-      : normalizePem(input.config.privateKey, "private");
+  const privateKey = isPemEncoded(input.config.privateKey)
+    ? input.config.privateKey
+    : normalizePem(input.config.privateKey, "private");
   params.sign = signAlipay(params, privateKey);
 
   const html = buildAlipayForm(gatewayUrl, params);
@@ -98,7 +98,7 @@ export async function queryAlipayTrade(input: {
   orderNo: string;
 }): Promise<AlipayTradeQueryResult> {
   const gatewayUrl = getAlipayGatewayUrl(input.config.env);
-  const privateKey = input.config.privateKey.includes("BEGIN")
+  const privateKey = isPemEncoded(input.config.privateKey)
     ? input.config.privateKey
     : normalizePem(input.config.privateKey, "private");
 

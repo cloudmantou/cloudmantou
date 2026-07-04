@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Loader2, Smartphone, Monitor, X } from "lucide-react";
@@ -49,11 +49,20 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
 
+  const onPaidRef = useRef(onPaid);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onPaidRef.current = onPaid;
+  }, [onPaid]);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   const finishPaid = useCallback(() => {
-    onPaid?.();
-    onClose();
+    onPaidRef.current?.();
+    onCloseRef.current();
     router.push(DASHBOARD_ORDERS_URL);
-  }, [onClose, onPaid, router]);
+  }, [router]);
 
   useEffect(() => {
     if (!open) return;

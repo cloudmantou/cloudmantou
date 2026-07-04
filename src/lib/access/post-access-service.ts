@@ -64,7 +64,13 @@ export async function decidePostAccess(input: {
   const now = new Date();
   const fullContent = buildFullContent(publicContent, paidContent);
 
-  if (await hasActiveVip(userId, now)) {
+  const [vip, entitled, credits] = await Promise.all([
+    hasActiveVip(userId, now),
+    hasPostEntitlement(userId, postId, now),
+    countArticleCredits(userId, now),
+  ]);
+
+  if (vip) {
     return {
       allowed: true,
       reason: "VIP",
@@ -73,7 +79,7 @@ export async function decidePostAccess(input: {
     };
   }
 
-  if (await hasPostEntitlement(userId, postId, now)) {
+  if (entitled) {
     return {
       allowed: true,
       reason: "POST_ENTITLEMENT",
@@ -81,8 +87,6 @@ export async function decidePostAccess(input: {
       content: fullContent,
     };
   }
-
-  const credits = await countArticleCredits(userId, now);
   if (credits > 0) {
     return {
       allowed: false,

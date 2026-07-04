@@ -47,9 +47,14 @@ async function readGatewaySettings(): Promise<Record<string, Record<string, unkn
   }
 }
 
+/** PEM 头检测（避免 base64 正文误含 BEGIN 子串） */
+export function isPemEncoded(value: string): boolean {
+  return /^-----BEGIN /m.test(value.trim());
+}
+
 export function normalizePem(value: string, type: "private" | "public"): string {
   const trimmed = value.trim();
-  if (trimmed.includes("BEGIN")) return trimmed;
+  if (isPemEncoded(trimmed)) return trimmed;
   const body = trimmed.replace(/\s+/g, "");
   const lines = body.match(/.{1,64}/g)?.join("\n") ?? body;
   if (type === "private") {

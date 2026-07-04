@@ -1,3 +1,7 @@
+/** 与 src/config/csp.ts 中 ALIPAY_FORM_ACTION_CSP 保持同步 */
+const ALIPAY_FORM_ACTION_CSP =
+  "'self' https://openapi.alipay.com https://openapi.alipaydev.com https://openapi-sandbox.dl.alipaydev.com";
+
 /** @type {import('next').NextConfig} */
 const securityHeaders = [
   {
@@ -35,7 +39,7 @@ const securityHeaders = [
       "connect-src 'self' https:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
-      "form-action 'self' https:",
+      `form-action ${ALIPAY_FORM_ACTION_CSP}`,
     ].join("; "),
   },
 ];
