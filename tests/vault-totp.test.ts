@@ -47,6 +47,9 @@ describe("vault unlock token", () => {
     const token = createVaultUnlockToken("user-1", now);
     expect(verifyVaultUnlockToken(token, "user-1", now)).toBe(true);
     expect(verifyVaultUnlockToken(token, "user-2", now)).toBe(false);
+    expect(verifyVaultUnlockToken(token, "user-1", now + VAULT_UNLOCK_TTL_MS)).toBe(
+      false
+    );
     expect(verifyVaultUnlockToken(token, "user-1", now + VAULT_UNLOCK_TTL_MS + 1)).toBe(
       false
     );

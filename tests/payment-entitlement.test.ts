@@ -30,6 +30,15 @@ function createMockTx(user?: { id: string; vipExpireAt: Date | null; vipLevel: n
   const findUniqueCalls: any[] = [];
 
   const tx: any = {
+    $queryRaw: async (query: TemplateStringsArray) => {
+      const sql = Array.from(query).join(" ");
+      if (sql.includes("FROM users")) {
+        return user
+          ? [{ vipExpireAt: user.vipExpireAt, vipLevel: user.vipLevel }]
+          : [];
+      }
+      return [];
+    },
     user: {
       findUnique: async (args: any) => {
         findUniqueCalls.push(args);
@@ -41,6 +50,7 @@ function createMockTx(user?: { id: string; vipExpireAt: Date | null; vipLevel: n
       },
     },
     entitlement: {
+      findMany: async () => [],
       create: async (args: any) => {
         entitlementsCreated.push(args.data);
         return args.data;
@@ -77,7 +87,7 @@ describe("grantEntitlement — VIP 分支写入 vipExpireAt", () => {
     // 更新了用户 VIP 等级和到期时间
     expect(userUpdates).toHaveLength(1);
     expect(userUpdates[0].where.id).toBe("user-001");
-    expect(userUpdates[0].data.vipLevel).toEqual({ set: 1 });
+    expect(userUpdates[0].data.vipLevel).toBe(1);
     expect(userUpdates[0].data.vipExpireAt).toBeInstanceOf(Date);
   });
 
@@ -91,7 +101,7 @@ describe("grantEntitlement — VIP 分支写入 vipExpireAt", () => {
     await grantEntitlement(tx, { ...ORDER_BASE, productType: "VIP_QUARTER" });
 
     expect(entitlementsCreated[0].type).toBe("VIP");
-    expect(userUpdates[0].data.vipLevel).toEqual({ set: 1 });
+    expect(userUpdates[0].data.vipLevel).toBe(1);
     expect(userUpdates[0].data.vipExpireAt).toBeInstanceOf(Date);
   });
 
@@ -104,7 +114,7 @@ describe("grantEntitlement — VIP 分支写入 vipExpireAt", () => {
 
     await grantEntitlement(tx, { ...ORDER_BASE, productType: "VIP_YEAR" });
 
-    expect(userUpdates[0].data.vipLevel).toEqual({ set: 2 });
+    expect(userUpdates[0].data.vipLevel).toBe(2);
     expect(userUpdates[0].data.vipExpireAt).toBeInstanceOf(Date);
   });
 

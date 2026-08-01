@@ -85,23 +85,25 @@ async function main() {
     },
   });
 
-  // 测试用户 — 密码从环境变量读取，缺失时使用开发默认值并打印警告
-  const seedUserPassword = process.env.SEED_USER_PASSWORD || "T3stUser!Cloud#2026";
-  if (!process.env.SEED_USER_PASSWORD) {
-    console.warn("⚠️  SEED_USER_PASSWORD 未设置，使用开发默认密码。生产环境请通过环境变量配置强密码。");
+  // 测试账号只属于本地开发。生产 seed 永远不会创建或重置已知测试用户。
+  if (!isProduction) {
+    const seedUserPassword = process.env.SEED_USER_PASSWORD ?? "T3stUser!Cloud#2026";
+    if (!process.env.SEED_USER_PASSWORD) {
+      console.warn("⚠️  SEED_USER_PASSWORD 未设置，使用本地开发默认密码。");
+    }
+    const userPassword = await bcrypt.hash(seedUserPassword, 12);
+    await prisma.user.upsert({
+      where: { email: "test@cloudmantou.com" },
+      update: { password: userPassword },
+      create: {
+        email: "test@cloudmantou.com",
+        username: "testuser",
+        password: userPassword,
+        nickname: "测试用户",
+        role: "USER",
+      },
+    });
   }
-  const userPassword = await bcrypt.hash(seedUserPassword, 12);
-  await prisma.user.upsert({
-    where: { email: "test@cloudmantou.com" },
-    update: { password: userPassword },
-    create: {
-      email: "test@cloudmantou.com",
-      username: "testuser",
-      password: userPassword,
-      nickname: "测试用户",
-      role: "USER",
-    },
-  });
 
   // 示例标签
   const tags = [
@@ -139,7 +141,7 @@ async function main() {
         excerpt: "这是第一篇示例文章，介绍了 CloudMantou 博客会员平台的功能与架构。",
         content: `# 欢迎来到 CloudMantou
 
-CloudMantou 是一个基于 Next.js 14 构建的全栈博客会员平台。
+CloudMantou 是一个基于 Next.js 16 构建的全栈博客会员平台。
 
 ## 主要功能
 
@@ -150,7 +152,7 @@ CloudMantou 是一个基于 Next.js 14 构建的全栈博客会员平台。
 
 ## 技术栈
 
-- **前端**：Next.js 14 (App Router) + TypeScript
+- **前端**：Next.js 16 (App Router) + TypeScript
 - **数据库**：MySQL + Prisma ORM
 - **认证**：Auth.js v5 (NextAuth)
 - **部署**：Docker
@@ -178,6 +180,57 @@ CloudMantou 是一个基于 Next.js 14 构建的全栈博客会员平台。
         create: { postId: post.id, tagId: tag.id },
       });
     }
+  }
+
+  // 应用商店预置
+  const storeApps = [
+    {
+      name: "香色闺阁",
+      slug: "xiangse",
+      tagline: "沉浸式阅读体验",
+      description:
+        "香色闺阁是广受读者喜爱的 iOS 阅读应用。通过馒头助手内置商店，会员可在有效期内一键安装并保持更新，无需反复寻找安装包。",
+      category: "READING" as const,
+      featured: true,
+      sortOrder: 1,
+      published: true,
+      minIos: "15.0",
+      installUrl: "mantou://store/xiangse",
+    },
+    {
+      name: "源阅读",
+      slug: "yuandu",
+      tagline: "简洁高效的阅读工具",
+      description:
+        "源阅读专注于清爽的阅读界面与书源管理。馒头助手商店提供稳定分发渠道，适合需要侧载阅读类应用的用户。",
+      category: "READING" as const,
+      featured: true,
+      sortOrder: 2,
+      published: true,
+      minIos: "15.0",
+      installUrl: "mantou://store/yuandu",
+    },
+    {
+      name: "地图定位助手",
+      slug: "location-tool",
+      tagline: "虚拟定位增强",
+      description:
+        "配合馒头助手虚拟定位能力，在支持的系统版本上模拟 GPS 坐标，适用于开发调试与测试场景。",
+      category: "TOOL" as const,
+      featured: false,
+      sortOrder: 10,
+      published: true,
+      minIos: "15.0",
+      installUrl: "mantou://store/location-tool",
+    },
+  ];
+
+  for (const app of storeApps) {
+    await prisma.storeApp.upsert({
+      where: { slug: app.slug },
+      update: app,
+      create: app,
+    });
   }
 
   console.log("✅ Seed completed");

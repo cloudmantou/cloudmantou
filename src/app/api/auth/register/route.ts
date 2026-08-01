@@ -20,7 +20,10 @@ const registerSchema = z.object({
 export async function POST(req: Request) {
   try {
     // 速率限制：每 IP 每小时最多 5 次注册
-    const limited = await checkRateLimit(req, RATE_LIMITS.REGISTER);
+    const limited = await checkRateLimit(req, {
+      ...RATE_LIMITS.REGISTER,
+      scope: "register",
+    });
     if (limited) return limited;
 
     const settings = await getSiteSettings();

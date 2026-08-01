@@ -11,6 +11,13 @@ import {
   VAULT_UNLOCK_TTL_MS,
 } from "@/lib/vault-session";
 import { auditAdminAction } from "@/lib/admin-audit-log";
+import { checkRateLimit } from "@/lib/rate-limit-server";
+
+const VAULT_VERIFY_RATE_LIMIT = {
+  limit: 5,
+  windowMs: 5 * 60 * 1000,
+  scope: "vault-verify",
+} as const;
 
 const verifySchema = z.object({
   code: z.string().min(6).max(8),
@@ -23,6 +30,13 @@ export async function POST(req: NextRequest) {
     if (!isVaultTotpConfigured()) {
       return fail("未配置 VAULT_TOTP_SECRET，无法启用 Vault 二次验证", 50300, 503);
     }
+
+    const rateLimited = await checkRateLimit(
+      req,
+      VAULT_VERIFY_RATE_LIMIT,
+      session.user.id
+    );
+    if (rateLimited) return rateLimited;
 
     const body = await req.json();
     const parsed = verifySchema.safeParse(body);

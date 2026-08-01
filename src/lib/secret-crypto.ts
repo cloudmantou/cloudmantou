@@ -29,16 +29,32 @@ function getEncryptionKey(): Buffer {
 }
 
 export function isEncryptedSecret(value: string): boolean {
-  return value.startsWith(PREFIX);
+  if (!value.startsWith(PREFIX)) return false;
+
+  const encoded = value.slice(PREFIX.length);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return false;
+
+  try {
+    const payload = Buffer.from(encoded, "base64");
+    if (payload.length < IV_BYTES + 16 + 1) return false;
+    return (
+      payload.toString("base64").replace(/=+$/, "") ===
+      encoded.replace(/=+$/, "")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function encryptSecret(plaintext: string): string {
-  if (!plaintext || plaintext.includes("••••") || isEncryptedSecret(plaintext)) {
-    return plaintext;
+  if (!plaintext) return plaintext;
+  if (plaintext.includes("••••")) {
+    throw new Error("Masked secret placeholders cannot be persisted");
   }
 
   const trimmed = plaintext.trim();
   if (!trimmed) return plaintext;
+  if (isEncryptedSecret(trimmed)) return trimmed;
 
   const key = getEncryptionKey();
   const iv = crypto.randomBytes(IV_BYTES);
@@ -50,7 +66,11 @@ export function encryptSecret(plaintext: string): string {
 }
 
 export function decryptSecret(value: string): string {
-  if (!value || !isEncryptedSecret(value)) return value;
+  if (!value || !value.startsWith(PREFIX)) return value;
+  if (!isEncryptedSecret(value)) {
+    console.error("[secret-crypto] invalid encrypted payload");
+    return "";
+  }
 
   const key = getEncryptionKey();
   try {

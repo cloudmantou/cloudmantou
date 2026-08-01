@@ -29,14 +29,16 @@ describe("secret-crypto", () => {
     expect(decryptSecret(encrypted)).toBe("my-private-key-value");
   });
 
-  it("keeps masked placeholder untouched", () => {
-    expect(encryptSecret("abcd••••••••wxyz")).toBe("abcd••••••••wxyz");
+  it("rejects masked placeholders instead of persisting them as plaintext", () => {
+    expect(() => encryptSecret("abcd••••••••wxyz")).toThrow(/masked/i);
   });
 
-  it("does not treat enc:v1: prefixed plaintext as already encrypted before trim", () => {
+  it("encrypts invalid enc:v1-prefixed plaintext instead of trusting the prefix", () => {
     const value = "enc:v1:not-really-encrypted";
-    expect(isEncryptedSecret(value)).toBe(true);
-    expect(encryptSecret(value)).toBe(value);
+    expect(isEncryptedSecret(value)).toBe(false);
+    const encrypted = encryptSecret(value);
+    expect(encrypted).not.toBe(value);
+    expect(decryptSecret(encrypted)).toBe(value);
   });
 
   it("encrypts only sensitive gateway fields", () => {

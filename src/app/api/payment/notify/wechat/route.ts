@@ -5,31 +5,39 @@ import {
   verifyWechatSign,
   verifyWechatV3Sign,
   verifyAmount,
-  grantEntitlement,
+  finalizePaidOrder,
   decryptWechatV3Resource,
 } from "@/lib/payment";
 import { recordPaymentNotifyAudit } from "@/lib/payment-notify-audit";
+import {
+  readRequestBodyWithLimit,
+  RequestBodyTooLargeError,
+} from "@/lib/request-body";
+import {
+  findWechatV3MerchantMismatch,
+  wechatNotifyFailure,
+  wechatNotifySuccess,
+  type WechatNotifyVersion,
+} from "@/lib/wechat-notify";
 
 /**
  * 微信支付异步通知回调（兼容 V2 XML 与 V3 JSON）
  */
 export async function POST(req: NextRequest) {
   let rawBody = "";
+  const contentType = req.headers.get("content-type") || "";
+  const version = detectWechatNotifyVersion(req.headers, contentType);
 
   try {
     const paymentConfig = await getPaymentRuntimeConfig();
-    rawBody = await req.text();
+    rawBody = await readRequestBodyWithLimit(req);
     let body: Record<string, any>;
-    let isV3 = false;
 
-    const contentType = req.headers.get("content-type") || "";
-
-    if (req.headers.get("wechatpay-signature")) {
-      isV3 = true;
+    if (version === "v3") {
       try {
         body = JSON.parse(rawBody);
       } catch {
-        return wechatV2Response("FAIL", "无效的请求格式");
+        return wechatNotifyFailure(version, "无效的请求格式");
       }
 
       const timestamp = req.headers.get("wechatpay-timestamp") || "";
@@ -47,7 +55,7 @@ export async function POST(req: NextRequest) {
           reason: "v3_public_key_not_configured",
           rawBody,
         });
-        return wechatV2Response("FAIL", "配置错误");
+        return wechatNotifyFailure(version, "配置错误", 500);
       }
 
       if (
@@ -63,21 +71,51 @@ export async function POST(req: NextRequest) {
           reason: "v3",
           rawBody,
         });
-        return wechatV2Response("FAIL", "签名验证失败");
+        return wechatNotifyFailure(version, "签名验证失败", 401);
       }
 
-      if (body.resource) {
-        const apiV3Key =
-          paymentConfig.wechat?.apiV3Key || process.env.WECHAT_API_V3_KEY || "";
-        if (!apiV3Key) {
-          return wechatV2Response("FAIL", "配置错误");
-        }
-        try {
-          body = decryptWechatV3Resource(body.resource, apiV3Key);
-        } catch (err) {
-          console.error("[WeChat v3 Decrypt Error]", err);
-          return wechatV2Response("FAIL", "解密失败");
-        }
+      const apiV3Key =
+        paymentConfig.wechat?.apiV3Key || process.env.WECHAT_API_V3_KEY || "";
+      if (!apiV3Key) {
+        return wechatNotifyFailure(version, "配置错误", 500);
+      }
+      if (!body.resource) {
+        return wechatNotifyFailure(version, "缺少加密资源");
+      }
+      try {
+        body = decryptWechatV3Resource(body.resource, apiV3Key);
+      } catch (err) {
+        console.error("[WeChat v3 Decrypt Error]", err);
+        return wechatNotifyFailure(version, "解密失败");
+      }
+
+      const expectedAppId =
+        paymentConfig.wechat?.appId || process.env.WECHAT_APP_ID || "";
+      const expectedMchId =
+        paymentConfig.wechat?.mchId || process.env.WECHAT_MCH_ID || "";
+      if (!expectedAppId || !expectedMchId) {
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "CONFIG_MISSING",
+          reason: "v3_merchant_identity_not_configured",
+          rawBody,
+        });
+        return wechatNotifyFailure(version, "配置错误", 500);
+      }
+
+      const merchantMismatch = findWechatV3MerchantMismatch(body, {
+        appId: expectedAppId,
+        mchId: expectedMchId,
+      });
+      if (merchantMismatch) {
+        console.warn(`[WeChat v3] ${merchantMismatch} mismatch`);
+        await recordPaymentNotifyAudit({
+          channel: "WECHAT",
+          status: "MERCHANT_MISMATCH",
+          reason: `v3_${merchantMismatch}_mismatch`,
+          rawBody,
+        });
+        return wechatNotifyFailure(version, `${merchantMismatch} mismatch`);
       }
     } else {
       const isXml =
@@ -90,7 +128,7 @@ export async function POST(req: NextRequest) {
           reason: contentType,
           rawBody,
         });
-        return wechatV2Response("FAIL", "invalid content type");
+        return wechatNotifyFailure(version, "invalid content type");
       }
 
       body = parseXmlBody(rawBody);
@@ -104,7 +142,7 @@ export async function POST(req: NextRequest) {
           reason: "v2_api_key_not_configured",
           rawBody,
         });
-        return wechatV2Response("FAIL", "配置错误");
+        return wechatNotifyFailure(version, "配置错误", 500);
       }
 
       if (!verifyWechatSign(body, apiKey)) {
@@ -116,19 +154,19 @@ export async function POST(req: NextRequest) {
           reason: "v2",
           rawBody,
         });
-        return wechatV2Response("FAIL", "签名验证失败");
+        return wechatNotifyFailure(version, "签名验证失败", 401);
       }
 
       const expectedAppId = paymentConfig.wechat?.appId;
       if (expectedAppId && body.appid !== expectedAppId) {
         console.warn("[WeChat v2] appid mismatch:", body.appid, "expected:", expectedAppId);
-        return wechatV2Response("FAIL", "appid mismatch");
+        return wechatNotifyFailure(version, "appid mismatch");
       }
 
       const expectedMchId = paymentConfig.wechat?.mchId;
       if (expectedMchId && body.mch_id !== expectedMchId) {
         console.warn("[WeChat v2] mch_id mismatch:", body.mch_id, "expected:", expectedMchId);
-        return wechatV2Response("FAIL", "mch mismatch");
+        return wechatNotifyFailure(version, "mch mismatch");
       }
     }
 
@@ -139,7 +177,7 @@ export async function POST(req: NextRequest) {
     const amount_total = body.amount?.total;
 
     if (!out_trade_no || !transaction_id) {
-      return wechatV2Response("FAIL", "参数不完整");
+      return wechatNotifyFailure(version, "参数不完整");
     }
 
     const order = await prisma.order.findUnique({
@@ -149,18 +187,14 @@ export async function POST(req: NextRequest) {
 
     if (!order) {
       console.warn("[WeChat] Unknown order:", out_trade_no);
-      return wechatV2Response("FAIL", "订单不存在");
+      return wechatNotifyFailure(version, "订单不存在", 404);
     }
 
-    if (order.status === "PAID") {
-      return wechatV2Response("SUCCESS");
+    if (order.status !== "PENDING" && order.status !== "PAID") {
+      return wechatNotifyFailure(version, "订单状态异常", 409);
     }
 
-    if (order.status !== "PENDING") {
-      return wechatV2Response("FAIL", "订单状态异常");
-    }
-
-    const paidAmountYuan = isV3
+    const paidAmountYuan = version === "v3"
       ? (parseInt(amount_total) / 100).toFixed(2)
       : (parseInt(total_fee) / 100).toFixed(2);
 
@@ -170,45 +204,32 @@ export async function POST(req: NextRequest) {
         orderAmount: order.amount.toString(),
         paidAmount: paidAmountYuan,
       });
-      return wechatV2Response("FAIL", "金额不匹配");
+      return wechatNotifyFailure(version, "金额不匹配");
     }
 
     const isPaid =
-      (isV3 && trade_state === "SUCCESS") ||
-      (!isV3 && body.result_code === "SUCCESS" && body.return_code === "SUCCESS");
+      (version === "v3" && trade_state === "SUCCESS") ||
+      (version === "v2" && body.result_code === "SUCCESS" && body.return_code === "SUCCESS");
 
     if (!isPaid) {
-      return wechatV2Response("SUCCESS");
+      return wechatNotifySuccess(version);
     }
 
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.order.updateMany({
-        where: { id: order.id, status: "PENDING" },
-        data: { status: "PAID", paidAt: new Date() },
-      });
-
-      if (updated.count === 0) return;
-
-      const paymentData = {
-        orderId: order.id,
-        channel: "WECHAT" as const,
-        amount: order.amount,
-        tradeNo: transaction_id,
-        status: "SUCCESS" as const,
-        rawCallback: rawBody,
-      };
-
-      if (order.payment) {
-        await tx.payment.update({ where: { orderId: order.id }, data: paymentData });
-      } else {
-        await tx.payment.create({ data: paymentData });
-      }
-
-      await grantEntitlement(tx, order);
+    await finalizePaidOrder({
+      order,
+      channel: "WECHAT",
+      tradeNo: transaction_id,
+      rawCallback: rawBody,
     });
 
-    return wechatV2Response("SUCCESS");
+    return wechatNotifySuccess(version);
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      if (version === "v3") {
+        return wechatNotifyFailure(version, "请求体过大", 413);
+      }
+      return new Response("payload too large", { status: 413 });
+    }
     console.error("[WeChat Notify Error]", error);
     await recordPaymentNotifyAudit({
       channel: "WECHAT",
@@ -216,25 +237,45 @@ export async function POST(req: NextRequest) {
       reason: error instanceof Error ? error.message : "unknown",
       rawBody,
     });
-    return wechatV2Response("FAIL", "处理失败");
+    return wechatNotifyFailure(version, "处理失败", 500);
   }
 }
 
-function wechatV2Response(returnCode: string, returnMsg?: string): Response {
-  const msg = returnMsg || "";
-  const xml = `<xml><return_code><![CDATA[${returnCode}]]></return_code><return_msg><![CDATA[${msg}]]></return_msg></xml>`;
-  return new Response(xml, {
-    status: 200,
-    headers: { "Content-Type": "application/xml" },
-  });
+function detectWechatNotifyVersion(
+  headers: Headers,
+  contentType: string
+): WechatNotifyVersion {
+  const hasV3Header = [
+    "wechatpay-signature",
+    "wechatpay-timestamp",
+    "wechatpay-nonce",
+    "wechatpay-serial",
+  ].some((name) => headers.has(name));
+  return contentType.includes("json") || hasV3Header ? "v3" : "v2";
 }
 
 function parseXmlBody(xml: string): Record<string, any> {
   const result: Record<string, any> = {};
-  const regex = /<(\w+)><!\[CDATA\[(.*?)\]\]><\/\1>/g;
+  // WeChat V2 permits both CDATA and ordinary text nodes (notably numeric
+  // fields such as total_fee). Keep this deliberately non-recursive so DTDs,
+  // entities and nested attacker-controlled XML are never evaluated.
+  const regex = /<([A-Za-z_][\w.-]*)>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*))<\/\1>/g;
   let match;
   while ((match = regex.exec(xml)) !== null) {
-    result[match[1]] = match[2];
+    result[match[1]] = match[2] ?? decodeXmlText(match[3] ?? "");
   }
   return result;
+}
+
+function decodeXmlText(value: string): string {
+  return value.replace(
+    /&(amp|lt|gt|quot|apos);/g,
+    (_match, entity: string) => ({
+      amp: "&",
+      lt: "<",
+      gt: ">",
+      quot: '"',
+      apos: "'",
+    })[entity] ?? ""
+  );
 }

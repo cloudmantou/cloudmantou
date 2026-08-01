@@ -3,8 +3,7 @@ node_modules/
 coverage/
 dist/
 *.log
-.env
-.env*.local
+.env*
 !.env.example
 prisma/dev.db
 public/uploads/*
@@ -35,3 +34,4 @@ tsconfig.tsbuildinfo
 .editor-*.png
 home-*.png
 current-ui-preview*.png
+official-preview-*.png

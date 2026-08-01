@@ -5,6 +5,7 @@ import { cardVerifySchema } from "@/lib/validators/card";
 import { auth } from "@/lib/auth";
 import { verifyCardSecret, hashCardSecret, isLegacyHash } from "@/lib/card-crypto";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
+import { grantMembership } from "@/lib/membership-service";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -13,7 +14,11 @@ export async function POST(req: NextRequest) {
   }
 
   // 速率限制：每用户每 15 分钟最多 10 次卡密验证
-  const limited = await checkRateLimit(req, RATE_LIMITS.CARD_VERIFY, session.user.id);
+  const limited = await checkRateLimit(
+    req,
+    { ...RATE_LIMITS.CARD_VERIFY, scope: "card-verify" },
+    session.user.id
+  );
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);
@@ -93,28 +98,19 @@ export async function POST(req: NextRequest) {
       let benefit: { type: string; message: string } | null = null;
 
       if (card.type === "VIP_DAYS") {
-        const user = await tx.user.findUnique({ where: { id: userId } });
-        if (!user) throw new Error("用户不存在");
-
         const now = new Date();
-        const baseDate = user.vipExpireAt && user.vipExpireAt > now
-          ? user.vipExpireAt
-          : now;
-
-        const newExpire = new Date(baseDate);
-        newExpire.setDate(newExpire.getDate() + card.value);
-
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            vipLevel: Math.max(user.vipLevel, 1),
-            vipExpireAt: newExpire,
-          },
+        const membership = await grantMembership(tx, {
+          userId,
+          duration: { days: card.value },
+          level: 1,
+          now,
         });
 
         benefit = {
           type: "VIP",
-          message: `会员已延长 ${card.value} 天，新到期时间：${newExpire.toLocaleDateString("zh-CN")}`,
+          message: membership.expiresAt
+            ? `会员已延长 ${card.value} 天，新到期时间：${membership.expiresAt.toLocaleDateString("zh-CN")}`
+            : `会员已延长 ${card.value} 天，当前为长期会员`,
         };
       } else if (card.type === "PAID_ARTICLE") {
         const credits = Math.max(1, card.value);

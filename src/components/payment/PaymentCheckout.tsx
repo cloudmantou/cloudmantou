@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { Loader2, Smartphone, Monitor, X } from "lucide-react";
 import clsx from "clsx";
 import QRCode from "qrcode";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
 
 export type CheckoutOrder = {
   id: string;
@@ -31,16 +33,12 @@ function detectScene(): PaymentScene {
   return "pc";
 }
 
-function sceneText(scene: PaymentScene) {
-  if (scene === "pc") return "电脑网站支付 / 微信扫码";
-  if (scene === "wechat_inapp") return "微信内 · 仅支持支付宝";
-  return "手机 H5 支付";
-}
-
 const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
 
 export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   const router = useRouter();
+  const { locale, messages } = useOfficialI18n();
+  const copy = messages.payment;
   const { data: session, status: sessionStatus } = useSession();
   const [scene, setScene] = useState<PaymentScene>("pc");
   const [loading, setLoading] = useState<"ALIPAY" | "WECHAT" | null>(null);
@@ -51,6 +49,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
 
   const onPaidRef = useRef(onPaid);
   const onCloseRef = useRef(onClose);
+  const pollTimerRef = useRef<number | null>(null);
+  const pollSequenceRef = useRef(0);
   useEffect(() => {
     onPaidRef.current = onPaid;
   }, [onPaid]);
@@ -58,17 +58,39 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  const stopPolling = useCallback((updateState = true) => {
+    pollSequenceRef.current += 1;
+    if (pollTimerRef.current !== null) {
+      window.clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    if (updateState) setPolling(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      pollSequenceRef.current += 1;
+      if (pollTimerRef.current !== null) {
+        window.clearTimeout(pollTimerRef.current);
+      }
+    };
+  }, []);
+
   const finishPaid = useCallback(() => {
+    stopPolling();
     onPaidRef.current?.();
     onCloseRef.current();
     router.push(DASHBOARD_ORDERS_URL);
-  }, [router]);
+  }, [router, stopPolling]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      stopPolling();
+      return;
+    }
     if (sessionStatus === "unauthenticated") {
       onClose();
-      router.push(`/login?callbackUrl=${encodeURIComponent(DASHBOARD_ORDERS_URL)}`);
+      router.push(`${localizeOfficialPath("/login", locale)}?callbackUrl=${encodeURIComponent(DASHBOARD_ORDERS_URL)}`);
       return;
     }
     if (sessionStatus === "loading") return;
@@ -78,7 +100,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     setQrImage(null);
     setPolling(false);
     setLoading(null);
-  }, [open, order?.id, sessionStatus, onClose, router]);
+    return () => stopPolling(false);
+  }, [locale, open, order?.id, sessionStatus, onClose, router, stopPolling]);
 
   useEffect(() => {
     if (!qrUrl) {
@@ -99,6 +122,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   }, [qrUrl]);
 
   const pollStatus = useCallback(async (orderNo: string) => {
+    stopPolling(false);
+    const sequence = pollSequenceRef.current;
     setPolling(true);
     const started = Date.now();
     const tick = async () => {
@@ -110,22 +135,23 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
         });
         const res = await fetch(`/api/payment/status?orderNo=${encodeURIComponent(orderNo)}`);
         const data = await res.json();
-        if (data.data?.status === "PAID") {
-          setPolling(false);
+        if (pollSequenceRef.current !== sequence) return;
+        if (data.data?.status === "PAID" && !data.data?.deliveryPending) {
           finishPaid();
           return;
         }
       } catch {
         // ignore
       }
+      if (pollSequenceRef.current !== sequence) return;
       if (Date.now() - started < 5 * 60 * 1000) {
-        window.setTimeout(tick, 2500);
+        pollTimerRef.current = window.setTimeout(tick, 2500);
       } else {
-        setPolling(false);
+        stopPolling();
       }
     };
-    tick();
-  }, [finishPaid]);
+    void tick();
+  }, [finishPaid, stopPolling]);
 
   const launchPay = async (channel: "ALIPAY" | "WECHAT") => {
     if (!order) return;
@@ -140,7 +166,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
         body: JSON.stringify({ orderId: order.id, channel, scene }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "发起支付失败");
+      if (!res.ok) throw new Error(locale === "en" ? copy.startFailed : data.message || copy.startFailed);
 
       const payload = data.data;
 
@@ -151,8 +177,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
           body: JSON.stringify({ orderId: order.id }),
         });
         const testData = await testRes.json();
-        if (!testRes.ok) throw new Error(testData.message || "模拟支付失败");
-        finishPaid();
+        if (!testRes.ok) throw new Error(locale === "en" ? copy.simulateFailed : testData.message || copy.simulateFailed);
+        pollStatus(order.orderNo);
         return;
       }
 
@@ -179,9 +205,9 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
         return;
       }
 
-      throw new Error("未知支付响应");
+      throw new Error(copy.unknownResponse);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "支付失败");
+      setError(e instanceof Error ? e.message : copy.failed);
     } finally {
       setLoading(null);
     }
@@ -192,15 +218,15 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   if (!open || !order || sessionStatus !== "authenticated" || !session) return null;
 
   return (
-    <div className="payment-checkout-overlay" role="dialog" aria-modal="true" aria-label="收银台">
-      <button type="button" className="payment-checkout-backdrop" onClick={onClose} aria-label="关闭" />
+    <div className="payment-checkout-overlay" role="dialog" aria-modal="true" aria-label={copy.checkout}>
+      <button type="button" className="payment-checkout-backdrop" onClick={onClose} aria-label={copy.close} />
       <div className="payment-checkout-modal">
         <div className="payment-checkout-header">
           <div>
-            <div className="payment-checkout-title">收银台</div>
-            <div className="payment-checkout-sub">{sceneText(scene)}</div>
+            <div className="payment-checkout-title">{copy.checkout}</div>
+            <div className="payment-checkout-sub">{scene === "pc" ? copy.scenes.pc : scene === "wechat_inapp" ? copy.scenes.wechat : copy.scenes.h5}</div>
           </div>
-          <button type="button" className="payment-checkout-close" onClick={onClose} aria-label="关闭">
+          <button type="button" className="payment-checkout-close" onClick={onClose} aria-label={copy.close}>
             <X size={18} />
           </button>
         </div>
@@ -211,7 +237,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             <span>¥</span>
             {order.amount.toFixed(2)}
           </div>
-          <div className="payment-checkout-meta">订单号 {order.orderNo}</div>
+          <div className="payment-checkout-meta">{interpolateMessage(copy.orderNo, { orderNo: order.orderNo })}</div>
         </div>
 
         <div className="payment-checkout-scene">
@@ -221,7 +247,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             onClick={() => setScene("pc")}
           >
             <Monitor size={14} />
-            电脑
+            {copy.desktop}
           </button>
           <button
             type="button"
@@ -229,22 +255,22 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             onClick={() => setScene("h5")}
           >
             <Smartphone size={14} />
-            手机 H5
+            {copy.mobileH5}
           </button>
           <button
             type="button"
             className={clsx("payment-scene-btn", scene === "wechat_inapp" && "active")}
             onClick={() => setScene("wechat_inapp")}
           >
-            微信内
+            {copy.wechatInApp}
           </button>
         </div>
 
         {qrImage ? (
           <div className="payment-checkout-qr">
-            <img src={qrImage} alt="微信支付二维码" width={220} height={220} />
-            <p>请使用微信扫一扫完成支付</p>
-            {polling ? <span className="payment-checkout-polling">等待支付结果…</span> : null}
+            <img src={qrImage} alt={copy.qrAlt} width={220} height={220} />
+            <p>{copy.qrPrompt}</p>
+            {polling ? <span className="payment-checkout-polling">{copy.waiting}</span> : null}
           </div>
         ) : (
           <div className="payment-checkout-actions">
@@ -255,19 +281,19 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
               onClick={() => launchPay("ALIPAY")}
             >
               {loading === "ALIPAY" ? <Loader2 size={16} className="animate-spin" /> : <span>支</span>}
-              支付宝
-              <small>{scene === "pc" ? "电脑网站" : "H5"}</small>
+              {copy.alipay}
+              <small>{scene === "pc" ? copy.desktopWeb : copy.h5}</small>
             </button>
             <button
               type="button"
               className="payment-channel-btn wechat"
               disabled={!!loading || wechatDisabled}
-              title={wechatDisabled ? "微信内需 JSAPI，请使用支付宝" : undefined}
+              title={wechatDisabled ? copy.wechatUnavailableTitle : undefined}
               onClick={() => launchPay("WECHAT")}
             >
               {loading === "WECHAT" ? <Loader2 size={16} className="animate-spin" /> : <span>微</span>}
-              微信支付
-              <small>{wechatDisabled ? "不可用" : scene === "pc" ? "扫码" : "H5"}</small>
+              {copy.wechatPay}
+              <small>{wechatDisabled ? copy.unavailable : scene === "pc" ? copy.scan : copy.h5}</small>
             </button>
           </div>
         )}

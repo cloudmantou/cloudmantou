@@ -1,12 +1,11 @@
 import type { PaymentChannel } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
-const MAX_RAW_BODY = 65_536;
-
-function truncateRaw(raw?: string): string | null {
+function summarizeRaw(raw?: string): string | null {
   if (!raw) return null;
-  if (raw.length <= MAX_RAW_BODY) return raw;
-  return `${raw.slice(0, MAX_RAW_BODY)}...[truncated]`;
+  const digest = createHash("sha256").update(raw, "utf8").digest("hex");
+  return `sha256:${digest};bytes:${Buffer.byteLength(raw, "utf8")}`;
 }
 
 export type PaymentNotifyAuditInput = {
@@ -28,7 +27,10 @@ export async function recordPaymentNotifyAudit(
         orderNo: input.orderNo?.slice(0, 64) ?? null,
         status: input.status.slice(0, 64),
         reason: input.reason?.slice(0, 500) ?? null,
-        rawBody: truncateRaw(input.rawBody),
+        // Failure audits are public-input metadata. The verified callback is
+        // retained separately on Payment; keeping raw failed bodies here would
+        // retain attacker-controlled PII and enable cheap database-fill abuse.
+        rawBody: summarizeRaw(input.rawBody),
       },
     });
   } catch (error) {

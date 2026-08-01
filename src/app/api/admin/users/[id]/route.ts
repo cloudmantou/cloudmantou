@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import { auditAdminAction } from "@/lib/admin-audit-log";
+import { setMembership } from "@/lib/membership-service";
 
 // 不允许把任何人提升为 ADMIN（包括自己）；也不允许修改自己。
 // 调用方是 EDITOR 时只能改 vipLevel（虽然 EDITOR 当前不通过 requireAdmin，
@@ -40,26 +41,34 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return fail("不能修改其他管理员", 40900, 409);
     }
 
-    // 仅当有值时才更新对应字段
-    const data: { role?: "USER" | "EDITOR"; vipLevel?: number; vipExpireAt?: Date | null } = {};
-    if (parsed.data.role !== undefined) data.role = parsed.data.role;
-    if (parsed.data.vipLevel !== undefined) {
-      data.vipLevel = parsed.data.vipLevel;
-      // VIP 升降同时设置 30 天有效期；0 表示免费（清空过期时间）
-      data.vipExpireAt = parsed.data.vipLevel > 0
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        : null;
-    }
-
-    const updated = await prisma.user.update({
-      where: { id },
-      data,
+    const vipExpireAt = parsed.data.vipLevel && parsed.data.vipLevel > 0
+      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      : null;
+    const updated = await prisma.$transaction(async (tx) => {
+      if (parsed.data.role !== undefined) {
+        await tx.user.update({
+          where: { id },
+          data: { role: parsed.data.role },
+        });
+      }
+      if (parsed.data.vipLevel !== undefined) {
+        await setMembership(tx, {
+          userId: id,
+          level: parsed.data.vipLevel,
+          expiresAt: vipExpireAt,
+        });
+      }
+      return tx.user.findUniqueOrThrow({ where: { id } });
     });
 
     await auditAdminAction(req, session.user.id, "user.update", {
       targetType: "user",
       targetId: id,
-      detail: JSON.stringify(data),
+      detail: JSON.stringify({
+        role: parsed.data.role,
+        vipLevel: parsed.data.vipLevel,
+        vipExpireAt,
+      }),
     });
 
     return ok({

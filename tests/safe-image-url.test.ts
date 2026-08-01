@@ -50,8 +50,19 @@ describe("resolveUploadRoot", () => {
   });
 
   it("allows default public/uploads under cwd", () => {
-    const root = resolveUploadRoot();
-    expect(root).toBe(path.resolve(process.cwd(), "public", "uploads"));
+    const configuredRoot = process.env.UPLOAD_DIR;
+    delete process.env.UPLOAD_DIR;
+
+    try {
+      const root = resolveUploadRoot();
+      expect(root).toBe(path.resolve(process.cwd(), "public", "uploads"));
+    } finally {
+      if (configuredRoot === undefined) {
+        delete process.env.UPLOAD_DIR;
+      } else {
+        process.env.UPLOAD_DIR = configuredRoot;
+      }
+    }
   });
 });
 

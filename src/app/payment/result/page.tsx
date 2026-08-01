@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
 
 const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
 
@@ -18,6 +20,8 @@ function collectAlipayReturnParams(searchParams: URLSearchParams) {
 
 function PaymentResultInner() {
   const router = useRouter();
+  const { locale, messages } = useOfficialI18n();
+  const copy = messages.payment.result;
   const searchParams = useSearchParams();
   const orderNo = searchParams.get("orderNo") || "";
   const returnParams = useMemo(
@@ -54,18 +58,22 @@ function PaymentResultInner() {
         }
         setTitle(data.data?.title || "");
         setAmount(data.data?.amount ?? null);
-        if (data.data?.status === "PAID") {
+        if (data.data?.status === "PAID" && !data.data?.deliveryPending) {
           setStatus("paid");
           setHint("");
           return;
         }
         if (Date.now() - started < 180_000) {
           setStatus("pending");
-          setHint("正在向支付宝确认支付结果，本地测试无公网回调时会自动查单…");
+          setHint(
+            data.data?.deliveryPending
+              ? copy.deliveryPending
+              : copy.confirmingProvider
+          );
           window.setTimeout(check, 2000);
         } else {
           setStatus("pending");
-          setHint("若支付宝已扣款但状态未更新，请稍后刷新或联系管理员手动查单。");
+          setHint(copy.delayed);
         }
       } catch {
         if (!cancelled) setStatus("error");
@@ -76,7 +84,7 @@ function PaymentResultInner() {
     return () => {
       cancelled = true;
     };
-  }, [orderNo, returnParams]);
+  }, [copy.confirmingProvider, copy.delayed, copy.deliveryPending, orderNo, returnParams]);
 
   useEffect(() => {
     if (status !== "paid") return;
@@ -92,22 +100,22 @@ function PaymentResultInner() {
         {status === "loading" ? (
           <>
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
-            <h1>正在确认支付结果</h1>
-            <p>订单号 {orderNo}</p>
+            <h1>{copy.confirming}</h1>
+            <p>{interpolateMessage(messages.payment.orderNo, { orderNo })}</p>
           </>
         ) : null}
 
         {status === "paid" ? (
           <>
             <CheckCircle2 size={40} style={{ color: "var(--teal)" }} />
-            <h1>支付成功</h1>
+            <h1>{copy.success}</h1>
             <p>{title}</p>
             {amount != null ? <div className="payment-result-amount">¥{amount.toFixed(2)}</div> : null}
             <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0 0" }}>
-              正在跳转到会员中心订单页…
+              {copy.redirecting}
             </p>
             <Link href={DASHBOARD_ORDERS_URL} className="payment-result-link">
-              查看我的订单
+              {copy.viewOrders}
             </Link>
           </>
         ) : null}
@@ -115,17 +123,17 @@ function PaymentResultInner() {
         {status === "pending" ? (
           <>
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--orange)" }} />
-            <h1>支付处理中</h1>
-            <p>{hint || "若已完成支付，请稍候或返回首页查看会员状态。"}</p>
-            <Link href="/" className="payment-result-link">返回首页</Link>
+            <h1>{copy.processing}</h1>
+            <p>{hint || copy.pendingFallback}</p>
+            <Link href={localizeOfficialPath("/", locale)} className="payment-result-link">{copy.home}</Link>
           </>
         ) : null}
 
         {status === "error" ? (
           <>
             <XCircle size={40} style={{ color: "var(--rose)" }} />
-            <h1>无法查询订单</h1>
-            <Link href="/" className="payment-result-link">返回首页</Link>
+            <h1>{copy.queryFailed}</h1>
+            <Link href={localizeOfficialPath("/", locale)} className="payment-result-link">{copy.home}</Link>
           </>
         ) : null}
       </div>

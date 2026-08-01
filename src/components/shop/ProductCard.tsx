@@ -1,6 +1,10 @@
+"use client";
+
 import { CreditCard, Info, ShoppingCart } from "lucide-react";
 import clsx from "clsx";
 import type { Product } from "@/types";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { interpolateMessage } from "@/i18n/official";
 
 type ProductCardProps = {
   product: Product;
@@ -11,6 +15,8 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSelect }: ProductCardProps) {
+  const { messages } = useOfficialI18n();
+  const copy = messages.product;
   const showDetail = product.category === "card" || Boolean(product.intro);
 
   const openDetail = () => {
@@ -27,7 +33,7 @@ export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSele
         className="product-card-hit"
         onClick={openDetail}
         disabled={!showDetail}
-        aria-label={showDetail ? `查看 ${product.name} 详情` : undefined}
+        aria-label={showDetail ? interpolateMessage(copy.viewDetails, { name: product.name }) : undefined}
       >
         <div className="product-cover" style={{ backgroundImage: product.cover }}>
           <span className={clsx("product-badge", `badge-${product.accent}`)}>{product.badge}</span>
@@ -38,7 +44,7 @@ export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSele
           <p>{product.description}</p>
           <div className="product-row">
             <strong>{product.price}</strong>
-            <span className={product.stock <= 20 ? "stock-low" : undefined}>库存 {product.stock}</span>
+            <span className={product.stock <= 20 ? "stock-low" : undefined}>{interpolateMessage(copy.stock, { count: product.stock })}</span>
           </div>
         </div>
       </button>
@@ -47,7 +53,7 @@ export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSele
         {showDetail ? (
           <button type="button" className="product-detail-btn" onClick={openDetail}>
             <Info size={14} aria-hidden="true" />
-            查看介绍
+            {copy.introduction}
           </button>
         ) : null}
         <button
@@ -59,7 +65,7 @@ export function ProductCard({ product, index = 0, loggedIn = true, onBuy, onSele
           }}
         >
           <ShoppingCart size={14} aria-hidden="true" />
-          {loggedIn ? "立即购买" : "登录购买"}
+          {loggedIn ? copy.buyNow : copy.loginToBuy}
         </button>
       </div>
     </article>

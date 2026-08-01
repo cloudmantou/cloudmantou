@@ -1,6 +1,6 @@
 # CloudMantou 技术设计
 
-CloudMantou 按照 StarBlog 的思路设计为个人博客 + 会员付费 + 自动卡密交付平台。当前仓库先落地可运行的 Next.js 14 工程骨架、Prisma 数据模型、API 响应规范和参考样式前端。
+CloudMantou 按照 StarBlog 的思路设计为个人博客 + 会员付费 + 自动卡密交付平台。当前仓库使用 Next.js 16 工程骨架、Prisma 数据模型、API 响应规范和参考样式前端。
 
 ## 产品边界
 
@@ -20,7 +20,7 @@ CloudMantou 按照 StarBlog 的思路设计为个人博客 + 会员付费 + 自�
 
 ## 技术栈
 
-- Next.js 14 App Router
+- Next.js 16 App Router
 - React 18 + TypeScript
 - Prisma ORM + MySQL
 - Zod 输入校验

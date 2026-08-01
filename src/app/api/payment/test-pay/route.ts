@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
-import { grantEntitlement } from "@/lib/payment";
+import { finalizePaidOrder } from "@/lib/payment";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 
 const schema = z.object({
@@ -40,31 +40,19 @@ export async function POST(req: NextRequest) {
     if (order.status === "PAID") {
       return ok({ paid: true, orderNo: order.orderNo });
     }
+    if (order.status !== "PENDING") {
+      return fail("订单状态不允许模拟支付", 40900, 409);
+    }
 
-    await prisma.$transaction(async (tx) => {
-      const updated = await tx.order.updateMany({
-        where: { id: order.id, status: "PENDING" },
-        data: { status: "PAID", paidAt: new Date() },
-      });
-      if (updated.count === 0) return;
-
-      const paymentData = {
-        orderId: order.id,
-        channel: (order.payment?.channel || "ALIPAY") as "ALIPAY" | "WECHAT",
-        amount: order.amount,
-        tradeNo: `TEST${Date.now()}`,
-        status: "SUCCESS" as const,
-        rawCallback: JSON.stringify({ test: true }),
-      };
-
-      if (order.payment) {
-        await tx.payment.update({ where: { orderId: order.id }, data: paymentData });
-      } else {
-        await tx.payment.create({ data: paymentData });
-      }
-
-      await grantEntitlement(tx, order);
+    const finalized = await finalizePaidOrder({
+      order,
+      channel: order.payment?.channel === "WECHAT" ? "WECHAT" : "ALIPAY",
+      tradeNo: `TEST${Date.now()}`,
+      rawCallback: JSON.stringify({ test: true }),
     });
+    if (!finalized) {
+      return fail("订单状态已变化，请刷新后重试", 40900, 409);
+    }
 
     return ok({ paid: true, orderNo: order.orderNo });
   } catch (error) {

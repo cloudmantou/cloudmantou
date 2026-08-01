@@ -1,9 +1,11 @@
 "use client";
 
 import { Suspense, type ReactNode } from "react";
+import { isOfficialSite } from "@/config/site";
+import { OfficialShell } from "@/components/official/OfficialShell";
 import { PlatformSidebar } from "@/components/layout/PlatformSidebar";
 
-function MarketingChrome({ children }: { children: ReactNode }) {
+function BlogMarketingChrome({ children }: { children: ReactNode }) {
   return (
     <PlatformSidebar mode="routes" mainClassName="marketing-main">
       <div className="marketing-content-shell">{children}</div>
@@ -11,18 +13,20 @@ function MarketingChrome({ children }: { children: ReactNode }) {
   );
 }
 
+function OfficialMarketingChrome({ children }: { children: ReactNode }) {
+  return <OfficialShell>{children}</OfficialShell>;
+}
+
 /**
  * MarketingShell —— 营销/内容页通用骨架
- *
- * 与 PlatformShell 共用左侧导航，用于：
- *   - /post/[slug]  文章详情
- *   - /category/[slug]  分类列表
- *   - /dashboard  会员中心
+ * 官网模式使用顶栏布局；博客模式保留左侧导航。
  */
 export function MarketingShell({ children }: { children: ReactNode }) {
+  const Chrome = isOfficialSite ? OfficialMarketingChrome : BlogMarketingChrome;
+
   return (
     <Suspense fallback={null}>
-      <MarketingChrome>{children}</MarketingChrome>
+      <Chrome>{children}</Chrome>
     </Suspense>
   );
 }

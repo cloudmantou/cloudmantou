@@ -123,6 +123,20 @@ describe("rateLimit — 窗口过期后计数器重置", () => {
 });
 
 describe("checkRateLimit — 返回 429 响应", () => {
+  it("isolates rate-limit buckets by endpoint for the same authenticated user", async () => {
+    const userId = uniqueId("scoped-user");
+    const firstEndpoint = new NextRequest("http://localhost/api/admin/vault/verify");
+    const secondEndpoint = new NextRequest("http://localhost/api/posts/example/like");
+    const baseConfig = { limit: 1, windowMs: 60_000 };
+
+    expect(
+      await checkRateLimit(firstEndpoint, { ...baseConfig, scope: "vault-verify" }, userId)
+    ).toBeNull();
+    expect(
+      await checkRateLimit(secondEndpoint, { ...baseConfig, scope: "post-like" }, userId)
+    ).toBeNull();
+  });
+
   it("超限时返回 429 状态码和 Retry-After 头", async () => {
     const id = uniqueId("checkrl");
     const req = new NextRequest("http://localhost/api/test", {

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail } from "@/lib/api-response";
 import { expireStalePendingOrders } from "@/lib/order-lifecycle";
+import { retryPendingCardDeliveries } from "@/lib/card-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ function readCronSecret(req: NextRequest): string | null {
   if (header?.startsWith("Bearer ")) {
     return header.slice(7).trim() || null;
   }
-  return req.nextUrl.searchParams.get("secret")?.trim() || null;
+  return null;
 }
 
 export async function GET(req: NextRequest) {
@@ -25,7 +26,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const expired = await expireStalePendingOrders();
-    return ok({ expired });
+    const cardDeliveries = await retryPendingCardDeliveries();
+    return ok({ expired, cardDeliveries });
   } catch (error) {
     console.error("[Cron Expire Orders Error]", error);
     return fail("清理过期订单失败", 50000, 500);

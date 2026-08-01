@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Github, Link2, Mail, MessageCircle, QrCode, Send, X } from "lucide-react";
 import { extractEmailFromHref, type ContactLink, type ContactLinkKind } from "@/lib/contact-links";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { interpolateMessage } from "@/i18n/official";
 
 const kindIcons: Record<ContactLinkKind, typeof Mail> = {
   wechat_official: QrCode,
@@ -15,6 +17,8 @@ const kindIcons: Record<ContactLinkKind, typeof Mail> = {
 };
 
 export function ContactLinksRow() {
+  const { messages } = useOfficialI18n();
+  const copy = messages.contact;
   const [links, setLinks] = useState<ContactLink[]>([]);
   const [activeQr, setActiveQr] = useState<ContactLink | null>(null);
   const [copyHint, setCopyHint] = useState<string | null>(null);
@@ -32,9 +36,9 @@ export function ContactLinksRow() {
 
     try {
       await navigator.clipboard.writeText(email);
-      showCopyHint(`已复制 ${email}`);
+      showCopyHint(interpolateMessage(copy.copied, { value: email }));
     } catch {
-      showCopyHint("复制失败，请手动复制");
+      showCopyHint(copy.copyFailed);
     }
   };
 
@@ -96,8 +100,8 @@ export function ContactLinksRow() {
                   key={link.id}
                   type="button"
                   className="social-link"
-                  aria-label={`复制${link.label}`}
-                  title={email ? `点击复制：${email}` : link.label}
+                  aria-label={interpolateMessage(copy.copy, { name: link.label })}
+                  title={email ? interpolateMessage(copy.copyTitle, { value: email }) : link.label}
                   onClick={() => copyEmail(link.href!)}
                 >
                   {content}
@@ -135,14 +139,14 @@ export function ContactLinksRow() {
           <button
             type="button"
             className="contact-qr-backdrop"
-            aria-label="关闭"
+            aria-label={copy.close}
             onClick={() => setActiveQr(null)}
           />
           <div className="contact-qr-card">
             <button
               type="button"
               className="contact-qr-close"
-              aria-label="关闭"
+              aria-label={copy.close}
               onClick={() => setActiveQr(null)}
             >
               <X size={16} />
@@ -150,7 +154,7 @@ export function ContactLinksRow() {
             <p className="contact-qr-title">{activeQr.label}</p>
             <Image
               src={activeQr.qrImageUrl}
-              alt={`${activeQr.label}二维码`}
+              alt={interpolateMessage(copy.qrAlt, { name: activeQr.label })}
               width={220}
               height={220}
               className="contact-qr-image"
@@ -164,7 +168,7 @@ export function ContactLinksRow() {
                   ? { target: "_blank", rel: "noopener noreferrer" }
                   : {})}
               >
-                打开链接
+                {copy.open}
               </a>
             ) : null}
           </div>

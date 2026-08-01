@@ -1,3 +1,4 @@
+import { isOfficialSite } from "@/config/site";
 import {
   buildBlogJsonLd,
   buildSoftwareApplicationJsonLd,
@@ -13,9 +14,9 @@ type Props = {
 
 export function JsonLd({ ctx, extra = [], nonce }: Props) {
   const graphs = [
-    buildBlogJsonLd(ctx),
     buildWebSiteJsonLd(ctx),
     buildSoftwareApplicationJsonLd(ctx),
+    ...(isOfficialSite ? [] : [buildBlogJsonLd(ctx)]),
     ...extra,
   ];
 

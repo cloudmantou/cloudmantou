@@ -102,4 +102,28 @@ describe("isAllowedAdminMutationOrigin", () => {
     });
     expect(isAllowedAdminMutationOrigin(req)).toBe(false);
   });
+
+  it("拒绝主机名相同但协议不同的 Origin", () => {
+    process.env.AUTH_URL = "https://example.com";
+    const req = new NextRequest("https://example.com/api/admin/settings", {
+      method: "PUT",
+      headers: {
+        origin: "http://example.com",
+        host: "example.com",
+      },
+    });
+    expect(isAllowedAdminMutationOrigin(req)).toBe(false);
+  });
+
+  it("拒绝主机名相同但端口不同的 Origin", () => {
+    process.env.AUTH_URL = "https://example.com";
+    const req = new NextRequest("https://example.com/api/admin/settings", {
+      method: "PUT",
+      headers: {
+        origin: "https://example.com:4444",
+        host: "example.com",
+      },
+    });
+    expect(isAllowedAdminMutationOrigin(req)).toBe(false);
+  });
 });
