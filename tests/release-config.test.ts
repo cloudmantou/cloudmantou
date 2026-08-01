@@ -136,8 +136,9 @@ describe("release configuration", () => {
       vite: "6.4.3",
     };
 
-    expect(workspace).toContain("postcss: 8.5.25");
-    expect(workspace).toContain("sharp: 0.35.3");
+    for (const [dependency, version] of Object.entries(expectedOverrides)) {
+      expect(workspace).toContain(`${dependency}: ${version}`);
+    }
     expect(packageJson.pnpm?.overrides).toEqual(expectedOverrides);
   });
 
