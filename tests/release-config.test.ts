@@ -126,9 +126,19 @@ describe("release configuration", () => {
 
   it("overrides vulnerable transitive image and CSS processors", () => {
     const workspace = readProjectFile("pnpm-workspace.yaml");
+    const packageJson = JSON.parse(readProjectFile("package.json")) as {
+      pnpm?: { overrides?: Record<string, string> };
+    };
+    const expectedOverrides = {
+      postcss: "8.5.25",
+      sharp: "0.35.3",
+      esbuild: "0.25.12",
+      vite: "6.4.3",
+    };
 
     expect(workspace).toContain("postcss: 8.5.25");
     expect(workspace).toContain("sharp: 0.35.3");
+    expect(packageJson.pnpm?.overrides).toEqual(expectedOverrides);
   });
 
   it("supports a git-pull, build, and npm-run-start deployment", () => {
