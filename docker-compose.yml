@@ -2,22 +2,39 @@ services:
   app:
     build:
       context: .
-      args:
-        SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-build-time-placeholder-32chars-min}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # 默认仅供宿主机反向代理访问；不要在信任代理头时把 3000 直连公网。
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:3000:3000"
     environment:
-      DATABASE_URL: mysql://root:${DB_ROOT_PASSWORD:-cm_strong_db_2026}@mysql:3306/cloudmantou
+      # 使用完整、已 URL 编码的连接串，避免强密码中的 @/:/# 破坏 URI。
+      DATABASE_URL: ${APP_DATABASE_URL:?APP_DATABASE_URL is required}
       REDIS_URL: redis://redis:6379
-      AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
-      SITE_URL: ${SITE_URL:-http://localhost:3000}
-      CARD_SECRET_SALT: ${CARD_SECRET_SALT}
+      RATE_LIMIT_REQUIRE_REDIS: ${RATE_LIMIT_REQUIRE_REDIS:-true}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_URL: ${AUTH_URL:?AUTH_URL is required}
+      SITE_URL: ${SITE_URL:?SITE_URL is required}
+      INTERNAL_SITE_URL: ${INTERNAL_SITE_URL:-http://127.0.0.1:3000}
+      CARD_SECRET_SALT: ${CARD_SECRET_SALT:?CARD_SECRET_SALT is required}
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
       SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:?SETTINGS_ENCRYPTION_KEY is required}
-      CRON_SECRET: ${CRON_SECRET:-}
+      CRON_SECRET: ${CRON_SECRET:?CRON_SECRET is required}
       PAYMENT_TEST_MODE: ${PAYMENT_TEST_MODE:-false}
+      # 支付材料只在容器运行时注入，不进入镜像层或 Git。
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
+      ALIPAY_PUBLIC_KEY: ${ALIPAY_PUBLIC_KEY:-}
+      ALIPAY_SELLER_ID: ${ALIPAY_SELLER_ID:-}
+      ALIPAY_ENV: ${ALIPAY_ENV:-}
+      ALIPAY_SANDBOX_GATEWAY: ${ALIPAY_SANDBOX_GATEWAY:-}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL:-}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_MCH_ID: ${WECHAT_MCH_ID:-}
+      WECHAT_API_KEY: ${WECHAT_API_KEY:-}
+      WECHAT_API_V3_KEY: ${WECHAT_API_V3_KEY:-}
+      WECHAT_V3_PUBLIC_KEY: ${WECHAT_V3_PUBLIC_KEY:-}
+      WECHAT_V3_PLATFORM_SERIAL: ${WECHAT_V3_PLATFORM_SERIAL:-}
+      WECHAT_NOTIFY_URL: ${WECHAT_NOTIFY_URL:-}
       NODE_ENV: production
     volumes:
       - uploads_data:/app/public/uploads
@@ -31,8 +48,10 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-cm_strong_db_2026}
-      MYSQL_DATABASE: cloudmantou
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${DB_NAME:-cloudmantou}
+      MYSQL_USER: ${DB_USER:?DB_USER is required}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     # 不暴露 3306 端口到宿主机，仅容器内网可访问
     # 如需本地调试数据库，请通过 SSH 隧道或临时开启端口
     expose:
@@ -40,7 +59,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_ROOT_PASSWORD:-cm_strong_db_2026}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\""]
       interval: 10s
       timeout: 5s
       retries: 6

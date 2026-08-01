@@ -4,9 +4,13 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { localizeOfficialPath } from "@/i18n/official";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { locale, messages } = useOfficialI18n();
+  const copy = messages.auth;
   const [form, setForm] = useState({
     email: "",
     username: "",
@@ -26,7 +30,7 @@ export default function RegisterPage() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("两次密码输入不一致");
+      setError(copy.passwordMismatch);
       return;
     }
 
@@ -47,7 +51,7 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "注册失败");
+        setError(locale === "en" ? copy.registerFailed : data.message || copy.registerFailed);
         return;
       }
 
@@ -59,13 +63,13 @@ export default function RegisterPage() {
       });
 
       if (signInResult?.error) {
-        router.push("/login");
+        router.push(localizeOfficialPath("/login", locale));
       } else {
-        router.push("/");
+        router.push(localizeOfficialPath("/", locale));
         router.refresh();
       }
     } catch {
-      setError("注册失败，请稍后重试");
+      setError(copy.registerFailed);
     } finally {
       setLoading(false);
     }
@@ -73,89 +77,89 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-card">
-      <h2 className="auth-title">注册</h2>
+      <h2 className="auth-title">{copy.register}</h2>
 
       {error && <div className="auth-error">{error}</div>}
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-field">
-          <label htmlFor="email">邮箱</label>
+          <label htmlFor="email">{copy.email}</label>
           <input
             id="email"
             name="email"
             type="email"
             value={form.email}
             onChange={handleChange}
-            placeholder="请输入邮箱"
+            placeholder={copy.emailPlaceholder}
             required
             autoComplete="email"
           />
         </div>
 
         <div className="auth-field">
-          <label htmlFor="username">用户名</label>
+          <label htmlFor="username">{copy.username}</label>
           <input
             id="username"
             name="username"
             type="text"
             value={form.username}
             onChange={handleChange}
-            placeholder="2-20个字符"
+            placeholder={copy.usernamePlaceholder}
             required
             autoComplete="username"
           />
         </div>
 
         <div className="auth-field">
-          <label htmlFor="nickname">昵称（可选）</label>
+          <label htmlFor="nickname">{copy.nickname}</label>
           <input
             id="nickname"
             name="nickname"
             type="text"
             value={form.nickname}
             onChange={handleChange}
-            placeholder="默认使用用户名"
+            placeholder={copy.nicknamePlaceholder}
             autoComplete="nickname"
           />
         </div>
 
         <div className="auth-field">
-          <label htmlFor="password">密码</label>
+          <label htmlFor="password">{copy.password}</label>
           <input
             id="password"
             name="password"
             type="password"
             value={form.password}
             onChange={handleChange}
-            placeholder="至少6个字符"
+            placeholder={copy.newPasswordPlaceholder}
             required
             autoComplete="new-password"
           />
         </div>
 
         <div className="auth-field">
-          <label htmlFor="confirmPassword">确认密码</label>
+          <label htmlFor="confirmPassword">{copy.confirmPassword}</label>
           <input
             id="confirmPassword"
             name="confirmPassword"
             type="password"
             value={form.confirmPassword}
             onChange={handleChange}
-            placeholder="再次输入密码"
+            placeholder={copy.confirmPasswordPlaceholder}
             required
             autoComplete="new-password"
           />
         </div>
 
         <button type="submit" className="auth-btn" disabled={loading}>
-          {loading ? "注册中..." : "注册"}
+          {loading ? copy.registering : copy.register}
         </button>
       </form>
 
       <p className="auth-footer">
-        已有账号？
-        <Link href="/login" className="auth-link">
-          立即登录
+        {copy.hasAccount}
+        <Link href={localizeOfficialPath("/login", locale)} className="auth-link">
+          {copy.loginNow}
         </Link>
       </p>
     </div>

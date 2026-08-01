@@ -1,5 +1,5 @@
 /**
- * 本地验证支付宝沙箱：签名 + 网关连通性（不经过浏览器）
+ * 验证当前支付宝环境：签名 + 网关连通性（不经过浏览器）
  * 用法: node scripts/test-alipay-sandbox.mjs
  */
 import crypto from "crypto";
@@ -54,9 +54,11 @@ function signAlipay(params, privateKeyPem) {
 
 const appId = process.env.ALIPAY_APP_ID;
 const privateKeyRaw = process.env.ALIPAY_PRIVATE_KEY;
-const gateway =
-  process.env.ALIPAY_SANDBOX_GATEWAY ||
-  "https://openapi-sandbox.dl.alipaydev.com/gateway.do";
+const isProduction = process.env.ALIPAY_ENV?.trim() === "production";
+const gateway = isProduction
+  ? "https://openapi.alipay.com/gateway.do"
+  : process.env.ALIPAY_SANDBOX_GATEWAY ||
+    "https://openapi-sandbox.dl.alipaydev.com/gateway.do";
 
 if (!appId || !privateKeyRaw) {
   console.error("缺少 ALIPAY_APP_ID / ALIPAY_PRIVATE_KEY，请先写入 .env.local");
@@ -68,7 +70,7 @@ const orderNo = `TEST${Date.now()}`;
 const bizContent = JSON.stringify({
   out_trade_no: orderNo,
   total_amount: "0.01",
-  subject: "CloudMantou 沙箱测试",
+  subject: `CloudMantou ${isProduction ? "生产" : "沙箱"}连通性测试`,
   product_code: "FAST_INSTANT_TRADE_PAY",
 });
 
@@ -102,10 +104,11 @@ const res = await fetch(gateway, {
 });
 
 console.log("网关:", gateway);
+console.log("环境:", isProduction ? "production" : "sandbox");
 console.log("HTTP 状态:", res.status);
 const text = await res.text();
 if (res.status === 302 || text.includes("alipay") || text.includes("<form")) {
-  console.log("✓ 沙箱网关接受请求（可跳转收银台）");
+  console.log("✓ 支付宝网关接受请求（可跳转收银台）");
 } else if (text.includes("invalid-signature") || text.includes("验签")) {
   console.error("✗ 支付宝返回验签失败，请检查应用私钥是否与沙箱应用匹配");
   console.log(text.slice(0, 500));

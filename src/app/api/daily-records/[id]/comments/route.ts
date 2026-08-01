@@ -84,7 +84,11 @@ export async function POST(
       return fail("请先登录", 40100, 401);
     }
 
-    const limited = await checkRateLimit(req, RATE_LIMITS.COMMENT, session.user.id);
+    const limited = await checkRateLimit(
+      req,
+      { ...RATE_LIMITS.COMMENT, scope: "daily-comment" },
+      session.user.id
+    );
     if (limited) return limited;
 
     const record = await prisma.dailyRecord.findUnique({

@@ -4,16 +4,20 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { localizeOfficialPath } from "@/i18n/official";
 
 function LoginForm() {
   const router = useRouter();
+  const { locale, messages } = useOfficialI18n();
+  const copy = messages.auth;
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = searchParams.get("callbackUrl") || localizeOfficialPath("/", locale);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +33,12 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "用户名或密码错误" : "登录失败，请稍后重试");
+        setError(result.error === "CredentialsSignin" ? copy.credentialsInvalid : copy.loginFailed);
         return;
       }
 
       if (!result?.ok) {
-        setError("登录失败，请稍后重试");
+        setError(copy.loginFailed);
         return;
       }
 
@@ -42,7 +46,7 @@ function LoginForm() {
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
-      setError(message.includes("频繁") ? message : "登录失败，请稍后重试");
+      setError(locale === "zh" && message.includes("频繁") ? message : copy.loginFailed);
     } finally {
       setLoading(false);
     }
@@ -50,13 +54,13 @@ function LoginForm() {
 
   return (
     <div className="auth-card">
-      <h2 className="auth-title">登录</h2>
+      <h2 className="auth-title">{copy.login}</h2>
 
       {error && <div className="auth-error">{error}</div>}
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-field">
-          <label htmlFor="email">用户名或邮箱</label>
+          <label htmlFor="email">{copy.usernameOrEmail}</label>
           <input
             id="email"
             type="text"
@@ -69,27 +73,27 @@ function LoginForm() {
         </div>
 
         <div className="auth-field">
-          <label htmlFor="password">密码</label>
+          <label htmlFor="password">{copy.password}</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="请输入密码"
+            placeholder={copy.passwordPlaceholder}
             required
             autoComplete="current-password"
           />
         </div>
 
         <button type="submit" className="auth-btn" disabled={loading}>
-          {loading ? "登录中..." : "登录"}
+          {loading ? copy.loggingIn : copy.login}
         </button>
       </form>
 
       <p className="auth-footer">
-        还没有账号？
-        <Link href="/register" className="auth-link">
-          立即注册
+        {copy.noAccount}
+        <Link href={localizeOfficialPath("/register", locale)} className="auth-link">
+          {copy.registerNow}
         </Link>
       </p>
     </div>

@@ -1,15 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { hasActiveMembership } from "@/lib/membership-service";
 
 export async function hasActiveVip(userId: string, now = new Date()): Promise<boolean> {
-  const row = await prisma.entitlement.findFirst({
-    where: {
-      userId,
-      type: "VIP",
-      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-    },
-    select: { id: true },
-  });
-  return Boolean(row);
+  return hasActiveMembership(userId, now);
 }
 
 export async function hasPostEntitlement(

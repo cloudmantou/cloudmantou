@@ -16,7 +16,11 @@ export async function POST(
     }
 
     // 速率限制：每用户每分钟最多 30 次点赞
-    const limited = await checkRateLimit(_req, RATE_LIMITS.LIKE, session.user.id);
+    const limited = await checkRateLimit(
+      _req,
+      { ...RATE_LIMITS.LIKE, scope: "post-like" },
+      session.user.id
+    );
     if (limited) return limited;
 
     const post = await prisma.post.findUnique({

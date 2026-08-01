@@ -21,6 +21,7 @@ import {
   Users,
   Wallet,
   Lock,
+  AppWindow,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
   {
     title: "商业运营",
     items: [
+      { href: "/admin/store-apps", label: "应用商店", icon: AppWindow },
       { href: "/admin/orders", label: "订单管理", icon: ShoppingCart },
       { href: "/admin/cards", label: "卡密管理", icon: KeyRound },
       { href: "/admin/payment-gateway", label: "支付对接", icon: Wallet },
@@ -86,6 +88,7 @@ const pageTitles: Record<string, string> = {
   "/admin/categories": "分类标签",
   "/admin/tags": "标签管理",
   "/admin/users": "用户管理",
+  "/admin/store-apps": "应用商店",
   "/admin/orders": "订单管理",
   "/admin/cards": "卡密管理",
   "/admin/payment-gateway": "支付对接",

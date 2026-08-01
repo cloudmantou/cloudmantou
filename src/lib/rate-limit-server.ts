@@ -10,6 +10,16 @@ import { getRedisClient } from "@/lib/redis";
 
 export { RATE_LIMITS, getClientIP, getRateLimitIdentifier };
 
+const REDIS_RATE_LIMIT_SCRIPT = `
+local count = redis.call("INCR", KEYS[1])
+local ttl = redis.call("PTTL", KEYS[1])
+if count == 1 or ttl < 0 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return {count, ttl}
+`;
+
 function shouldRequireRedis(): boolean {
   if (process.env.RATE_LIMIT_REQUIRE_REDIS === "true") return true;
   return process.env.NODE_ENV === "production" && Boolean(process.env.REDIS_URL?.trim());
@@ -33,17 +43,26 @@ async function redisRateLimit(
   if (!redis) return null;
 
   try {
-    if (redis.status !== "ready") {
+    if (redis.status === "wait") {
       await redis.connect();
     }
 
     const key = `rl:${identifier}`;
-    const count = await redis.incr(key);
-    if (count === 1) {
-      await redis.pexpire(key, windowMs);
+    const response = await redis.eval(
+      REDIS_RATE_LIMIT_SCRIPT,
+      1,
+      key,
+      String(windowMs)
+    );
+    if (!Array.isArray(response) || response.length < 2) {
+      throw new Error("Redis rate-limit script returned an invalid response");
     }
 
-    const ttl = await redis.pttl(key);
+    const count = Number(response[0]);
+    const ttl = Number(response[1]);
+    if (!Number.isFinite(count) || !Number.isFinite(ttl)) {
+      throw new Error("Redis rate-limit script returned non-numeric values");
+    }
     const resetAt = Date.now() + (ttl > 0 ? ttl : windowMs);
 
     if (count > limit) {
@@ -82,10 +101,11 @@ export async function rateLimitAsync(
 
 export async function checkRateLimit(
   req: NextRequest | Request,
-  config: { limit: number; windowMs: number },
+  config: { limit: number; windowMs: number; scope?: string },
   userId?: string | null
 ): Promise<Response | null> {
-  const identifier = getRateLimitIdentifier(req, userId);
+  const scope = config.scope?.trim() || "request";
+  const identifier = `${scope}:${getRateLimitIdentifier(req, userId)}`;
   const result = await rateLimitAsync(identifier, config.limit, config.windowMs);
 
   if (!result.success) {

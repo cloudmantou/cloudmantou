@@ -6,7 +6,7 @@
 
 ## 技术栈
 
-- **框架**: Next.js 15 App Router
+- **框架**: Next.js 16 App Router
 - **语言**: TypeScript + React 18
 - **数据库**: MySQL 8.0 + Prisma ORM
 - **认证**: NextAuth.js v5 (JWT)
@@ -103,7 +103,8 @@ SEED_ADMIN_PASSWORD=your-strong-password
 
 # 可选
 REDIS_URL=redis://localhost:6379
-TRUST_PROXY_HEADERS=false
+APP_BIND_ADDRESS=127.0.0.1
+TRUST_PROXY_HEADERS=true
 SETTINGS_ENCRYPTION_KEY=optional-dedicated-encryption-key
 WECHAT_V3_PLATFORM_SERIAL=wechat-platform-cert-serial
 ```
@@ -120,12 +121,14 @@ pnpm test
 
 ### Docker Compose（推荐）
 
-1. 复制并填写环境变量（至少 `AUTH_SECRET`、`CARD_SECRET_SALT`、`DB_ROOT_PASSWORD`）：
+1. 复制并填写环境变量（至少 `AUTH_SECRET`、`CARD_SECRET_SALT`、`CRON_SECRET`、`DB_ROOT_PASSWORD`、`DB_USER`、`DB_PASSWORD` 与 `APP_DATABASE_URL`）：
 
 ```bash
 cp .env.example .env
 # 编辑 .env，设置生产用密钥
 ```
+
+`APP_DATABASE_URL` 是应用容器使用的完整 MySQL URI，主机名应为 `mysql`；密码含 `@`、`:`、`/`、`#` 等字符时必须进行 URL 编码。`DB_PASSWORD` 则保留数据库实际原值。
 
 2. 启动全部服务（应用容器启动时会自动执行 `prisma migrate deploy`，仓库已包含 `prisma/migrations` 初始迁移）：
 
@@ -139,13 +142,48 @@ docker-compose up -d --build
 docker-compose exec app npx prisma db seed
 ```
 
-### 手动部署要点
+### Git 拉取后直接运行
 
-- 构建前：`pnpm prisma generate`
-- 启动前：`pnpm prisma migrate deploy`
-- 生产环境：`NODE_ENV=production` 且必须配置 `SEED_ADMIN_PASSWORD`
-- 反代需正确传递真实客户端 IP，并配置 `AUTH_URL`、`SITE_URL` 为公网地址
-- 图片上传默认写入 `public/uploads`；Docker Compose 已通过 `uploads_data` 卷持久化
+将生产配置上传为项目根目录的 `.env`，然后执行：
+
+```bash
+git pull
+corepack enable
+pnpm install --frozen-lockfile
+pnpm prisma generate
+pnpm prisma migrate deploy
+pnpm run build
+pnpm run start
+```
+
+使用 npm 时，最后两步也可以执行：
+
+```bash
+npm run build
+npm run start
+```
+
+`pnpm run build` 会自动把 `.next/static` 与 `public` 整理进 standalone
+目录；`pnpm run start` / `npm run start` 会读取项目根目录 `.env` 并通过
+Node.js 启动 `.next/standalone/server.js`。该命令是前台进程；在宝塔 Node 项目
+中配置启动命令时，由宝塔负责进程守护和异常重启。
+
+生产环境应设置 `NODE_ENV=production`，首次初始化数据时还需执行
+`pnpm prisma db seed`。反向代理应传递真实客户端 IP，并将 `AUTH_URL`、
+`SITE_URL` 设置为公网地址。应用端口保持绑定在 `127.0.0.1`，由同机
+Nginx 反向代理。图片上传目录通过 `.env` 的 `UPLOAD_DIR` 指向持久化路径。
+
+### 订单维护定时任务
+
+至少每分钟调用一次维护接口；它会过期超时未支付订单，并重试已支付但尚未发放的卡密订单：
+
+```bash
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  https://your-domain.example/api/cron/expire-orders
+```
+
+只允许通过 `Authorization: Bearer` 传入密钥，避免查询参数进入代理访问日志。Docker Compose 要求显式设置 `CRON_SECRET`。
 
 ### 图片上传（本地存储）
 

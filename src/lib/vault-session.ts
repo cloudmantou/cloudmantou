@@ -29,7 +29,7 @@ export function verifyVaultUnlockToken(
   if (uid !== userId) return false;
 
   const exp = Number(expRaw);
-  if (!Number.isFinite(exp) || exp < now) return false;
+  if (!Number.isFinite(exp) || exp <= now) return false;
 
   const payload = `${uid}.${expRaw}`;
   const expected = createHmac("sha256", signingKey()).update(payload).digest("hex");

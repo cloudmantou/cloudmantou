@@ -1,12 +1,17 @@
 import crypto from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
-import { deliverCardPackageOrder } from "@/lib/card-delivery";
+import {
+  deliverCardPackageOrder,
+  ensureCardDeliveryForPaidOrder,
+} from "@/lib/card-delivery";
 import {
   assertOrderTransition,
   assertPaymentTransition,
   pairedStatusesForPaid,
 } from "@/lib/payment-state";
+import { grantMembership } from "@/lib/membership-service";
 
 /** 支付宝交易号：16–28 位字母数字 */
 export const ALIPAY_TRADE_NO_RE = /^[0-9A-Za-z]{16,28}$/;
@@ -173,24 +178,6 @@ export function verifyAmount(
 
 // ===== 权益发放（统一逻辑） =====
 
-/**
- * 计算 VIP 续费后的新到期时间
- * 如果当前 VIP 尚未过期，从现有到期时间开始续期；否则从当前时间开始
- */
-function calculateVipExpiry(
-  currentVipExpireAt: Date | null,
-  now: Date,
-  monthsToAdd: number
-): Date {
-  const baseDate =
-    currentVipExpireAt && currentVipExpireAt > now
-      ? new Date(currentVipExpireAt)
-      : new Date(now);
-  const expiresAt = new Date(baseDate);
-  expiresAt.setMonth(expiresAt.getMonth() + monthsToAdd);
-  return expiresAt;
-}
-
 type OrderForFinalize = {
   id: string;
   userId: string;
@@ -201,118 +188,159 @@ type OrderForFinalize = {
   payment: { id: string } | null;
 };
 
+type PaymentChannel = "ALIPAY" | "WECHAT";
+
+type GrantOrder = (
+  tx: Prisma.TransactionClient,
+  order: Pick<OrderForFinalize, "id" | "userId" | "productType" | "productId">
+) => Promise<void>;
+
+type FinalizePaidOrderInput = {
+  order: OrderForFinalize;
+  channel: PaymentChannel;
+  tradeNo: string;
+  rawCallback: string;
+};
+
+type FinalizePaidOrderInTransactionInput = FinalizePaidOrderInput & {
+  grantOrder?: GrantOrder;
+};
+
 export function canFinalizeOrder(status: string): boolean {
   return status === "PENDING";
 }
 
-/** 将支付宝订单标记为已支付并发放权益（异步通知与主动查单共用） */
+/**
+ * 在调用方事务内完成渠道无关的支付终态写入。
+ * 条件更新是并发回调的最终幂等边界；只有抢到终态的事务才发放权益。
+ */
+export async function finalizePaidOrderInTransaction(
+  tx: Prisma.TransactionClient,
+  input: FinalizePaidOrderInTransactionInput
+): Promise<boolean> {
+  const { order, channel, tradeNo, rawCallback } = input;
+  // Card fulfillment is deliberately deferred until after the payment fact commits.
+  // External payment must never roll back merely because stock is temporarily absent.
+  const grantOrder = input.grantOrder ?? (
+    order.productType === "CARD_PACKAGE"
+      ? async () => undefined
+      : grantEntitlement
+  );
+  const { orderStatus, paymentStatus } = pairedStatusesForPaid();
+
+  const current = await tx.order.findUnique({
+    where: { id: order.id },
+    select: {
+      status: true,
+      payment: { select: { id: true, status: true } },
+    },
+  });
+
+  if (!current) {
+    return false;
+  }
+  if (current.status === "PAID") return true;
+
+  assertOrderTransition(current.status, orderStatus);
+
+  const updated = await tx.order.updateMany({
+    where: { id: order.id, status: current.status },
+    data: { status: orderStatus, paidAt: new Date() },
+  });
+
+  if (updated.count === 0) {
+    return false;
+  }
+
+  const paymentData = {
+    orderId: order.id,
+    channel,
+    amount: order.amount,
+    tradeNo,
+    status: paymentStatus,
+    rawCallback,
+  };
+
+  if (current.payment) {
+    assertPaymentTransition(current.payment.status, paymentStatus);
+    await tx.payment.update({
+      where: { orderId: order.id },
+      data: paymentData,
+    });
+  } else {
+    await tx.payment.create({ data: paymentData });
+  }
+
+  await grantOrder(tx, order);
+  return true;
+}
+
+/** 支付通知与主动查单共用的渠道无关终态服务。 */
+export async function finalizePaidOrder(input: FinalizePaidOrderInput): Promise<boolean> {
+  const alreadyPaid = input.order.status === "PAID";
+  if (!alreadyPaid && !canFinalizeOrder(input.order.status)) {
+    return false;
+  }
+
+  const finalized = alreadyPaid
+    ? false
+    : await prisma.$transaction((tx) => finalizePaidOrderInTransaction(tx, input));
+
+  if (input.order.productType === "CARD_PACKAGE") {
+    try {
+      await ensureCardDeliveryForPaidOrder({ ...input.order, status: "PAID" });
+    } catch (error) {
+      // The paid order remains durable and the existing idempotent backfill path can retry.
+      console.error("[Card Delivery Deferred] paid order awaits fulfillment", {
+        orderId: input.order.id,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }
+
+  return alreadyPaid || finalized;
+}
+
+/** @deprecated 新代码应直接调用 finalizePaidOrder。 */
 export async function finalizeAlipayOrder(input: {
   order: OrderForFinalize;
   tradeNo: string;
   rawCallback: string;
 }): Promise<boolean> {
-  const { order, tradeNo, rawCallback } = input;
-
-  if (order.status === "PAID") {
-    return true;
-  }
-
-  if (!canFinalizeOrder(order.status)) {
-    return false;
-  }
-
-  const { orderStatus, paymentStatus } = pairedStatusesForPaid();
-
-  await prisma.$transaction(async (tx) => {
-    const current = await tx.order.findUnique({
-      where: { id: order.id },
-      select: {
-        status: true,
-        payment: { select: { id: true, status: true } },
-      },
-    });
-
-    if (!current || current.status === "PAID") {
-      return;
-    }
-
-    assertOrderTransition(current.status, orderStatus);
-
-    const updated = await tx.order.updateMany({
-      where: { id: order.id, status: current.status },
-      data: { status: orderStatus, paidAt: new Date() },
-    });
-
-    if (updated.count === 0) {
-      return;
-    }
-
-    const paymentData = {
-      orderId: order.id,
-      channel: "ALIPAY" as const,
-      amount: order.amount,
-      tradeNo,
-      status: paymentStatus,
-      rawCallback,
-    };
-
-    if (current.payment) {
-      assertPaymentTransition(current.payment.status, paymentStatus);
-      await tx.payment.update({
-        where: { orderId: order.id },
-        data: paymentData,
-      });
-    } else {
-      await tx.payment.create({ data: paymentData });
-    }
-
-    await grantEntitlement(tx, order);
-  });
-
-  return true;
+  return finalizePaidOrder({ ...input, channel: "ALIPAY" });
 }
 
 export async function grantEntitlement(
-  tx: any,
+  tx: Prisma.TransactionClient,
   order: { id: string; userId: string; productType: string; productId: string | null }
 ) {
   const now = new Date();
 
   switch (order.productType) {
     case "VIP_MONTH": {
-      const user = await tx.user.findUnique({ where: { id: order.userId } });
-      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 1);
-      await tx.entitlement.create({
-        data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
-      });
-      // 同步更新用户 VIP 等级和到期时间
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { vipLevel: { set: 1 }, vipExpireAt: expiresAt },
+      await grantMembership(tx, {
+        userId: order.userId,
+        duration: { months: 1 },
+        level: 1,
+        orderId: order.id,
       });
       break;
     }
     case "VIP_QUARTER": {
-      const user = await tx.user.findUnique({ where: { id: order.userId } });
-      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 3);
-      await tx.entitlement.create({
-        data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
-      });
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { vipLevel: { set: 1 }, vipExpireAt: expiresAt },
+      await grantMembership(tx, {
+        userId: order.userId,
+        duration: { months: 3 },
+        level: 1,
+        orderId: order.id,
       });
       break;
     }
     case "VIP_YEAR": {
-      const user = await tx.user.findUnique({ where: { id: order.userId } });
-      const expiresAt = calculateVipExpiry(user?.vipExpireAt ?? null, now, 12);
-      await tx.entitlement.create({
-        data: { userId: order.userId, type: "VIP", orderId: order.id, expiresAt },
-      });
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { vipLevel: { set: 2 }, vipExpireAt: expiresAt },
+      await grantMembership(tx, {
+        userId: order.userId,
+        duration: { months: 12 },
+        level: 2,
+        orderId: order.id,
       });
       break;
     }

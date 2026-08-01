@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { Check, CreditCard, ShoppingCart, X } from "lucide-react";
 import clsx from "clsx";
 import type { Product } from "@/types";
+import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
+import { interpolateMessage } from "@/i18n/official";
 
 type ProductDetailModalProps = {
   product: Product | null;
@@ -13,14 +15,15 @@ type ProductDetailModalProps = {
   onBuy: (product: Product) => void;
 };
 
-const categoryLabel: Record<Product["category"], string> = {
-  membership: "会员套餐",
-  "paid-post": "付费内容",
-  card: "卡密商品",
-  service: "增值服务",
-};
-
 export function ProductDetailModal({ product, open, loggedIn = true, onClose, onBuy }: ProductDetailModalProps) {
+  const { messages } = useOfficialI18n();
+  const copy = messages.product;
+  const categoryLabel: Record<Product["category"], string> = {
+    membership: copy.categories.membership,
+    "paid-post": copy.categories.paidPost,
+    card: copy.categories.card,
+    service: copy.categories.service,
+  };
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -40,8 +43,8 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
   const isCard = product.category === "card";
 
   return (
-    <div className="product-detail-overlay" role="dialog" aria-modal="true" aria-label={`${product.name} 详情`}>
-      <button type="button" className="product-detail-backdrop" onClick={onClose} aria-label="关闭" />
+    <div className="product-detail-overlay" role="dialog" aria-modal="true" aria-label={interpolateMessage(copy.details, { name: product.name })}>
+      <button type="button" className="product-detail-backdrop" onClick={onClose} aria-label={copy.close} />
       <div className="product-detail-modal">
         <div
           className="product-detail-cover"
@@ -58,7 +61,7 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
               <h2 className="product-detail-title">{product.name}</h2>
               <p className="product-detail-summary">{product.description}</p>
             </div>
-            <button type="button" className="product-detail-close" onClick={onClose} aria-label="关闭">
+            <button type="button" className="product-detail-close" onClick={onClose} aria-label={copy.close}>
               <X size={18} />
             </button>
           </div>
@@ -84,7 +87,7 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
 
           {isCard && product.usageSteps && product.usageSteps.length > 0 ? (
             <div className="product-detail-steps">
-              <h3>使用方式</h3>
+              <h3>{copy.usage}</h3>
               <ol>
                 {product.usageSteps.map((step, index) => (
                   <li key={step}>
@@ -99,7 +102,7 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
           <div className="product-detail-footer">
             <div className="product-detail-price">
               <strong>{product.price}</strong>
-              <span className={product.stock <= 20 ? "stock-low" : undefined}>库存 {product.stock}</span>
+              <span className={product.stock <= 20 ? "stock-low" : undefined}>{interpolateMessage(copy.stock, { count: product.stock })}</span>
             </div>
             <button
               type="button"
@@ -108,7 +111,7 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
               onClick={() => onBuy(product)}
             >
               <ShoppingCart size={14} aria-hidden="true" />
-              {!loggedIn ? "登录购买" : canBuy ? "立即购买" : "暂未开放"}
+              {!loggedIn ? copy.loginToBuy : canBuy ? copy.buyNow : copy.unavailable}
             </button>
           </div>
         </div>

@@ -599,6 +599,33 @@ button {
   overflow: hidden;
   isolation: isolate;
   contain: strict;
+  transform: translateZ(0);
+}
+
+/* 官网 lite 背景：保留氛围，关闭持续动画与大模糊 */
+.home-backdrop--lite .home-backdrop-aurora,
+.home-backdrop--lite .home-backdrop-orb,
+.home-backdrop--lite .home-backdrop-grid {
+  animation: none !important;
+}
+
+.home-backdrop--lite .home-backdrop-aurora {
+  filter: blur(36px);
+  opacity: 0.48;
+}
+
+.home-backdrop--lite .home-backdrop-orb {
+  filter: blur(52px);
+}
+
+.home-backdrop--lite .home-backdrop-orb--gold {
+  width: 42%;
+  height: 42%;
+}
+
+.home-backdrop--lite .home-backdrop-orb--teal {
+  width: 36%;
+  height: 36%;
 }
 
 .home-backdrop-base {

@@ -4,14 +4,12 @@ RUN corepack enable
 # --- Dependencies ---
 FROM base AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod=false
 
 # --- Build ---
 FROM base AS build
 WORKDIR /app
-ARG SETTINGS_ENCRYPTION_KEY=build-time-placeholder-32chars-min
-ENV SETTINGS_ENCRYPTION_KEY=$SETTINGS_ENCRYPTION_KEY
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm prisma generate

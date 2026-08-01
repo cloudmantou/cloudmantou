@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import {
   BRAND_NAME,
+  DEFAULT_BLOG_SITE_URL,
   DEFAULT_SITE_DESCRIPTION,
   DEFAULT_SITE_SUBTITLE,
   DEFAULT_SITE_URL,
+  OFFICIAL_ALTERNATE_NAME,
   TOOL_NAME,
+  isOfficialSite,
 } from "@/config/site";
 import { getSiteSettings } from "@/lib/site-settings";
+import {
+  getOfficialMessages,
+  localizeOfficialPath,
+  MINIMUM_IOS_VERSION,
+  type OfficialLocale,
+} from "@/i18n/official";
 
 export {
   BRAND_NAME,
@@ -15,27 +24,41 @@ export {
   DEFAULT_SITE_URL,
 };
 
-export const DEFAULT_KEYWORDS = [
+const BLOG_KEYWORDS = [
   "技术博客",
   "个人博客",
   "独立开发",
   "运维",
   "Next.js",
-  "cloudmantoua.top",
   "馒头",
   "馒头助手",
-  "iOS安装",
-  "香色闺阁",
-  "源阅读",
-  "会员内容",
-  "卡密",
 ] as const;
+
+const OFFICIAL_KEYWORDS = [
+  "馒头助手",
+  "AppFlex",
+  "iOS应用安装",
+  "iOS安装",
+  "虚拟定位",
+  "香色闺阁",
+  "香色闺阁安装",
+  "源阅读",
+  "源阅读安装",
+  "应用商店",
+  "巨魔商店",
+  "cloudmantoua.top",
+  "卡密",
+  "会员",
+] as const;
+
+export const DEFAULT_KEYWORDS = isOfficialSite ? OFFICIAL_KEYWORDS : BLOG_KEYWORDS;
 
 export type SeoContext = {
   name: string;
   subtitle: string;
   description: string;
   url: string;
+  locale: OfficialLocale;
 };
 
 export function resolveSiteUrl(settingsUrl?: string): string {
@@ -46,21 +69,45 @@ export function resolveSiteUrl(settingsUrl?: string): string {
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.SITE_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
 
-  return DEFAULT_SITE_URL;
+  return isOfficialSite ? DEFAULT_SITE_URL : DEFAULT_BLOG_SITE_URL;
 }
 
-export async function getSeoContext(): Promise<SeoContext> {
+export async function getSeoContext(locale: OfficialLocale = "zh"): Promise<SeoContext> {
   const settings = await getSiteSettings();
+  const officialCopy = getOfficialMessages(locale).site;
   return {
-    name: settings.siteName?.trim() || BRAND_NAME,
-    subtitle: settings.siteSubtitle?.trim() || DEFAULT_SITE_SUBTITLE,
-    description: settings.siteDescription?.trim() || DEFAULT_SITE_DESCRIPTION,
+    name: isOfficialSite ? officialCopy.name : settings.siteName?.trim() || BRAND_NAME,
+    subtitle: isOfficialSite
+      ? officialCopy.subtitle
+      : settings.siteSubtitle?.trim() || DEFAULT_SITE_SUBTITLE,
+    description: isOfficialSite
+      ? officialCopy.description
+      : settings.siteDescription?.trim() || DEFAULT_SITE_DESCRIPTION,
     url: resolveSiteUrl(settings.siteUrl),
+    locale,
+  };
+}
+
+function localizedUrl(ctx: SeoContext, path: string): string {
+  if (!isOfficialSite) return path === "/" ? ctx.url : `${ctx.url}${path}`;
+  const localizedPath = localizeOfficialPath(path, ctx.locale);
+  return localizedPath === "/" ? ctx.url : `${ctx.url}${localizedPath}`;
+}
+
+function languageAlternates(ctx: SeoContext, path: string) {
+  const zhPath = localizeOfficialPath(path, "zh");
+  const enPath = localizeOfficialPath(path, "en");
+  const zhUrl = zhPath === "/" ? ctx.url : `${ctx.url}${zhPath}`;
+  return {
+    "zh-CN": zhUrl,
+    "en-US": `${ctx.url}${enPath}`,
+    "x-default": zhUrl,
   };
 }
 
 export function buildRootMetadata(ctx: SeoContext): Metadata {
   const title = `${ctx.name} — ${ctx.subtitle}`;
+  const canonical = localizedUrl(ctx, "/");
   return {
     metadataBase: new URL(ctx.url),
     title: {
@@ -69,13 +116,13 @@ export function buildRootMetadata(ctx: SeoContext): Metadata {
     },
     description: ctx.description,
     keywords: [...DEFAULT_KEYWORDS],
-    alternates: {
-      canonical: ctx.url,
-    },
+    alternates: isOfficialSite
+      ? { canonical, languages: languageAlternates(ctx, "/") }
+      : { canonical },
     openGraph: {
       type: "website",
-      locale: "zh_CN",
-      url: ctx.url,
+      locale: ctx.locale === "en" ? "en_US" : "zh_CN",
+      url: canonical,
       siteName: ctx.name,
       title,
       description: ctx.description,
@@ -103,15 +150,19 @@ export function buildPageMetadata(
   }
 ): Metadata {
   const description = options.description || ctx.description;
-  const canonical = options.path ? `${ctx.url}${options.path}` : undefined;
+  const canonical = options.path ? localizedUrl(ctx, options.path) : undefined;
 
   return {
     title: options.title,
     description,
-    alternates: canonical ? { canonical } : undefined,
+    alternates: canonical
+      ? isOfficialSite
+        ? { canonical, languages: languageAlternates(ctx, options.path || "/") }
+        : { canonical }
+      : undefined,
     openGraph: {
       type: options.type || "website",
-      locale: "zh_CN",
+      locale: ctx.locale === "en" ? "en_US" : "zh_CN",
       url: canonical,
       siteName: ctx.name,
       title: options.title,
@@ -127,17 +178,21 @@ export function buildPageMetadata(
 }
 
 export function buildWebSiteJsonLd(ctx: SeoContext) {
+  const alternateNames = isOfficialSite
+    ? [OFFICIAL_ALTERNATE_NAME, "cloudmantoua.top"]
+    : ["cloudmantoua.top", TOOL_NAME];
+
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: ctx.name,
-    alternateName: ["cloudmantoua.top", TOOL_NAME],
-    url: ctx.url,
+    alternateName: alternateNames,
+    url: localizedUrl(ctx, "/"),
     description: ctx.description,
-    inLanguage: "zh-CN",
+    inLanguage: ctx.locale === "en" ? "en-US" : "zh-CN",
     publisher: {
-      "@type": "Person",
-      name: "Mantou",
+      "@type": "Organization",
+      name: isOfficialSite ? (ctx.locale === "en" ? ctx.name : TOOL_NAME) : "Mantou",
     },
   };
 }
@@ -146,12 +201,14 @@ export function buildSoftwareApplicationJsonLd(ctx: SeoContext) {
   return {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: TOOL_NAME,
+    name: ctx.name,
+    alternateName: OFFICIAL_ALTERNATE_NAME,
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "iOS",
-    description:
-      "作者自研的 iOS 应用安装工具，支持香色闺阁、源阅读等阅读类应用的安装与分发。",
-    url: ctx.url,
+    softwareRequirements: `iOS ${MINIMUM_IOS_VERSION} or later`,
+    inLanguage: ctx.locale === "en" ? "en-US" : "zh-CN",
+    description: ctx.description,
+    url: localizedUrl(ctx, "/download"),
     offers: {
       "@type": "Offer",
       price: "0",

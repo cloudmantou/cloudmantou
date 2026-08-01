@@ -47,11 +47,11 @@ export async function requireAuth() {
   return session;
 }
 
-/** Vault 二次验证：配置 TOTP 后需有效解锁 cookie */
+/** Vault 二次验证：TOTP 未配置时关闭 Vault，配置后需有效解锁 cookie。 */
 export async function requireVaultUnlock(_req?: NextRequest) {
   const session = await requireAdmin();
   if (!isVaultTotpConfigured()) {
-    return session;
+    throw new ApiError("Vault 二次验证未配置，访问已禁用", 50301, 503);
   }
 
   const cookieStore = await cookies();

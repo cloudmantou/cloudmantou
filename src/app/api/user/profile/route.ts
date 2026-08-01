@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { countArticleCredits } from "@/lib/post-access";
+import { getMembershipStatus } from "@/lib/membership-service";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,9 @@ export async function GET() {
       return fail("用户不存在", 40400, 404);
     }
 
-    const [articleCredits, unlockedPosts, orderCount] = await Promise.all([
+    const now = new Date();
+    const [membership, articleCredits, unlockedPosts, orderCount] = await Promise.all([
+      getMembershipStatus(session.user.id, now),
       countArticleCredits(session.user.id),
       prisma.entitlement.count({
         where: {
@@ -43,14 +46,12 @@ export async function GET() {
       prisma.order.count({ where: { userId: session.user.id } }),
     ]);
 
-    const now = new Date();
-    const vipActive = Boolean(user.vipExpireAt && user.vipExpireAt > now);
-
     return ok({
       ...user,
-      vipExpireAt: user.vipExpireAt?.toISOString() || null,
+      vipLevel: membership.level,
+      vipExpireAt: membership.expiresAt?.toISOString() || null,
       createdAt: user.createdAt.toISOString(),
-      vipActive,
+      vipActive: membership.active,
       articleCredits,
       unlockedPosts,
       orderCount,

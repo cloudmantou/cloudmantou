@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { getClientIP, RATE_LIMITS, type RateLimitResult } from "@/lib/rate-limit";
 import { rateLimitAsync } from "@/lib/rate-limit-server";
@@ -11,8 +12,11 @@ export async function checkLoginRateLimitServer(
   const normalizedId = identifier.trim().toLowerCase();
   const ip = getClientIP(req).trim() || "unknown";
 
-  const byId = await rateLimitAsync(`login:id:${normalizedId}`, limit, windowMs);
-  if (!byId.success) return byId;
+  // Check the bounded IP bucket first. Once an IP is denied, attacker-controlled
+  // identifiers can no longer allocate additional buckets.
+  const byIp = await rateLimitAsync(`login:ip:${ip}`, limit, windowMs);
+  if (!byIp.success) return byIp;
 
-  return rateLimitAsync(`login:ip:${ip}`, limit, windowMs);
+  const identifierHash = createHash("sha256").update(normalizedId).digest("hex");
+  return rateLimitAsync(`login:id:${identifierHash}`, limit, windowMs);
 }

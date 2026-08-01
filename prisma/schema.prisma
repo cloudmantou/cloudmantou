@@ -470,6 +470,35 @@ model PaymentNotifyAudit {
   @@map("payment_notify_audits")
 }
 
+model StoreApp {
+  id           String           @id @default(cuid())
+  name         String
+  slug         String           @unique
+  tagline      String?
+  description  String           @db.Text
+  iconUrl      String?
+  coverUrl     String?
+  screenshots  Json?
+  category     StoreAppCategory @default(READING)
+  featured     Boolean          @default(false)
+  sortOrder    Int              @default(0)
+  published    Boolean          @default(false)
+  installUrl   String?          @db.Text
+  minIos       String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([published, featured, sortOrder])
+  @@map("store_apps")
+}
+
+enum StoreAppCategory {
+  READING
+  TOOL
+  ENTERTAINMENT
+  OTHER
+}
+
 /// 管理员操作审计（仅 insert，不可更新）
 model AdminAuditLog {
   id         String   @id @default(cuid())

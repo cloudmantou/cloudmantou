@@ -118,7 +118,11 @@ export async function POST(
     }
 
     // 速率限制：每用户每 10 分钟最多 10 条评论
-    const limited = await checkRateLimit(req, RATE_LIMITS.COMMENT, session.user.id);
+    const limited = await checkRateLimit(
+      req,
+      { ...RATE_LIMITS.COMMENT, scope: "post-comment" },
+      session.user.id
+    );
     if (limited) return limited;
 
     const post = await prisma.post.findUnique({

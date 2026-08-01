@@ -8,6 +8,10 @@ import {
   isValidAlipayTradeNo,
 } from "@/lib/payment";
 import { recordPaymentNotifyAudit } from "@/lib/payment-notify-audit";
+import {
+  readRequestBodyWithLimit,
+  RequestBodyTooLargeError,
+} from "@/lib/request-body";
 
 /**
  * 支付宝异步通知回调
@@ -22,7 +26,7 @@ export async function POST(req: NextRequest) {
     const paymentConfig = await getPaymentRuntimeConfig();
     const alipayConfig = paymentConfig.alipay;
 
-    rawBody = await req.text();
+    rawBody = await readRequestBodyWithLimit(req);
     const params = Object.fromEntries(new URLSearchParams(rawBody));
 
     const {
@@ -72,11 +76,7 @@ export async function POST(req: NextRequest) {
       return new Response("failure", { status: 200 });
     }
 
-    if (order.status === "PAID") {
-      return new Response("success", { status: 200 });
-    }
-
-    if (order.status !== "PENDING") {
+    if (order.status !== "PENDING" && order.status !== "PAID") {
       console.warn("[Alipay] Order status not PENDING:", out_trade_no, order.status);
       await recordPaymentNotifyAudit({
         channel: "ALIPAY",
@@ -166,6 +166,9 @@ export async function POST(req: NextRequest) {
 
     return new Response("success", { status: 200 });
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return new Response("payload too large", { status: 413 });
+    }
     console.error("[Alipay Notify Error]", error);
     await recordPaymentNotifyAudit({
       channel: "ALIPAY",
