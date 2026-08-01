@@ -52,7 +52,7 @@ describe("release configuration", () => {
   it("keeps the trusted-proxy app port private and requires the cron secret", () => {
     const compose = readProjectFile("docker-compose.yml");
     const cronRoute = readProjectFile("src/app/api/cron/expire-orders/route.ts");
-    const readme = readProjectFile("README.md");
+    const deploymentGuide = readProjectFile("docs/deployment.md");
 
     expect(compose).toContain('${APP_BIND_ADDRESS:-127.0.0.1}:3000:3000');
     expect(compose).toContain("TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}");
@@ -63,8 +63,8 @@ describe("release configuration", () => {
     expect(compose).toContain("SITE_URL: ${SITE_URL:?SITE_URL is required}");
     expect(compose).toContain("RATE_LIMIT_REQUIRE_REDIS: ${RATE_LIMIT_REQUIRE_REDIS:-true}");
     expect(cronRoute).not.toContain('searchParams.get("secret")');
-    expect(readme).toContain("/api/cron/expire-orders");
-    expect(readme).toContain("Authorization: Bearer");
+    expect(deploymentGuide).toContain("/api/cron/expire-orders");
+    expect(deploymentGuide).toContain("Authorization: Bearer");
   });
 
   it("passes payment gateway secrets only at runtime", () => {
@@ -137,7 +137,7 @@ describe("release configuration", () => {
       engines?: Record<string, string>;
     };
     const prepareScript = readProjectFile("scripts/prepare-standalone.mjs");
-    const readme = readProjectFile("README.md");
+    const deploymentGuide = readProjectFile("docs/deployment.md");
     const gitignore = readProjectFile(".gitignore");
 
     expect(packageJson.scripts.build).toContain("scripts/prepare-standalone.mjs");
@@ -149,11 +149,11 @@ describe("release configuration", () => {
     expect(prepareScript).toContain('resolve(root, ".next/standalone/.next/static")');
     expect(prepareScript).toContain('resolve(root, "public")');
     expect(prepareScript).toContain('resolve(root, ".next/standalone/public")');
-    expect(readme).toContain("pnpm install --frozen-lockfile");
-    expect(readme).toContain("pnpm run start");
-    expect(readme).toContain("npm run start");
-    expect(readme).toContain("前台进程");
-    expect(readme).toContain("宝塔 Node 项目");
+    expect(deploymentGuide).toContain("pnpm install --frozen-lockfile");
+    expect(deploymentGuide).toContain("pnpm run start");
+    expect(deploymentGuide).toContain("npm run start");
+    expect(deploymentGuide).toContain("前台进程");
+    expect(deploymentGuide).toContain("宝塔 Node 项目");
     expect(gitignore).toMatch(/^\.env\*$/m);
     expect(gitignore).toMatch(/^!\.env\.example$/m);
   });
