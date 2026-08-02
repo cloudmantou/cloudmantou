@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Check, CreditCard, ShoppingCart, X } from "lucide-react";
 import clsx from "clsx";
 import type { Product } from "@/types";
@@ -24,16 +24,39 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
     card: copy.categories.card,
     service: copy.categories.service,
   };
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !modalRef.current) return;
+      const focusable = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKey);
+      previousFocus?.focus();
     };
   }, [open, onClose]);
 
@@ -43,9 +66,9 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
   const isCard = product.category === "card";
 
   return (
-    <div className="product-detail-overlay" role="dialog" aria-modal="true" aria-label={interpolateMessage(copy.details, { name: product.name })}>
+    <div className="product-detail-overlay editorial-product-detail" role="dialog" aria-modal="true" aria-label={interpolateMessage(copy.details, { name: product.name })}>
       <button type="button" className="product-detail-backdrop" onClick={onClose} aria-label={copy.close} />
-      <div className="product-detail-modal">
+      <div ref={modalRef} className="product-detail-modal">
         <div
           className="product-detail-cover"
           style={{ backgroundImage: product.cover }}
@@ -61,7 +84,7 @@ export function ProductDetailModal({ product, open, loggedIn = true, onClose, on
               <h2 className="product-detail-title">{product.name}</h2>
               <p className="product-detail-summary">{product.description}</p>
             </div>
-            <button type="button" className="product-detail-close" onClick={onClose} aria-label={copy.close}>
+            <button ref={closeButtonRef} type="button" className="product-detail-close" onClick={onClose} aria-label={copy.close}>
               <X size={18} />
             </button>
           </div>

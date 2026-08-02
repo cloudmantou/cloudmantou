@@ -1,15 +1,14 @@
-import Image from "next/image";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import type { OfficialLocale } from "@/i18n/official";
-import { localizeOfficialPath } from "@/i18n/official";
 import {
   MANTOU_ASSISTANT_ARTICLE,
   MANTOU_ASSISTANT_ARTICLE_EN,
 } from "@/config/editorial-blog";
 import { MarkdownRenderer } from "@/components/blog/MarkdownRenderer";
+import { countArticleWords, estimateReadTime } from "@/components/blog/PostMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { EditorialArticleChrome } from "@/components/editorial/EditorialArticleChrome";
+import { ENGLISH_EDITORIAL_TAGS, extractArticleHeadings } from "@/lib/editorial-article";
 import { getCspNonce } from "@/lib/csp-nonce";
 import {
   buildBlogPostingJsonLd,
@@ -22,6 +21,14 @@ export async function EditorialStaticMantouArticle({ locale }: { locale: Officia
   const ctx = withEditorialSeoContext(baseCtx);
   const article = locale === "en" ? MANTOU_ASSISTANT_ARTICLE_EN : MANTOU_ASSISTANT_ARTICLE;
   const publishedAt = new Date(article.publishedAt);
+  const publishedAtIso = publishedAt.toISOString();
+  const tags = locale === "en"
+    ? ENGLISH_EDITORIAL_TAGS.map((tag) => ({ id: tag.slug, name: tag.name, slug: tag.slug }))
+    : [
+        { id: "ios", name: "iOS", slug: "ios" },
+        { id: "indie-development", name: "独立开发", slug: "indie-development" },
+        { id: "product-practice", name: "产品实践", slug: "product-practice" },
+      ];
 
   return (
     <EditorialShell locale={locale}>
@@ -41,32 +48,27 @@ export async function EditorialStaticMantouArticle({ locale }: { locale: Officia
           }),
         ]}
       />
-      <article className="editorial-post-page min-h-screen px-4 py-10 md:px-8">
-        <div className="mx-auto" style={{ maxWidth: 860 }}>
-          <div className="editorial-static-article-topbar">
-            <Link href={localizeOfficialPath("/", locale)}>
-              <ArrowLeft size={15} aria-hidden="true" />
-              {locale === "en" ? "Back home" : "返回首页"}
-            </Link>
-          </div>
-          <article className="editorial-static-article-content">
-            <Image
-              src={article.coverImage}
-              alt={article.title}
-              width={1024}
-              height={1024}
-              className="editorial-static-article-cover"
-              priority
-            />
-            <span className="editorial-static-article-category">
-              {locale === "en" ? "Product practice" : MANTOU_ASSISTANT_ARTICLE.category}
-            </span>
-            <h1>{article.title}</h1>
-            <p className="editorial-static-article-excerpt">{article.excerpt}</p>
+      <div className="editorial-post-page">
+        <EditorialArticleChrome
+          locale={locale}
+          slug={article.slug}
+          title={article.title}
+          excerpt={article.excerpt}
+          coverImage={article.coverImage}
+          publishedAt={publishedAtIso}
+          updatedAt={publishedAtIso}
+          authorName={locale === "en" ? "Mantou" : "馒头"}
+          category={{ name: locale === "en" ? "Product practice" : MANTOU_ASSISTANT_ARTICLE.category, slug: "product-notes" }}
+          tags={tags}
+          headings={extractArticleHeadings(article.content)}
+          wordCount={countArticleWords(article.content)}
+          readTime={estimateReadTime(article.content, locale)}
+          recommendationHref="/download"
+          recommendationLabel={locale === "en" ? "Get the tool" : "获取工具"}
+        >
             <MarkdownRenderer content={article.content} />
-          </article>
-        </div>
-      </article>
+        </EditorialArticleChrome>
+      </div>
     </EditorialShell>
   );
 }

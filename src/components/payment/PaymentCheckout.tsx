@@ -51,6 +51,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   const onCloseRef = useRef(onClose);
   const pollTimerRef = useRef<number | null>(null);
   const pollSequenceRef = useRef(0);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     onPaidRef.current = onPaid;
   }, [onPaid]);
@@ -100,7 +102,39 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     setQrImage(null);
     setPolling(false);
     setLoading(null);
-    return () => stopPolling(false);
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !modalRef.current) return;
+      const focusable = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      stopPolling(false);
+      previousFocus?.focus();
+    };
   }, [locale, open, order?.id, sessionStatus, onClose, router, stopPolling]);
 
   useEffect(() => {
@@ -218,20 +252,20 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
   if (!open || !order || sessionStatus !== "authenticated" || !session) return null;
 
   return (
-    <div className="payment-checkout-overlay" role="dialog" aria-modal="true" aria-label={copy.checkout}>
+    <div className="payment-checkout-overlay editorial-checkout" role="dialog" aria-modal="true" aria-labelledby="editorial-checkout-title">
       <button type="button" className="payment-checkout-backdrop" onClick={onClose} aria-label={copy.close} />
-      <div className="payment-checkout-modal">
+      <div ref={modalRef} className="payment-checkout-modal editorial-checkout-panel">
         <div className="payment-checkout-header">
           <div>
-            <div className="payment-checkout-title">{copy.checkout}</div>
+            <div className="payment-checkout-title" id="editorial-checkout-title">{copy.checkout}</div>
             <div className="payment-checkout-sub">{scene === "pc" ? copy.scenes.pc : scene === "wechat_inapp" ? copy.scenes.wechat : copy.scenes.h5}</div>
           </div>
-          <button type="button" className="payment-checkout-close" onClick={onClose} aria-label={copy.close}>
+          <button ref={closeButtonRef} type="button" className="payment-checkout-close" onClick={onClose} aria-label={copy.close}>
             <X size={18} />
           </button>
         </div>
 
-        <div className="payment-checkout-order">
+        <div className="payment-checkout-order editorial-checkout-order">
           <div className="payment-checkout-product">{order.title}</div>
           <div className="payment-checkout-amount">
             <span>¥</span>
@@ -245,6 +279,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             type="button"
             className={clsx("payment-scene-btn", scene === "pc" && "active")}
             onClick={() => setScene("pc")}
+            aria-pressed={scene === "pc"}
           >
             <Monitor size={14} />
             {copy.desktop}
@@ -253,6 +288,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             type="button"
             className={clsx("payment-scene-btn", scene === "h5" && "active")}
             onClick={() => setScene("h5")}
+            aria-pressed={scene === "h5"}
           >
             <Smartphone size={14} />
             {copy.mobileH5}
@@ -261,6 +297,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             type="button"
             className={clsx("payment-scene-btn", scene === "wechat_inapp" && "active")}
             onClick={() => setScene("wechat_inapp")}
+            aria-pressed={scene === "wechat_inapp"}
           >
             {copy.wechatInApp}
           </button>
@@ -273,7 +310,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
             {polling ? <span className="payment-checkout-polling">{copy.waiting}</span> : null}
           </div>
         ) : (
-          <div className="payment-checkout-actions">
+          <div className="payment-checkout-actions editorial-checkout-channels">
             <button
               type="button"
               className="payment-channel-btn alipay"
@@ -298,7 +335,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
           </div>
         )}
 
-        {error ? <p className="payment-checkout-error">{error}</p> : null}
+        {error ? <p className="payment-checkout-error" role="alert">{error}</p> : null}
       </div>
     </div>
   );

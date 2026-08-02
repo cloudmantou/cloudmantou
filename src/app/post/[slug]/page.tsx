@@ -25,6 +25,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const locale = await getRequestLocale();
   const baseCtx = await getSeoContext(locale);
   const ctx = withEditorialSeoContext(baseCtx);
+  if (locale === "en" && slug !== MANTOU_ASSISTANT_ARTICLE.slug) {
+    return { title: "Article not found" };
+  }
   if (locale === "en" && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
     return buildPageMetadata(ctx, {
       title: MANTOU_ASSISTANT_ARTICLE_EN.title,
@@ -70,6 +73,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
   const [session, locale] = await Promise.all([auth(), getRequestLocale()]);
+
+  if (locale === "en" && slug !== MANTOU_ASSISTANT_ARTICLE.slug) notFound();
 
   if (locale === "en" && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
     return <EditorialStaticMantouArticle locale={locale} />;
@@ -155,7 +160,29 @@ export default async function PostPage({ params }: PageProps) {
   }
 
   const tags = post.tags.map((pt) => pt.tag);
-  const approvedCommentCount = await countApprovedPostComments(post.id);
+  const [approvedCommentCount, previousPost, nextPost] = await Promise.all([
+    countApprovedPostComments(post.id),
+    post.publishedAt
+      ? prisma.post.findFirst({
+          where: {
+            status: { in: ["PUBLISHED", "PAID_ONLY"] },
+            publishedAt: { lt: post.publishedAt },
+          },
+          orderBy: { publishedAt: "desc" },
+          select: { slug: true, title: true },
+        })
+      : null,
+    post.publishedAt
+      ? prisma.post.findFirst({
+          where: {
+            status: { in: ["PUBLISHED", "PAID_ONLY"] },
+            publishedAt: { gt: post.publishedAt },
+          },
+          orderBy: { publishedAt: "asc" },
+          select: { slug: true, title: true },
+        })
+      : null,
+  ]);
 
   // 统一访问权限判断
   const access = await getPostAccess(
@@ -208,11 +235,8 @@ export default async function PostPage({ params }: PageProps) {
           }),
         ]}
       />
-      <article
-        className="editorial-post-page min-h-screen px-4 py-10 md:px-8"
-        style={{ background: "var(--article-bg)" }}
-      >
-        <div className="mx-auto" style={{ maxWidth: 860 }}>
+      <div className="editorial-post-page">
+        <div className="editorial-post-frame">
           <PostContent
             post={{
               id: post.id,
@@ -223,6 +247,7 @@ export default async function PostPage({ params }: PageProps) {
               coverImage: post.coverImage,
               status: post.status,
               publishedAt: post.publishedAt?.toISOString() ?? null,
+              updatedAt: post.updatedAt.toISOString(),
               viewCount: post.viewCount,
               likeCount: post.likeCount,
               commentCount: approvedCommentCount,
@@ -237,9 +262,12 @@ export default async function PostPage({ params }: PageProps) {
             accessReason={access.reason}
             articleCreditsAvailable={access.articleCreditsAvailable ?? 0}
             commentsData={commentsData}
+            locale={locale}
+            previousPost={previousPost}
+            nextPost={nextPost}
           />
         </div>
-      </article>
+      </div>
     </EditorialShell>
   );
 }

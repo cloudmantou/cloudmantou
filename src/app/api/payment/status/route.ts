@@ -46,11 +46,27 @@ export async function GET(req: NextRequest) {
       return fail("订单不存在", 40400, 404);
     }
 
+    const cardProduct = order.productType === "CARD_PACKAGE" && order.productId
+      ? await prisma.cardPackage.findUnique({
+          where: { id: order.productId },
+          select: { slug: true, cardType: true, cardValue: true },
+        })
+      : null;
+
     return ok({
       orderNo: order.orderNo,
       status: order.status,
       title: order.title,
       amount: Number(order.amount),
+      productType: order.productType,
+      productId: order.productId,
+      product: cardProduct
+        ? {
+            productSlug: cardProduct.slug,
+            cardType: cardProduct.cardType,
+            cardValue: cardProduct.cardValue,
+          }
+        : null,
       paidAt: order.paidAt?.toISOString() || null,
       payment: order.payment
         ? {

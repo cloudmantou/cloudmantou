@@ -73,6 +73,8 @@ const OFFICIAL_PUBLIC_ROOTS = new Set([
   "store",
   "blog",
   "post",
+  "category",
+  "tag",
   "login",
   "register",
 ]);

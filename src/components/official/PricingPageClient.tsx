@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { CreditCard, KeyRound, LockKeyhole, Rocket, ShoppingBag } from "lucide-react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { ProductDetailModal } from "@/components/shop/ProductDetailModal";
 import { PaymentCheckout, type CheckoutOrder } from "@/components/payment/PaymentCheckout";
-import { PageHeader } from "@/components/official/sections";
 import type { Product } from "@/types";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { localizeOfficialPath } from "@/i18n/official";
+import { localizeEditorialOrderTitle, localizeEditorialProduct } from "@/lib/editorial-commerce";
+import { EditorialOrbitArt } from "@/components/editorial/EditorialOrbitArt";
 
 export function PricingPageClient() {
   const router = useRouter();
@@ -34,7 +36,7 @@ export function PricingPageClient() {
         return body;
       })
       .then((d) => {
-        if (Array.isArray(d.data)) setProducts(d.data);
+        if (Array.isArray(d.data)) setProducts(d.data.map((product: Product) => localizeEditorialProduct(product, locale)));
         setError("");
       })
       .catch((loadError) => {
@@ -73,7 +75,15 @@ export function PricingPageClient() {
         setCheckoutOrder({
           id: data.data.id,
           orderNo: data.data.orderNo,
-          title: data.data.title,
+          title: localizeEditorialOrderTitle(
+            {
+              title: data.data.title,
+              productType: data.data.productType ?? product.productType,
+              productId: data.data.productId ?? product.id,
+              product,
+            },
+            locale
+          ),
           amount: data.data.amount,
         });
         setCheckoutOpen(true);
@@ -85,50 +95,66 @@ export function PricingPageClient() {
 
   return (
     <>
-      <PageHeader
-        title={copy.title}
-        description={copy.description}
-      />
-      <div className="official-container" style={{ paddingBottom: 48 }}>
-        <div
-          className="official-prose"
-          style={{
-            marginBottom: 20,
-            padding: 16,
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            background: "var(--card)",
-          }}
-        >
-          <strong>{copy.noticeTitle}</strong>
-          <p style={{ marginBottom: 0 }}>
-            {copy.noticeBody}
-          </p>
-        </div>
-        {error ? <p role="alert" style={{ color: "var(--rose)", marginBottom: 16 }}>{error}</p> : null}
-        <div
-          className="product-grid"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}
-        >
-          {products.map((product, index) => (
-            <ProductCard
-              key={product.id}
-              index={index}
-              product={product}
-              loggedIn={isLoggedIn}
-              onBuy={handleBuy}
-              onSelect={(p) => {
-                setSelected(p);
-                setDetailOpen(true);
-              }}
-            />
-          ))}
-        </div>
-        {loading ? (
-          <p style={{ color: "var(--text-muted)" }}>{copy.loading}</p>
-        ) : products.length === 0 && !error ? (
-          <p style={{ color: "var(--text-muted)" }}>{copy.empty}</p>
-        ) : null}
+      <div className="editorial-pricing-page">
+        <section className="editorial-pricing-intro">
+          <div className="editorial-container editorial-pricing-hero-grid">
+            <div>
+              <h1>{locale === "en" ? "Pricing & support" : "定价与支付"}</h1>
+              <p>{copy.description}</p>
+            </div>
+            <EditorialOrbitArt label={locale === "en" ? "Membership support orbit" : "会员支持轨道插画"} />
+          </div>
+        </section>
+
+        <section className="editorial-container editorial-pricing-body">
+          <div className="editorial-pricing-notice">
+            <span><LockKeyhole size={25} /></span>
+            <div><strong>{copy.noticeTitle}</strong><p>{copy.noticeBody}</p></div>
+          </div>
+
+          <div className="editorial-purchase-flow" aria-label={locale === "en" ? "Purchase flow" : "购买流程"}>
+            {[
+              [ShoppingBag, locale === "en" ? "Choose" : "选择商品"],
+              [CreditCard, locale === "en" ? "Pay" : "完成支付"],
+              [KeyRound, locale === "en" ? "Receive" : "获取权益"],
+              [Rocket, locale === "en" ? "Use" : "开始使用"],
+            ].map(([Icon, label], index) => {
+              const FlowIcon = Icon as typeof ShoppingBag;
+              return <span key={String(label)}><FlowIcon size={22} /><b>{label as string}</b>{index < 3 ? <i aria-hidden="true">→</i> : null}</span>;
+            })}
+          </div>
+
+          {error ? <p className="editorial-pricing-error" role="alert">{error}</p> : null}
+          <div className="editorial-pricing-products product-grid">
+            {products.map((product, index) => (
+              <ProductCard
+                key={product.id}
+                index={index}
+                product={product}
+                loggedIn={isLoggedIn}
+                onBuy={handleBuy}
+                onSelect={(selectedProduct) => {
+                  setSelected(selectedProduct);
+                  setDetailOpen(true);
+                }}
+              />
+            ))}
+          </div>
+          {loading ? (
+            <p className="editorial-pricing-state" aria-live="polite">{copy.loading}</p>
+          ) : products.length === 0 && !error ? (
+            <p className="editorial-pricing-state">{copy.empty}</p>
+          ) : null}
+
+          <section className="editorial-pricing-trust">
+            {[
+              [locale === "en" ? "Secure payment" : "安全支付", locale === "en" ? "Provider-signed payment requests" : "支付请求由服务端签名"],
+              [locale === "en" ? "Automatic delivery" : "自动发货", locale === "en" ? "Benefits are delivered after payment" : "付款完成后自动交付权益"],
+              [locale === "en" ? "Order history" : "订单留痕", locale === "en" ? "Review orders in the account center" : "会员中心可查询订单与交付"],
+              [locale === "en" ? "Privacy" : "隐私保护", locale === "en" ? "Sensitive payment data stays with providers" : "敏感支付信息由支付平台处理"],
+            ].map(([title, body]) => <div key={title}><strong>{title}</strong><p>{body}</p></div>)}
+          </section>
+        </section>
       </div>
 
       <ProductDetailModal

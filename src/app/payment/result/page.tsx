@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
+import { localizeEditorialOrderTitle } from "@/lib/editorial-commerce";
 
 const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
 
@@ -56,7 +57,17 @@ function PaymentResultInner() {
           setStatus("error");
           return;
         }
-        setTitle(data.data?.title || "");
+        setTitle(
+          localizeEditorialOrderTitle(
+            {
+              title: data.data?.title || "",
+              productType: data.data?.productType,
+              productId: data.data?.productId,
+              product: data.data?.product,
+            },
+            locale
+          )
+        );
         setAmount(data.data?.amount ?? null);
         if (data.data?.status === "PAID" && !data.data?.deliveryPending) {
           setStatus("paid");
@@ -84,7 +95,7 @@ function PaymentResultInner() {
     return () => {
       cancelled = true;
     };
-  }, [copy.confirmingProvider, copy.delayed, copy.deliveryPending, orderNo, returnParams]);
+  }, [copy.confirmingProvider, copy.delayed, copy.deliveryPending, locale, orderNo, returnParams]);
 
   useEffect(() => {
     if (status !== "paid") return;
@@ -95,7 +106,7 @@ function PaymentResultInner() {
   }, [status, router]);
 
   return (
-    <div className="payment-result-page">
+    <div className="payment-result-page editorial-payment-result">
       <div className="payment-result-card">
         {status === "loading" ? (
           <>
@@ -145,7 +156,7 @@ export default function PaymentResultPage() {
   return (
     <Suspense
       fallback={
-        <div className="payment-result-page">
+        <div className="payment-result-page editorial-payment-result">
           <div className="payment-result-card">
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
           </div>

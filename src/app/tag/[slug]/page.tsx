@@ -15,32 +15,32 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getRequestLocale()]);
-  if (locale === "en" && slug !== "product-notes") {
-    return { title: "Category not found" };
+  if (locale === "en" && !ENGLISH_EDITORIAL_TAGS.some((tag) => tag.slug === slug)) {
+    return { title: "Tag not found" };
   }
-  const [baseCtx, category] = await Promise.all([
+  const [baseCtx, tag] = await Promise.all([
     getSeoContext(locale),
-    prisma.category.findUnique({ where: { slug }, select: { name: true, description: true, slug: true } }),
+    prisma.tag.findUnique({ where: { slug }, select: { name: true, slug: true } }),
   ]);
   const ctx = withEditorialSeoContext(baseCtx);
-  if (!category) return { title: locale === "en" ? "Category not found" : "分类不存在" };
-  const localized = localizeEditorialTaxonomy("category", category, locale);
+  if (!tag) return { title: locale === "en" ? "Tag not found" : "标签不存在" };
+  const localized = localizeEditorialTaxonomy("tag", tag, locale);
   return buildPageMetadata(ctx, {
-    title: locale === "en" ? `${localized.name} — category` : `${localized.name} - 文章分类`,
-    description: locale === "en" ? `Articles filed under ${localized.name}.` : category.description || `${localized.name} 相关文章。`,
-    path: `/category/${slug}`,
+    title: locale === "en" ? `Posts tagged ${localized.name}` : `标签：${localized.name}`,
+    description: locale === "en" ? `Articles tagged ${localized.name}.` : `带有 ${localized.name} 标签的文章。`,
+    path: `/tag/${slug}`,
   });
 }
 
-export default async function CategoryPage({ params }: PageProps) {
+export default async function TagPage({ params }: PageProps) {
   const [{ slug }, locale] = await Promise.all([params, getRequestLocale()]);
-  if (locale === "en" && slug !== "product-notes") notFound();
-  const category = await prisma.category.findUnique({ where: { slug }, select: { id: true, name: true, slug: true, description: true } });
-  if (!category) notFound();
+  if (locale === "en" && !ENGLISH_EDITORIAL_TAGS.some((item) => item.slug === slug)) notFound();
+  const tag = await prisma.tag.findUnique({ where: { slug }, select: { id: true, name: true, slug: true } });
+  if (!tag) notFound();
 
   const [postRows, categoryRows, tagRows, totalPostCount] = await Promise.all([
     prisma.post.findMany({
-      where: { status: { in: ["PUBLISHED", "PAID_ONLY"] }, categoryId: category.id },
+      where: { status: { in: ["PUBLISHED", "PAID_ONLY"] }, tags: { some: { tagId: tag.id } } },
       orderBy: [{ isTop: "desc" }, { publishedAt: "desc" }],
       select: {
         slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
@@ -85,19 +85,19 @@ export default async function CategoryPage({ params }: PageProps) {
     : tagRows
         .filter((item) => item._count.posts > 0)
         .map((item) => localizeEditorialTaxonomy("tag", { slug: item.slug, name: item.name, count: item._count.posts }, locale));
-  const localizedCategory = localizeEditorialTaxonomy("category", category, locale);
+  const localizedTag = localizeEditorialTaxonomy("tag", tag, locale);
 
   return (
     <EditorialShell locale={locale}>
       <EditorialArchivePage
         locale={locale}
-        title={localizedCategory.name}
-        description={locale === "en" ? `Posts filed in ${localizedCategory.name}.` : category.description || `${localizedCategory.name} 相关实践记录。`}
+        title={locale === "en" ? `Posts tagged ${localizedTag.name}` : `标签：${localizedTag.name}`}
+        description={locale === "en" ? `Field notes connected by the ${localizedTag.name} topic.` : `围绕 ${localizedTag.name} 汇总的实践文章。`}
         posts={posts}
         categories={categories}
         tags={tags}
         totalPosts={locale === "en" ? 1 : totalPostCount}
-        activeCategory={slug}
+        activeTag={slug}
       />
     </EditorialShell>
   );

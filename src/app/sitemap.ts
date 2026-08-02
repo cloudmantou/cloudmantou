@@ -46,12 +46,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       orderBy: { publishedAt: "desc" },
     });
 
-    const postPages: MetadataRoute.Sitemap = posts.map((p) => ({
-      url: `${baseUrl}/post/${p.slug}`,
-      lastModified: p.updatedAt,
-      changeFrequency: "weekly" as const,
-      priority: isOfficialSite ? 0.6 : 0.8,
-    }));
+    const postPages: MetadataRoute.Sitemap = posts.flatMap((p) => {
+      const locales = isOfficialSite && p.slug === "mantou-assistant" ? (["zh", "en"] as const) : (["zh"] as const);
+      return locales.map((locale) => ({
+        url: `${baseUrl}${localizeOfficialPath(`/post/${p.slug}`, locale)}`,
+        lastModified: p.updatedAt,
+        changeFrequency: "weekly" as const,
+        priority: isOfficialSite ? 0.6 : 0.8,
+      }));
+    });
 
     const storeApps = isOfficialSite
       ? await prisma.storeApp.findMany({
@@ -70,13 +73,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
 
     const categories = await prisma.category.findMany({ select: { slug: true } });
-    const categoryPages: MetadataRoute.Sitemap = categories.map((c) => ({
-      url: `${baseUrl}/category/${c.slug}`,
-      changeFrequency: "weekly" as const,
-      priority: isOfficialSite ? 0.5 : 0.6,
-    }));
+    const categoryPages: MetadataRoute.Sitemap = categories.flatMap((category) => {
+      const locales = isOfficialSite && category.slug === "product-notes" ? (["zh", "en"] as const) : (["zh"] as const);
+      return locales.map((locale) => ({
+        url: `${baseUrl}${localizeOfficialPath(`/category/${category.slug}`, locale)}`,
+        changeFrequency: "weekly" as const,
+        priority: isOfficialSite ? 0.5 : 0.6,
+      }));
+    });
 
-    return [...staticPages, ...storePages, ...postPages, ...categoryPages];
+    const tags = await prisma.tag.findMany({ select: { slug: true } });
+    const translatedTags = new Set(["ios", "indie-development", "product-practice"]);
+    const tagPages: MetadataRoute.Sitemap = tags.flatMap((tag) => {
+      const locales = isOfficialSite && translatedTags.has(tag.slug) ? (["zh", "en"] as const) : (["zh"] as const);
+      return locales.map((locale) => ({
+        url: `${baseUrl}${localizeOfficialPath(`/tag/${tag.slug}`, locale)}`,
+        changeFrequency: "weekly" as const,
+        priority: isOfficialSite ? 0.45 : 0.55,
+      }));
+    });
+
+    return [...staticPages, ...storePages, ...postPages, ...categoryPages, ...tagPages];
   } catch {
     return staticPages;
   }

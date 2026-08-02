@@ -221,6 +221,8 @@ export async function POST(req: NextRequest) {
       title: order.title,
       amount: Number(order.amount),
       status: order.status,
+      productType: order.productType,
+      productId: order.productId,
     });
   } catch (error) {
     console.error("[Create Order Error]", error);

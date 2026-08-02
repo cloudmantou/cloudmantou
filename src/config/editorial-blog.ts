@@ -96,7 +96,7 @@ export const EDITORIAL_PROJECTS_EN = [
   {
     name: "Deployment Lab",
     description: "Notes on Node.js, Next.js, reverse proxies, and release workflows.",
-    href: "/category/devops",
+    href: "/blog#articles",
     accent: "yellow",
   },
 ] as const;

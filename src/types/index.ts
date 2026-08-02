@@ -41,6 +41,10 @@ export type Product = {
   accent: Accent;
   cover: string;
   productType?: "VIP_MONTH" | "VIP_QUARTER" | "VIP_YEAR" | "PAID_POST" | "CARD_PACKAGE";
+  /** Stable public identity used to localize dynamic card packages without trusting display text. */
+  productSlug?: string;
+  cardType?: "VIP_DAYS" | "PAID_ARTICLE" | "BALANCE" | "GENERIC";
+  cardValue?: number;
 };
 
 export type MoodType = "happy" | "productive" | "tired" | "excited" | "chill";

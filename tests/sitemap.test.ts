@@ -4,6 +4,7 @@ const prismaMock = vi.hoisted(() => ({
   post: { findMany: vi.fn() },
   storeApp: { findMany: vi.fn() },
   category: { findMany: vi.fn() },
+  tag: { findMany: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
@@ -19,6 +20,7 @@ describe("official sitemap", () => {
       { slug: "xiangse", updatedAt: new Date("2026-07-01T00:00:00Z") },
     ]);
     prismaMock.category.findMany.mockResolvedValue([{ slug: "tools" }]);
+    prismaMock.tag.findMany.mockResolvedValue([{ slug: "ios" }]);
   });
 
   it("includes both localized store detail URLs", async () => {

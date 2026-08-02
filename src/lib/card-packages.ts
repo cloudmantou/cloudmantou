@@ -163,6 +163,9 @@ export function cardPackageToProduct(
       pkg.cover ||
       "linear-gradient(135deg, rgba(232,185,100,0.22), rgba(77,217,182,0.12))",
     productType: "CARD_PACKAGE",
+    productSlug: pkg.slug,
+    cardType: pkg.cardType,
+    cardValue: pkg.cardValue,
   };
 }
 
