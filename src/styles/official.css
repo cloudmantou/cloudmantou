@@ -2096,3 +2096,101 @@ html.official-site-root body.official-site-body {
   .official-version-row { grid-template-columns: 1fr auto; }
   .official-version-row small { display: none; }
 }
+
+.official-download-platforms {
+  padding: 0 0 48px;
+}
+
+.official-download-platform-heading {
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+
+.official-download-platform-heading h2 {
+  margin: 0;
+  color: #071738;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  letter-spacing: -0.035em;
+}
+
+.official-download-platform-heading p {
+  margin: 10px 0 0;
+  color: #657188;
+  line-height: 1.7;
+}
+
+.official-download-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.official-download-platform-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid #dfe7f3;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fff, #f5f8ff);
+  box-shadow: 0 16px 36px rgba(36, 61, 105, 0.07);
+}
+
+.official-download-platform-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 17px;
+  color: #1769ff;
+  background: #eaf1ff;
+}
+
+.official-download-platform-card h3 {
+  margin: 0;
+  color: #14223d;
+  font-size: 1.18rem;
+}
+
+.official-download-platform-card p {
+  margin: 5px 0 0;
+  color: #657188;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.official-download-platform-card .official-btn,
+.official-download-pending {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  justify-content: center;
+}
+
+.official-download-pending {
+  min-height: 43px;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 16px;
+  border: 1px solid #dfe5ef;
+  border-radius: 12px;
+  color: #758197;
+  background: #f4f6f9;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .official-download-platforms {
+    padding-bottom: 36px;
+  }
+
+  .official-download-platform-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .official-download-platform-card {
+    padding: 20px;
+  }
+}

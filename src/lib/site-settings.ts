@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { parseContactLinks, type ContactLink } from "@/lib/contact-links";
+import { getDesktopDownloadUrls, normalizeDesktopDownloadUrl } from "@/lib/desktop-downloads";
 
 import {
   BRAND_NAME,
@@ -18,6 +19,8 @@ export type SiteSettings = {
   siteDescription: string;
   homeTypingPhrases: string[];
   contactLinks: ContactLink[];
+  windowsDownloadUrl: string;
+  macosDownloadUrl: string;
 };
 
 export const DEFAULT_HOME_TYPING_PHRASES = [
@@ -26,6 +29,8 @@ export const DEFAULT_HOME_TYPING_PHRASES = [
   "Next.js · Prisma · MySQL · NextAuth · Docker",
   "也维护自研工具馒头助手，支持香色闺阁、源阅读等 iOS 应用安装。",
 ];
+
+const defaultDesktopDownloads = getDesktopDownloadUrls();
 
 const DEFAULTS: SiteSettings = {
   openRegistration: true,
@@ -37,6 +42,8 @@ const DEFAULTS: SiteSettings = {
   siteDescription: DEFAULT_SITE_DESCRIPTION,
   homeTypingPhrases: DEFAULT_HOME_TYPING_PHRASES,
   contactLinks: [],
+  windowsDownloadUrl: defaultDesktopDownloads[0].url ?? "",
+  macosDownloadUrl: defaultDesktopDownloads[1].url ?? "",
 };
 
 let cache: { value: SiteSettings; expiresAt: number } | null = null;
@@ -60,6 +67,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
           "siteDescription",
           "homeTypingPhrases",
           "contactLinks",
+          "windowsDownloadUrl",
+          "macosDownloadUrl",
         ],
       },
     },
@@ -95,6 +104,12 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     siteDescription: map.siteDescription || DEFAULTS.siteDescription,
     homeTypingPhrases,
     contactLinks: parseContactLinks(map.contactLinks),
+    windowsDownloadUrl:
+      normalizeDesktopDownloadUrl(map.windowsDownloadUrl) ??
+      (Object.hasOwn(map, "windowsDownloadUrl") ? "" : DEFAULTS.windowsDownloadUrl),
+    macosDownloadUrl:
+      normalizeDesktopDownloadUrl(map.macosDownloadUrl) ??
+      (Object.hasOwn(map, "macosDownloadUrl") ? "" : DEFAULTS.macosDownloadUrl),
   };
 
   cache = { value, expiresAt: Date.now() + CACHE_MS };

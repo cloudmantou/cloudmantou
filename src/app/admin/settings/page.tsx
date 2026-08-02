@@ -36,6 +36,8 @@ export default function AdminSettingsPage() {
     maintenanceMode: false,
     homeTypingPhrases: "",
     contactLinks: [] as ContactLink[],
+    windowsDownloadUrl: "",
+    macosDownloadUrl: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -166,6 +168,37 @@ export default function AdminSettingsPage() {
                 onChange={(e) => update("adminEmail", e.target.value)}
                 className="form-input mono"
                 placeholder="admin@example.com"
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section className="data-panel">
+          <div className="data-panel-header">
+            <span className="data-panel-title">客户端下载</span>
+            <span className="data-panel-meta">Windows / macOS</span>
+          </div>
+          <div className="settings-form">
+            <Field label="Windows 下载地址" hint="HTTPS 链接或本站 / 开头的路径，留空则前台显示配置中">
+              <input
+                type="text"
+                inputMode="url"
+                value={settings.windowsDownloadUrl}
+                onChange={(e) => update("windowsDownloadUrl", e.target.value)}
+                maxLength={2000}
+                className="form-input mono"
+                placeholder="https://downloads.example.com/mantou.exe"
+              />
+            </Field>
+            <Field label="macOS 下载地址" hint="HTTPS 链接或本站 / 开头的路径，留空则前台显示配置中">
+              <input
+                type="text"
+                inputMode="url"
+                value={settings.macosDownloadUrl}
+                onChange={(e) => update("macosDownloadUrl", e.target.value)}
+                maxLength={2000}
+                className="form-input mono"
+                placeholder="https://downloads.example.com/mantou.dmg"
               />
             </Field>
           </div>

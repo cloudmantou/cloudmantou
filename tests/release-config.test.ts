@@ -124,7 +124,7 @@ describe("release configuration", () => {
     expect(script).toContain("https://openapi.alipay.com/gateway.do");
   });
 
-  it("overrides vulnerable transitive image and CSS processors", () => {
+  it("overrides vulnerable transitive build and test dependencies", () => {
     const workspace = readProjectFile("pnpm-workspace.yaml");
     const packageJson = JSON.parse(readProjectFile("package.json")) as {
       pnpm?: { overrides?: Record<string, string> };
@@ -134,6 +134,9 @@ describe("release configuration", () => {
       sharp: "0.35.3",
       esbuild: "0.25.12",
       vite: "6.4.3",
+      "brace-expansion@<1.1.17": "1.1.17",
+      "brace-expansion@>=2.0.0 <2.1.3": "2.1.3",
+      "brace-expansion@>=4.0.0 <5.0.8": "5.0.8",
     };
 
     for (const [dependency, version] of Object.entries(expectedOverrides)) {

@@ -40,9 +40,9 @@ export const siteConfig = {
   blogUrl: DEFAULT_BLOG_SITE_URL,
   nav: isOfficialSite
       ? [
+        { label: "安装", value: "download", href: "/download" },
         { label: "功能", value: "features", href: "/features" },
         { label: "应用商店", value: "store", href: "/store" },
-        { label: "安装", value: "download", href: "/download" },
         { label: "教程", value: "docs", href: "/docs" },
       ]
     : [

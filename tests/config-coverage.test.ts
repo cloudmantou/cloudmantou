@@ -51,6 +51,8 @@ describe("site settings production exports", () => {
       maintenanceMode: false,
       homeTypingPhrases: DEFAULT_HOME_TYPING_PHRASES,
       contactLinks: [],
+      windowsDownloadUrl: "",
+      macosDownloadUrl: "",
     });
     expect(second).toBe(first);
     expect(prismaMock.findMany).toHaveBeenCalledTimes(1);
@@ -65,6 +67,8 @@ describe("site settings production exports", () => {
       { key: "siteName", value: "Configured name" },
       { key: "siteSubtitle", value: "Configured subtitle" },
       { key: "siteDescription", value: "Configured description" },
+      { key: "windowsDownloadUrl", value: "https://downloads.example/mantou.exe" },
+      { key: "macosDownloadUrl", value: "/downloads/mantou.dmg" },
       { key: "homeTypingPhrases", value: JSON.stringify(["First", " ", 42, "Second"]) },
       {
         key: "contactLinks",
@@ -92,6 +96,8 @@ describe("site settings production exports", () => {
       siteSubtitle: "Configured subtitle",
       siteDescription: "Configured description",
       homeTypingPhrases: ["First", "Second"],
+      windowsDownloadUrl: "https://downloads.example/mantou.exe",
+      macosDownloadUrl: "/downloads/mantou.dmg",
     });
     expect(settings.contactLinks).toHaveLength(1);
     expect(await getInitialCommentStatus()).toBe("APPROVED");

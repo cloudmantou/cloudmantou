@@ -6,6 +6,7 @@ import {
   OFFICIAL_HERO,
   getOfficialHomeContent,
 } from "@/config/official-home";
+import { siteConfig } from "@/config/site";
 
 describe("official homepage content", () => {
   it("keeps the three iOS compatibility promises separate", () => {
@@ -29,16 +30,17 @@ describe("official homepage content", () => {
     ]);
   });
 
-  it("separates card-key purchase from the free tool download", () => {
+  it("puts the free tool download before card-key purchase", () => {
     expect(OFFICIAL_HERO.title).toBe("一款免费的 iOS 设备必备工具");
     expect(OFFICIAL_HERO.primaryAction).toEqual({
-      label: "购买卡密",
-      href: "/pricing",
-    });
-    expect(OFFICIAL_HERO.secondaryAction).toEqual({
       label: "获取下载方式",
       href: "/download",
     });
+    expect(OFFICIAL_HERO.secondaryAction).toEqual({
+      label: "购买卡密",
+      href: "/pricing",
+    });
+    expect(siteConfig.nav[0]).toEqual({ label: "安装", value: "download", href: "/download" });
     expect(OFFICIAL_FREE_NOTICE).toContain("工具免费下载");
     expect(OFFICIAL_FREE_NOTICE).toContain("卡密权益以商品说明为准");
   });
@@ -47,8 +49,8 @@ describe("official homepage content", () => {
     const english = getOfficialHomeContent("en");
 
     expect(english.hero.title).toBe("A free essential toolkit for iOS devices");
-    expect(english.hero.primaryAction).toEqual({ label: "Buy a card key", href: "/pricing" });
-    expect(english.hero.secondaryAction).toEqual({ label: "Get download options", href: "/download" });
+    expect(english.hero.primaryAction).toEqual({ label: "Get download options", href: "/download" });
+    expect(english.hero.secondaryAction).toEqual({ label: "Buy a card key", href: "/pricing" });
     expect(english.compatibility.baseline).toBe("iOS 15.0+");
     expect(english.compatibility.virtualLocation).toBe("iOS 15+");
     expect(english.features).toHaveLength(6);

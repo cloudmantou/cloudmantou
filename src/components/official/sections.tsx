@@ -50,11 +50,11 @@ export function HeroSection() {
           <p>{copy.hero.description}</p>
           <div className="official-home-actions">
             <Link href={localizeOfficialPath(copy.hero.primaryAction.href, locale)} className="official-btn official-btn-primary">
-              <FileKey2 size={17} aria-hidden="true" />
+              <Download size={17} aria-hidden="true" />
               {copy.hero.primaryAction.label}
             </Link>
             <Link href={localizeOfficialPath(copy.hero.secondaryAction.href, locale)} className="official-btn official-btn-ghost">
-              <Download size={17} aria-hidden="true" />
+              <FileKey2 size={17} aria-hidden="true" />
               {copy.hero.secondaryAction.label}
             </Link>
           </div>
@@ -249,11 +249,11 @@ export function FinalDownloadSection() {
         </div>
         <div>
           <span className="official-final-actions">
-            <Link href={localizeOfficialPath("/pricing", locale)} className="official-btn official-btn-primary">
-              <FileKey2 size={17} /> {copy.hero.primaryAction.label}
+            <Link href={localizeOfficialPath(copy.hero.primaryAction.href, locale)} className="official-btn official-btn-primary">
+              <Download size={17} /> {copy.hero.primaryAction.label}
             </Link>
-            <Link href={localizeOfficialPath("/download", locale)} className="official-btn official-btn-ghost">
-              <Download size={17} /> {copy.hero.secondaryAction.label}
+            <Link href={localizeOfficialPath(copy.hero.secondaryAction.href, locale)} className="official-btn official-btn-ghost">
+              <FileKey2 size={17} /> {copy.hero.secondaryAction.label}
             </Link>
           </span>
           <p><CheckCircle2 size={15} />{copy.final.notice}</p>

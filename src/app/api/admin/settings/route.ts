@@ -6,6 +6,7 @@ import { z } from "zod";
 import { DEFAULT_HOME_TYPING_PHRASES, invalidateSiteSettingsCache } from "@/lib/site-settings";
 import { auditAdminAction } from "@/lib/admin-audit-log";
 import { CONTACT_LINK_KINDS, serializeContactLinks } from "@/lib/contact-links";
+import { getDesktopDownloadUrls, normalizeDesktopDownloadUrl } from "@/lib/desktop-downloads";
 
 const SETTING_KEYS = [
   "siteName",
@@ -20,6 +21,8 @@ const SETTING_KEYS = [
   "maintenanceMode",
   "homeTypingPhrases",
   "contactLinks",
+  "windowsDownloadUrl",
+  "macosDownloadUrl",
 ] as const;
 
 const contactLinkSchema = z.object({
@@ -33,7 +36,15 @@ const contactLinkSchema = z.object({
   qrImageUrl: z.string().max(500).optional(),
 });
 
-// 严格白名单：只允许这 10 个 key，其它字段直接报错。
+const desktopDownloadUrlSchema = z
+  .string()
+  .max(2000)
+  .refine(
+    (value) => value.trim() === "" || normalizeDesktopDownloadUrl(value) !== null,
+    "下载地址只支持 HTTPS 链接或本站 / 开头的路径",
+  );
+
+// 严格白名单：只允许 schema 中声明的 key，其它字段直接报错。
 // 此前开放 Object.entries(body) 会写入任意 key，存在污染 / 覆盖风险。
 const settingsSchema = z
   .object({
@@ -49,6 +60,8 @@ const settingsSchema = z
     maintenanceMode: z.boolean().optional(),
     homeTypingPhrases: z.string().max(8000).optional(),
     contactLinks: z.array(contactLinkSchema).max(12).optional(),
+    windowsDownloadUrl: desktopDownloadUrlSchema.optional(),
+    macosDownloadUrl: desktopDownloadUrlSchema.optional(),
   })
   .strict();
 
@@ -72,6 +85,9 @@ export async function GET() {
     for (const s of settings) {
       map[s.key] = s.value;
     }
+    const defaultDownloads = new Map(
+      getDesktopDownloadUrls().map((download) => [download.id, download.url]),
+    );
 
     return ok({
       siteName: map.siteName || "馒头的博客",
@@ -109,6 +125,12 @@ export async function GET() {
           return [];
         }
       })(),
+      windowsDownloadUrl:
+        normalizeDesktopDownloadUrl(map.windowsDownloadUrl) ??
+        (Object.hasOwn(map, "windowsDownloadUrl") ? "" : defaultDownloads.get("windows") ?? ""),
+      macosDownloadUrl:
+        normalizeDesktopDownloadUrl(map.macosDownloadUrl) ??
+        (Object.hasOwn(map, "macosDownloadUrl") ? "" : defaultDownloads.get("macos") ?? ""),
     });
   } catch (error) {
     if (error instanceof ApiError) {
@@ -139,6 +161,8 @@ export async function PUT(req: NextRequest) {
       } else if (key === "contactLinks") {
         stored = serializeContactLinks(Array.isArray(value) ? value : []);
         type = "json";
+      } else if (key === "windowsDownloadUrl" || key === "macosDownloadUrl") {
+        stored = normalizeDesktopDownloadUrl(String(value)) ?? "";
       } else {
         stored = String(value);
       }
