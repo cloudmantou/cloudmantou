@@ -91,6 +91,18 @@ describe("SEO production exports", () => {
     });
   });
 
+  it("keeps site metadata available when runtime settings storage is temporarily unavailable", async () => {
+    getSiteSettingsMock.mockRejectedValueOnce(new Error("database unavailable"));
+
+    await expect(getSeoContext()).resolves.toEqual({
+      name: BRAND_NAME,
+      subtitle: DEFAULT_SITE_SUBTITLE,
+      description: DEFAULT_SITE_DESCRIPTION,
+      url: DEFAULT_SITE_URL,
+      locale: "zh",
+    });
+  });
+
   it("builds canonical root metadata for search and social crawlers", () => {
     const metadata = buildRootMetadata(ctx);
 
@@ -181,7 +193,7 @@ describe("SEO production exports", () => {
     });
     expect(buildBlogJsonLd(ctx)).toMatchObject({
       "@type": "Blog",
-      url: "https://example.test/?section=blog",
+      url: "https://example.test/blog",
       publisher: { "@type": "Person", name: "Mantou" },
     });
   });
@@ -221,6 +233,26 @@ describe("SEO production exports", () => {
     expect(fallback.description).toBe(ctx.description);
     expect(fallback.datePublished).toBeUndefined();
     expect(fallback).not.toHaveProperty("image");
+  });
+
+  it("localizes article structured data and expands bundled image paths", () => {
+    const englishContext: SeoContext = { ...ctx, locale: "en" };
+    const jsonLd = buildBlogPostingJsonLd(englishContext, {
+      title: "Product note",
+      slug: "mantou-assistant",
+      excerpt: "English article",
+      coverImage: "/brand/mantou-assistant-icon.png",
+      publishedAt: new Date("2026-08-02T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-02T00:00:00.000Z"),
+      authorName: "Mantou",
+    });
+
+    expect(jsonLd).toMatchObject({
+      inLanguage: "en-US",
+      image: ["https://example.test/brand/mantou-assistant-icon.png"],
+      url: "https://example.test/en/post/mantou-assistant",
+      mainEntityOfPage: "https://example.test/en/post/mantou-assistant",
+    });
   });
 
   it("loads the blog-mode keyword and publisher branches", async () => {

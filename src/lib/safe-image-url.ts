@@ -1,4 +1,5 @@
 const UPLOAD_PATH_RE = /^\/uploads\/[\w./-]+$/;
+const BUNDLED_COVER_PATH_RE = /^\/(brand|editorial)\/[\w./-]+$/;
 
 /** 评论头像：仅允许本站上传路径 */
 export function isSafeAvatarSrc(src: string | null | undefined): boolean {
@@ -38,11 +39,11 @@ export function isSafeExternalHref(href: string): boolean {
   }
 }
 
-/** 封面图：/uploads/、受限 data URL（禁 SVG）、或 https 外链 */
+/** 封面图：托管上传、内置品牌/编辑资源、受限 data URL（禁 SVG）或 https 外链 */
 export function isSafeCoverImageUrl(val: string): boolean {
   const trimmed = val.trim();
   if (!trimmed) return false;
-  if (UPLOAD_PATH_RE.test(trimmed)) return true;
+  if (UPLOAD_PATH_RE.test(trimmed) || BUNDLED_COVER_PATH_RE.test(trimmed)) return true;
   if (trimmed.startsWith("data:image/")) {
     if (/^data:image\/svg/i.test(trimmed)) return false;
     return /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(trimmed);

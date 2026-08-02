@@ -1,93 +1,67 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { OfficialShell } from "@/components/official/OfficialShell";
-import { PageHeader } from "@/components/official/sections";
-import { buildPageMetadata, getSeoContext } from "@/lib/seo";
-import { getOfficialMessages } from "@/i18n/official";
+import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { EditorialArticleCard, type EditorialPostCardData } from "@/components/editorial/EditorialArticleCard";
+import { getEditorialBlogCopy } from "@/config/editorial-blog";
+import { buildPageMetadata, getSeoContext, withEditorialSeoContext } from "@/lib/seo";
 import { getRequestLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
-  const copy = getOfficialMessages(locale).pages.blog;
-  const ctx = await getSeoContext(locale);
+  const copy = getEditorialBlogCopy(locale);
+  const ctx = withEditorialSeoContext(await getSeoContext(locale));
   return buildPageMetadata(ctx, {
-    title: copy.title,
-    description: copy.metaDescription,
+    title: copy.nav[1].label,
+    description: locale === "en" ? "Field notes from real software and product work." : "来自真实开发、部署与产品实践的文章。",
     path: "/blog",
   });
 }
 
 export default async function BlogPage() {
   const locale = await getRequestLocale();
-  const copy = getOfficialMessages(locale).pages.blog;
-  let posts: Array<{
-    title: string;
-    slug: string;
-    excerpt: string | null;
-    publishedAt: Date | null;
-    category: { name: string } | null;
-  }> = [];
+  const copy = getEditorialBlogCopy(locale);
+  let posts: EditorialPostCardData[] = [];
 
-  try {
-    if (locale === "en") throw new Error("English editorial content is not published yet");
-    posts = await prisma.post.findMany({
-      where: { status: "PUBLISHED" },
-      orderBy: { publishedAt: "desc" },
-      select: {
-        title: true,
-        slug: true,
-        excerpt: true,
-        publishedAt: true,
-        category: { select: { name: true } },
-      },
-    });
-  } catch {
-    posts = [];
+  if (locale === "zh") {
+    try {
+      posts = await prisma.post.findMany({
+        where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } },
+        orderBy: [{ isTop: "desc" }, { publishedAt: "desc" }],
+        select: {
+          slug: true,
+          title: true,
+          excerpt: true,
+          coverImage: true,
+          publishedAt: true,
+          status: true,
+          category: { select: { name: true } },
+          author: { select: { username: true, nickname: true } },
+        },
+      });
+    } catch {
+      posts = [];
+    }
   }
 
   return (
-    <OfficialShell>
-      <PageHeader
-        title={copy.title}
-        description={copy.description}
-      />
-      <div className="official-container" style={{ display: "grid", gap: 12, paddingBottom: 56 }}>
-        {posts.map((post) => (
-          <Link
-            key={post.slug}
-            href={`/post/${post.slug}`}
-            style={{
-              textDecoration: "none",
-              color: "inherit",
-              padding: "16px 18px",
-              borderRadius: 12,
-              border: "1px solid var(--border)",
-              background: "var(--card)",
-            }}
-          >
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-              {post.category ? <span className="official-tag">{post.category.name}</span> : null}
-              {post.publishedAt ? (
-                <span className="official-tag">
-                  {post.publishedAt.toLocaleDateString(locale === "en" ? "en-US" : "zh-CN")}
-                </span>
-              ) : null}
-            </div>
-            <strong style={{ fontSize: "1.05rem" }}>{post.title}</strong>
-            {post.excerpt ? (
-              <p style={{ margin: "8px 0 0", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                {post.excerpt}
-              </p>
-            ) : null}
-          </Link>
-        ))}
-        {posts.length === 0 ? (
-          <p style={{ color: "var(--text-muted)" }}>{copy.empty}</p>
-        ) : null}
-      </div>
-    </OfficialShell>
+    <EditorialShell locale={locale}>
+      <section className="editorial-archive-hero">
+        <div className="editorial-container">
+          <span>ARCHIVE / {new Date().getFullYear()}</span>
+          <h1>{copy.nav[1].label}</h1>
+          <p>{locale === "en" ? "Real projects, deployment notes, and product retrospectives." : "真实项目、部署记录、产品思考与踩坑复盘。"}</p>
+        </div>
+      </section>
+      <section className="editorial-section editorial-archive-section">
+        <div className="editorial-container editorial-archive-grid">
+          {posts.map((post, index) => (
+            <EditorialArticleCard key={post.slug} post={post} locale={locale} variant={index === 0 ? "lead" : "card"} index={index} />
+          ))}
+          {posts.length === 0 ? <p className="editorial-empty">{locale === "en" ? "English articles are being prepared." : "文章正在整理中。"}</p> : null}
+        </div>
+      </section>
+    </EditorialShell>
   );
 }

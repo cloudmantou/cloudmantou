@@ -72,6 +72,7 @@ const OFFICIAL_PUBLIC_ROOTS = new Set([
   "pricing",
   "store",
   "blog",
+  "post",
   "login",
   "register",
 ]);
@@ -123,6 +124,25 @@ export type OfficialRequestResolution = {
   rewritePath: string | null;
   persistLocale: OfficialLocale | null;
 };
+
+export function buildOfficialRewriteUrl(requestUrl: string | URL, pathname: string): URL {
+  const target = new URL(requestUrl);
+  target.pathname = pathname;
+  return target;
+}
+
+export function resolveRoutedOfficialRequest(
+  localeHeader?: string | null,
+  internalRewriteHeader?: string | null
+): OfficialRequestResolution | null {
+  if (internalRewriteHeader !== "1" || !isOfficialLocale(localeHeader)) return null;
+  return {
+    locale: localeHeader,
+    redirectPath: null,
+    rewritePath: null,
+    persistLocale: null,
+  };
+}
 
 export function resolveOfficialRequest(
   input: OfficialRequestResolutionInput

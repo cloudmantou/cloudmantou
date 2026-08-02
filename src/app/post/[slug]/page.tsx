@@ -6,9 +6,15 @@ import { getPostAccess } from "@/lib/post-access";
 import { countApprovedPostComments } from "@/lib/comment-count";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getCspNonce } from "@/lib/csp-nonce";
-import { buildBlogPostingJsonLd, buildPageMetadata, getSeoContext } from "@/lib/seo";
+import { buildBlogPostingJsonLd, buildPageMetadata, getSeoContext, withEditorialSeoContext } from "@/lib/seo";
 import { PostContent } from "./PostContent";
-import { MarketingShell } from "@/components/layout/MarketingShell";
+import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { EditorialStaticMantouArticle } from "@/components/editorial/EditorialStaticArticle";
+import {
+  MANTOU_ASSISTANT_ARTICLE,
+  MANTOU_ASSISTANT_ARTICLE_EN,
+} from "@/config/editorial-blog";
+import { getRequestLocale } from "@/i18n/server";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -16,14 +22,38 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const [ctx, post] = await Promise.all([
-    getSeoContext(),
-    prisma.post.findUnique({
+  const locale = await getRequestLocale();
+  const baseCtx = await getSeoContext(locale);
+  const ctx = withEditorialSeoContext(baseCtx);
+  if (locale === "en" && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
+    return buildPageMetadata(ctx, {
+      title: MANTOU_ASSISTANT_ARTICLE_EN.title,
+      description: MANTOU_ASSISTANT_ARTICLE_EN.excerpt,
+      path: `/post/${slug}`,
+      type: "article",
+      image: MANTOU_ASSISTANT_ARTICLE_EN.coverImage,
+    });
+  }
+
+  const post = await prisma.post
+    .findUnique({
       where: { slug },
       select: { title: true, excerpt: true, coverImage: true, status: true },
-    }),
-  ]);
+    })
+    .catch((error: unknown) => {
+      if (slug === MANTOU_ASSISTANT_ARTICLE.slug) return null;
+      throw error;
+    });
 
+  if (!post && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
+    return buildPageMetadata(ctx, {
+      title: MANTOU_ASSISTANT_ARTICLE.title,
+      description: MANTOU_ASSISTANT_ARTICLE.excerpt,
+      path: `/post/${slug}`,
+      type: "article",
+      image: MANTOU_ASSISTANT_ARTICLE.coverImage,
+    });
+  }
   if (!post || post.status === "DRAFT") {
     return { title: "文章不存在" };
   }
@@ -39,11 +69,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PostPage({ params }: PageProps) {
   const { slug } = await params;
-  const session = await auth();
+  const [session, locale] = await Promise.all([auth(), getRequestLocale()]);
 
-  const post = await prisma.post.findUnique({
-    where: { slug },
-    include: {
+  if (locale === "en" && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
+    return <EditorialStaticMantouArticle locale={locale} />;
+  }
+
+  const post = await prisma.post
+    .findUnique({
+      where: { slug },
+      include: {
       author: {
         select: { id: true, username: true, nickname: true, avatar: true },
       },
@@ -86,9 +121,16 @@ export default async function PostPage({ params }: PageProps) {
         orderBy: { createdAt: "desc" as const },
         take: 10,
       },
-    },
-  });
+      },
+    })
+    .catch((error: unknown) => {
+      if (slug === MANTOU_ASSISTANT_ARTICLE.slug) return null;
+      throw error;
+    });
 
+  if (!post && slug === MANTOU_ASSISTANT_ARTICLE.slug) {
+    return <EditorialStaticMantouArticle locale={locale} />;
+  }
   if (!post || post.status === "DRAFT") {
     notFound();
   }
@@ -144,14 +186,16 @@ export default async function PostPage({ params }: PageProps) {
         : null,
   };
 
-  const [ctx, nonce] = await Promise.all([getSeoContext(), getCspNonce()]);
+  const [baseCtx, nonce] = await Promise.all([getSeoContext(locale), getCspNonce()]);
+  const ctx = withEditorialSeoContext(baseCtx);
   const authorName = post.author.nickname || post.author.username;
 
   return (
-    <MarketingShell>
+    <EditorialShell locale={locale}>
       <JsonLd
         ctx={ctx}
         nonce={nonce}
+        variant="extra"
         extra={[
           buildBlogPostingJsonLd(ctx, {
             title: post.title,
@@ -165,7 +209,7 @@ export default async function PostPage({ params }: PageProps) {
         ]}
       />
       <article
-        className="min-h-screen px-4 py-10 md:px-8"
+        className="editorial-post-page min-h-screen px-4 py-10 md:px-8"
         style={{ background: "var(--article-bg)" }}
       >
         <div className="mx-auto" style={{ maxWidth: 860 }}>
@@ -196,6 +240,6 @@ export default async function PostPage({ params }: PageProps) {
           />
         </div>
       </article>
-    </MarketingShell>
+    </EditorialShell>
   );
 }

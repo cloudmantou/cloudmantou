@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "content:mantou-article": "node --env-file=.env scripts/upsert-mantou-article.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

@@ -7,7 +7,9 @@ import { authConfig } from "@/lib/auth.config";
 import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
 import {
   OFFICIAL_LOCALE_COOKIE,
+  buildOfficialRewriteUrl,
   resolveOfficialRequest,
+  resolveRoutedOfficialRequest,
   type OfficialRequestResolution,
 } from "@/i18n/official";
 
@@ -34,12 +36,7 @@ function withCsp(_req: NextRequest, response: NextResponse, nonce: string): Next
 }
 
 function getInternalRewriteUrl(req: NextRequest, pathname: string): URL {
-  const target = req.nextUrl.clone();
-  target.pathname = pathname;
-  const internalOrigin = process.env.INTERNAL_SITE_URL?.trim();
-  return internalOrigin
-    ? new URL(`${target.pathname}${target.search}`, internalOrigin)
-    : target;
+  return buildOfficialRewriteUrl(req.url, pathname);
 }
 
 function nextWithCsp(
@@ -48,6 +45,7 @@ function nextWithCsp(
   localeResolution?: OfficialRequestResolution
 ): NextResponse {
   const requestHeaders = new Headers(req.headers);
+  requestHeaders.delete("x-official-internal-rewrite");
   requestHeaders.set("x-nonce", nonce);
   if (localeResolution?.locale) {
     requestHeaders.set("x-official-locale", localeResolution.locale);
@@ -56,6 +54,9 @@ function nextWithCsp(
   }
 
   const rewritePath = localeResolution?.rewritePath;
+  if (rewritePath) {
+    requestHeaders.set("x-official-internal-rewrite", "1");
+  }
   const response = rewritePath
     ? NextResponse.rewrite(getInternalRewriteUrl(req, rewritePath), {
         request: { headers: requestHeaders },
@@ -78,13 +79,18 @@ function nextWithCsp(
 
 export default auth(async (req) => {
   const nonce = generateCspNonce();
+  const routedLocaleResolution = resolveRoutedOfficialRequest(
+    req.headers.get("x-official-locale"),
+    req.headers.get("x-official-internal-rewrite")
+  );
   const localeResolution: OfficialRequestResolution = isOfficialSite
-    ? resolveOfficialRequest({
-        pathname: req.nextUrl.pathname,
-        method: req.method,
-        cookieHeader: req.headers.get("cookie"),
-        acceptLanguage: req.headers.get("accept-language"),
-      })
+    ? routedLocaleResolution ||
+      resolveOfficialRequest({
+          pathname: req.nextUrl.pathname,
+          method: req.method,
+          cookieHeader: req.headers.get("cookie"),
+          acceptLanguage: req.headers.get("accept-language"),
+        })
     : { locale: null, redirectPath: null, rewritePath: null, persistLocale: null };
 
   if (localeResolution.redirectPath) {

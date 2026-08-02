@@ -31,6 +31,7 @@ corepack enable
 pnpm install --frozen-lockfile
 pnpm prisma generate
 pnpm prisma migrate deploy
+pnpm run content:mantou-article
 pnpm run build
 pnpm run start
 ```
@@ -58,6 +59,9 @@ pnpm prisma db seed
 ```
 
 生产环境需要在 `.env` 中设置 `SEED_ADMIN_PASSWORD`。
+
+`pnpm run content:mantou-article` 会幂等创建或更新首页置顶的馒头助手产品文章；
+已有管理员账号后，每次发布均可重复执行，使数据库正文与 Git 内容保持一致。
 
 ## 反向代理
 

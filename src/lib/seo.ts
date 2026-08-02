@@ -16,6 +16,7 @@ import {
   MINIMUM_IOS_VERSION,
   type OfficialLocale,
 } from "@/i18n/official";
+import { getEditorialBlogCopy } from "@/config/editorial-blog";
 
 export {
   BRAND_NAME,
@@ -24,7 +25,7 @@ export {
   DEFAULT_SITE_URL,
 };
 
-const BLOG_KEYWORDS = [
+export const BLOG_KEYWORDS = [
   "技术博客",
   "个人博客",
   "独立开发",
@@ -61,6 +62,16 @@ export type SeoContext = {
   locale: OfficialLocale;
 };
 
+export function withEditorialSeoContext(ctx: SeoContext): SeoContext {
+  const copy = getEditorialBlogCopy(ctx.locale);
+  return {
+    ...ctx,
+    name: copy.brand.name,
+    subtitle: copy.brand.subtitle,
+    description: copy.hero.description,
+  };
+}
+
 export function resolveSiteUrl(settingsUrl?: string): string {
   const fromSettings = settingsUrl?.trim();
   if (fromSettings) return fromSettings.replace(/\/$/, "");
@@ -73,17 +84,21 @@ export function resolveSiteUrl(settingsUrl?: string): string {
 }
 
 export async function getSeoContext(locale: OfficialLocale = "zh"): Promise<SeoContext> {
-  const settings = await getSiteSettings();
+  const settings = await getSiteSettings().catch((error: unknown) => {
+    const cause = error instanceof Error ? error.name : "UnknownError";
+    console.warn(`[SEO] Runtime site settings unavailable; using defaults (${cause})`);
+    return null;
+  });
   const officialCopy = getOfficialMessages(locale).site;
   return {
-    name: isOfficialSite ? officialCopy.name : settings.siteName?.trim() || BRAND_NAME,
+    name: isOfficialSite ? officialCopy.name : settings?.siteName?.trim() || BRAND_NAME,
     subtitle: isOfficialSite
       ? officialCopy.subtitle
-      : settings.siteSubtitle?.trim() || DEFAULT_SITE_SUBTITLE,
+      : settings?.siteSubtitle?.trim() || DEFAULT_SITE_SUBTITLE,
     description: isOfficialSite
       ? officialCopy.description
-      : settings.siteDescription?.trim() || DEFAULT_SITE_DESCRIPTION,
-    url: resolveSiteUrl(settings.siteUrl),
+      : settings?.siteDescription?.trim() || DEFAULT_SITE_DESCRIPTION,
+    url: resolveSiteUrl(settings?.siteUrl),
     locale,
   };
 }
@@ -105,7 +120,10 @@ function languageAlternates(ctx: SeoContext, path: string) {
   };
 }
 
-export function buildRootMetadata(ctx: SeoContext): Metadata {
+export function buildRootMetadata(
+  ctx: SeoContext,
+  options: { keywords?: readonly string[] } = {}
+): Metadata {
   const title = `${ctx.name} — ${ctx.subtitle}`;
   const canonical = localizedUrl(ctx, "/");
   return {
@@ -115,7 +133,7 @@ export function buildRootMetadata(ctx: SeoContext): Metadata {
       template: `%s | ${ctx.name}`,
     },
     description: ctx.description,
-    keywords: [...DEFAULT_KEYWORDS],
+    keywords: [...(options.keywords || DEFAULT_KEYWORDS)],
     alternates: isOfficialSite
       ? { canonical, languages: languageAlternates(ctx, "/") }
       : { canonical },
@@ -222,9 +240,9 @@ export function buildBlogJsonLd(ctx: SeoContext) {
     "@context": "https://schema.org",
     "@type": "Blog",
     name: ctx.name,
-    url: `${ctx.url}/?section=blog`,
-    description: "个人技术博客，记录开发、运维与独立产品实践。",
-    inLanguage: "zh-CN",
+    url: localizedUrl(ctx, "/blog"),
+    description: ctx.description,
+    inLanguage: ctx.locale === "en" ? "en-US" : "zh-CN",
     publisher: {
       "@type": "Person",
       name: "Mantou",
@@ -244,12 +262,16 @@ export function buildBlogPostingJsonLd(
     authorName: string;
   }
 ) {
+  const image = post.coverImage?.startsWith("/")
+    ? `${ctx.url}${post.coverImage}`
+    : post.coverImage;
+  const articleUrl = localizedUrl(ctx, `/post/${post.slug}`);
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     description: post.excerpt || ctx.description,
-    url: `${ctx.url}/post/${post.slug}`,
+    url: articleUrl,
     datePublished: post.publishedAt?.toISOString(),
     dateModified: post.updatedAt.toISOString(),
     author: {
@@ -261,8 +283,8 @@ export function buildBlogPostingJsonLd(
       name: ctx.name,
       url: ctx.url,
     },
-    ...(post.coverImage ? { image: [post.coverImage] } : {}),
-    inLanguage: "zh-CN",
-    mainEntityOfPage: `${ctx.url}/post/${post.slug}`,
+    ...(image ? { image: [image] } : {}),
+    inLanguage: ctx.locale === "en" ? "en-US" : "zh-CN",
+    mainEntityOfPage: articleUrl,
   };
 }

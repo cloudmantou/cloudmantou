@@ -8,6 +8,9 @@ import { getOfficialMessages, localizeOfficialPath } from "@/i18n/official";
 import { getRequestLocale } from "@/i18n/server";
 import { getDesktopDownloadUrls } from "@/lib/desktop-downloads";
 import { getSiteSettings } from "@/lib/site-settings";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildSoftwareApplicationJsonLd } from "@/lib/seo";
+import { getCspNonce } from "@/lib/csp-nonce";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
@@ -21,7 +24,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function DownloadPage() {
-  const [locale, siteSettings] = await Promise.all([getRequestLocale(), getSiteSettings()]);
+  const locale = await getRequestLocale();
+  const [siteSettings, ctx, nonce] = await Promise.all([
+    getSiteSettings(),
+    getSeoContext(locale),
+    getCspNonce(),
+  ]);
   const copy = getOfficialMessages(locale).pages.download;
   const downloadUrls = getDesktopDownloadUrls(siteSettings);
   const configuredDownloads = new Map(downloadUrls.map((item) => [item.id, item.url]));
@@ -29,6 +37,12 @@ export default async function DownloadPage() {
 
   return (
     <OfficialShell>
+      <JsonLd
+        ctx={ctx}
+        nonce={nonce}
+        variant="extra"
+        extra={[buildSoftwareApplicationJsonLd(ctx)]}
+      />
       <PageHeader
         title={copy.pageTitle}
         description={copy.description}

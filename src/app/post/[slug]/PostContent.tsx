@@ -10,6 +10,7 @@ import { PostMeta, estimateReadTime } from "@/components/blog/PostMeta";
 import { LikeButton } from "@/components/blog/LikeButton";
 import { CommentSection } from "@/components/blog/CommentSection";
 import type { CommentData } from "@/components/blog/CommentItem";
+import { isSafeCoverImageUrl } from "@/lib/safe-image-url";
 
 type PostData = {
   id: string;
@@ -72,6 +73,9 @@ export function PostContent({
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const isPaidOnly = post.status === "PAID_ONLY";
   const canUseArticleCredit = accessReason === "article_credit_available" && articleCreditsAvailable > 0;
+  const safeCoverImage = post.coverImage && isSafeCoverImageUrl(post.coverImage)
+    ? post.coverImage
+    : null;
 
   const handleUnlockWithCredit = async () => {
     setUnlockError(null);
@@ -132,10 +136,10 @@ export function PostContent({
       {/* Article content */}
       <article className="max-w-3xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
         {/* Cover image */}
-        {post.coverImage && (
+        {safeCoverImage && (
           <div
             className="w-full aspect-[21/9] rounded-xl mb-8 bg-cover bg-center"
-            style={{ backgroundImage: `url(${post.coverImage})` }}
+            style={{ backgroundImage: `url(${JSON.stringify(safeCoverImage)})` }}
             role="img"
             aria-label={post.title}
           />

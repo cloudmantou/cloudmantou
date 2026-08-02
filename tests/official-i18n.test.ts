@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   OFFICIAL_LOCALE_COOKIE,
+  buildOfficialRewriteUrl,
   getOfficialMessages,
   getOfficialLocaleFromPath,
   isOfficialPublicPath,
   localizeOfficialPath,
   parseOfficialLocaleCookie,
   resolveOfficialRequest,
+  resolveRoutedOfficialRequest,
   resolveOfficialLocale,
   stripOfficialLocalePrefix,
 } from "@/i18n/official";
@@ -64,11 +66,15 @@ describe("official-site locale resolution", () => {
   });
 
   it("localizes only public website paths and refuses protected boundaries", () => {
-    for (const path of ["/", "/features", "/download", "/docs", "/pricing", "/store/app", "/blog", "/login", "/register"]) {
+    for (const path of ["/", "/features", "/download", "/docs", "/pricing", "/store/app", "/blog", "/post/mantou-assistant", "/login", "/register"]) {
       expect(isOfficialPublicPath(path)).toBe(true);
     }
 
-    for (const path of ["/api/products", "/admin", "/dashboard", "/payment/result", "/maintenance", "/post/chinese-only", "/category/news", "/_next/static/app.js"]) {
+    expect(localizeOfficialPath("/post/mantou-assistant", "en")).toBe(
+      "/en/post/mantou-assistant"
+    );
+
+    for (const path of ["/api/products", "/admin", "/dashboard", "/payment/result", "/maintenance", "/category/news", "/_next/static/app.js"]) {
       expect(isOfficialPublicPath(path)).toBe(false);
       expect(localizeOfficialPath(path, "en")).toBe(path);
     }
@@ -105,5 +111,25 @@ describe("official-site locale resolution", () => {
       rewritePath: null,
       persistLocale: null,
     });
+  });
+
+  it("keeps locale rewrites on the incoming origin instead of re-entering an internal host", () => {
+    const rewritten = buildOfficialRewriteUrl(
+      "https://cloudmantoua.top/en/blog?from=nav",
+      "/blog"
+    );
+
+    expect(rewritten.toString()).toBe("https://cloudmantoua.top/blog?from=nav");
+  });
+
+  it("inherits the locale exactly once for an internal rewrite", () => {
+    expect(resolveRoutedOfficialRequest("en", "1")).toEqual({
+      locale: "en",
+      redirectPath: null,
+      rewritePath: null,
+      persistLocale: null,
+    });
+    expect(resolveRoutedOfficialRequest("en", null)).toBeNull();
+    expect(resolveRoutedOfficialRequest("fr", "1")).toBeNull();
   });
 });

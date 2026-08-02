@@ -31,6 +31,13 @@ describe("isSafeAvatarSrc", () => {
 });
 
 describe("isSafeCoverImageUrl", () => {
+  it("allows managed upload and bundled editorial asset paths", () => {
+    expect(isSafeCoverImageUrl("/uploads/2026/08/cover.webp")).toBe(true);
+    expect(isSafeCoverImageUrl("/brand/mantou-assistant-icon.png")).toBe(true);
+    expect(isSafeCoverImageUrl("/editorial/editorial-workbook.png")).toBe(true);
+    expect(isSafeCoverImageUrl("/private/secret.png")).toBe(false);
+  });
+
   it("rejects SVG data URLs", () => {
     expect(isSafeCoverImageUrl("data:image/svg+xml;base64,PHN2Zy8+")).toBe(false);
     expect(isSafeCoverImageUrl("data:image/png;base64,abc")).toBe(true);
