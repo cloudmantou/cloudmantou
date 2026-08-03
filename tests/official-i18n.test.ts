@@ -66,7 +66,7 @@ describe("official-site locale resolution", () => {
   });
 
   it("localizes only public website paths and refuses protected boundaries", () => {
-    for (const path of ["/", "/features", "/download", "/docs", "/pricing", "/store/app", "/blog", "/post/mantou-assistant", "/category/news", "/tag/ios", "/login", "/register"]) {
+    for (const path of ["/", "/features", "/download", "/docs", "/pricing", "/store/app", "/blog", "/post/mantou-assistant", "/category/news", "/tag/ios", "/about", "/privacy", "/disclaimer", "/contact", "/login", "/register", "/dashboard", "/payment/result"]) {
       expect(isOfficialPublicPath(path)).toBe(true);
     }
 
@@ -75,8 +75,10 @@ describe("official-site locale resolution", () => {
     );
     expect(localizeOfficialPath("/category/news", "en")).toBe("/en/category/news");
     expect(localizeOfficialPath("/tag/ios", "en")).toBe("/en/tag/ios");
+    expect(localizeOfficialPath("/dashboard?paid=1#orders", "en")).toBe("/en/dashboard?paid=1#orders");
+    expect(localizeOfficialPath("/payment/result?orderNo=1", "en")).toBe("/en/payment/result?orderNo=1");
 
-    for (const path of ["/api/products", "/admin", "/dashboard", "/payment/result", "/maintenance", "/_next/static/app.js"]) {
+    for (const path of ["/api/products", "/admin", "/maintenance", "/_next/static/app.js"]) {
       expect(isOfficialPublicPath(path)).toBe(false);
       expect(localizeOfficialPath(path, "en")).toBe(path);
     }

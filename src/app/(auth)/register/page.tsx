@@ -1,43 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { localizeOfficialPath } from "@/i18n/official";
+import { normalizeInternalReturnUrl } from "@/lib/return-url";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale, messages } = useOfficialI18n();
   const copy = messages.auth;
-  const [form, setForm] = useState({
-    email: "",
-    username: "",
-    password: "",
-    confirmPassword: "",
-    nickname: "",
-  });
+  const [form, setForm] = useState({ email: "", username: "", password: "", confirmPassword: "", nickname: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const callbackUrl = normalizeInternalReturnUrl(
+    searchParams.get("callbackUrl"),
+    localizeOfficialPath("/", locale)
+  );
+  const loginHref = `${localizeOfficialPath("/login", locale)}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const update = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((previous) => ({ ...previous, [event.target.name]: event.target.value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
-
     if (form.password !== form.confirmPassword) {
       setError(copy.passwordMismatch);
       return;
     }
 
     setLoading(true);
-
     try {
-      const res = await fetch("/api/auth/register", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -47,27 +46,24 @@ export default function RegisterPage() {
           nickname: form.nickname || undefined,
         }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
+      const data = await response.json();
+      if (!response.ok) {
         setError(locale === "en" ? copy.registerFailed : data.message || copy.registerFailed);
         return;
       }
 
-      // 注册成功，自动登录
-      const signInResult = await signIn("credentials", {
+      const result = await signIn("credentials", {
         email: form.email,
         password: form.password,
         redirect: false,
+        callbackUrl,
       });
-
-      if (signInResult?.error) {
-        router.push(localizeOfficialPath("/login", locale));
-      } else {
-        router.push(localizeOfficialPath("/", locale));
-        router.refresh();
+      if (result?.error || !result?.ok) {
+        router.push(loginHref);
+        return;
       }
+      router.push(callbackUrl);
+      router.refresh();
     } catch {
       setError(copy.registerFailed);
     } finally {
@@ -75,93 +71,50 @@ export default function RegisterPage() {
     }
   };
 
+  const fields: Array<{ name: keyof typeof form; label: string; placeholder: string; type?: string; autoComplete?: string; required?: boolean }> = [
+    { name: "email", label: copy.email, placeholder: copy.emailPlaceholder, type: "email", autoComplete: "email", required: true },
+    { name: "username", label: copy.username, placeholder: copy.usernamePlaceholder, autoComplete: "username", required: true },
+    { name: "nickname", label: copy.nickname, placeholder: copy.nicknamePlaceholder, autoComplete: "nickname" },
+    { name: "password", label: copy.password, placeholder: copy.newPasswordPlaceholder, type: "password", autoComplete: "new-password", required: true },
+    { name: "confirmPassword", label: copy.confirmPassword, placeholder: copy.confirmPasswordPlaceholder, type: "password", autoComplete: "new-password", required: true },
+  ];
+
   return (
-    <div className="auth-card">
-      <h2 className="auth-title">{copy.register}</h2>
-
-      {error && <div className="auth-error">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="auth-form">
-        <div className="auth-field">
-          <label htmlFor="email">{copy.email}</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder={copy.emailPlaceholder}
-            required
-            autoComplete="email"
-          />
-        </div>
-
-        <div className="auth-field">
-          <label htmlFor="username">{copy.username}</label>
-          <input
-            id="username"
-            name="username"
-            type="text"
-            value={form.username}
-            onChange={handleChange}
-            placeholder={copy.usernamePlaceholder}
-            required
-            autoComplete="username"
-          />
-        </div>
-
-        <div className="auth-field">
-          <label htmlFor="nickname">{copy.nickname}</label>
-          <input
-            id="nickname"
-            name="nickname"
-            type="text"
-            value={form.nickname}
-            onChange={handleChange}
-            placeholder={copy.nicknamePlaceholder}
-            autoComplete="nickname"
-          />
-        </div>
-
-        <div className="auth-field">
-          <label htmlFor="password">{copy.password}</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={form.password}
-            onChange={handleChange}
-            placeholder={copy.newPasswordPlaceholder}
-            required
-            autoComplete="new-password"
-          />
-        </div>
-
-        <div className="auth-field">
-          <label htmlFor="confirmPassword">{copy.confirmPassword}</label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={form.confirmPassword}
-            onChange={handleChange}
-            placeholder={copy.confirmPasswordPlaceholder}
-            required
-            autoComplete="new-password"
-          />
-        </div>
-
-        <button type="submit" className="auth-btn" disabled={loading}>
+    <section aria-labelledby="register-title" style={{ border: "3px solid var(--ed-ink)", background: "var(--ed-paper-strong)", boxShadow: "9px 9px 0 var(--ed-red)", padding: "clamp(22px, 5vw, 36px)" }}>
+      <h2 id="register-title" style={{ margin: 0, color: "var(--ed-ink)", fontSize: "1.5rem", fontWeight: 950 }}>
+        {copy.register}
+      </h2>
+      {error ? <p role="alert" style={{ margin: "18px 0 0", borderLeft: "6px solid var(--ed-red)", background: "#fff0ed", color: "#8d2118", fontSize: 13, fontWeight: 750, padding: 12 }}>{error}</p> : null}
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 15, marginTop: 24 }}>
+        {fields.map((field) => (
+          <label key={field.name} style={{ display: "grid", gap: 7, color: "var(--ed-ink)", fontSize: 13, fontWeight: 850 }}>
+            {field.label}
+            <input
+              name={field.name}
+              type={field.type || "text"}
+              value={form[field.name]}
+              onChange={update}
+              placeholder={field.placeholder}
+              required={field.required}
+              autoComplete={field.autoComplete}
+              style={{ width: "100%", border: "2px solid var(--ed-ink)", borderRadius: 0, background: "#fffdf6", color: "var(--ed-ink)", padding: "11px 13px" }}
+            />
+          </label>
+        ))}
+        <button type="submit" disabled={loading} style={{ minHeight: 46, border: "2px solid var(--ed-ink)", borderRadius: 0, background: "var(--ed-red)", boxShadow: "4px 4px 0 var(--ed-ink)", color: "#fff", cursor: loading ? "wait" : "pointer", fontWeight: 900, opacity: loading ? 0.7 : 1 }}>
           {loading ? copy.registering : copy.register}
         </button>
       </form>
-
-      <p className="auth-footer">
-        {copy.hasAccount}
-        <Link href={localizeOfficialPath("/login", locale)} className="auth-link">
+      <p style={{ margin: "22px 0 0", color: "var(--ed-muted)", fontSize: 13 }}>
+        {copy.hasAccount}{" "}
+        <Link href={loginHref} style={{ color: "var(--ed-blue)", fontWeight: 900, textDecoration: "underline", textUnderlineOffset: 3 }}>
           {copy.loginNow}
         </Link>
       </p>
-    </div>
+    </section>
   );
+}
+
+export default function RegisterPage() {
+  return <Suspense><RegisterForm /></Suspense>;
 }

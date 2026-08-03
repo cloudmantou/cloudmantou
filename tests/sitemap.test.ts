@@ -23,13 +23,13 @@ describe("official sitemap", () => {
     prismaMock.tag.findMany.mockResolvedValue([{ slug: "ios" }]);
   });
 
-  it("includes both localized store detail URLs", async () => {
+  it("keeps retired store routes out of the public sitemap", async () => {
     const { default: sitemap } = await import("@/app/sitemap");
     const rows = await sitemap();
     const urls = rows.map((row) => row.url);
 
-    expect(urls).toContain("https://cloudmantoua.top/store/xiangse");
-    expect(urls).toContain("https://cloudmantoua.top/en/store/xiangse");
+    expect(urls.some((url) => url.includes("/store"))).toBe(false);
+    expect(prismaMock.storeApp.findMany).not.toHaveBeenCalled();
   });
 
   it("does not mark static routes as modified on every request", async () => {
@@ -40,5 +40,16 @@ describe("official sitemap", () => {
 
     expect(staticPage?.lastModified).toBeUndefined();
     expect(categoryPage?.lastModified).toBeUndefined();
+  });
+
+  it("includes localized editorial public-information pages", async () => {
+    const { default: sitemap } = await import("@/app/sitemap");
+    const urls = (await sitemap()).map((row) => row.url);
+
+    for (const path of ["about", "privacy", "disclaimer", "contact"]) {
+      expect(urls).toContain(`https://cloudmantoua.top/${path}`);
+      expect(urls).toContain(`https://cloudmantoua.top/en/${path}`);
+    }
+    expect(urls.some((url) => /\/(?:en\/)?(?:login|register)$/.test(url))).toBe(false);
   });
 });

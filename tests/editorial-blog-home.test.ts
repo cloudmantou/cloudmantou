@@ -16,7 +16,7 @@ describe("editorial blog homepage contract", () => {
       { label: "文章", href: "/blog" },
       { label: "项目", href: "/#projects" },
       { label: "支持", href: "/pricing" },
-      { label: "关于", href: "/#about" },
+      { label: "关于", href: "/about" },
     ]);
     expect(EDITORIAL_BLOG.support.primaryAction.href).toBe("/pricing");
     expect(EDITORIAL_BLOG.support.primaryAction.label).toBe("查看会员与卡密");

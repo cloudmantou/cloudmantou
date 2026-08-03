@@ -69,3 +69,14 @@ export function pairedStatusesForFailed(): {
 } {
   return { orderStatus: "PENDING", paymentStatus: "FAILED" };
 }
+
+export type PaymentResultState = "paid" | "pending" | "error";
+
+export function resolvePaymentResultState(
+  orderStatus: string,
+  deliveryPending: boolean
+): PaymentResultState {
+  if (orderStatus === "PAID") return deliveryPending ? "pending" : "paid";
+  if (orderStatus === "PENDING") return "pending";
+  return "error";
+}

@@ -165,6 +165,7 @@ export function buildPageMetadata(
     path?: string;
     type?: "website" | "article";
     image?: string | null;
+    translated?: boolean;
   }
 ): Metadata {
   const description = options.description || ctx.description;
@@ -175,7 +176,9 @@ export function buildPageMetadata(
     description,
     alternates: canonical
       ? isOfficialSite
-        ? { canonical, languages: languageAlternates(ctx, options.path || "/") }
+        ? options.translated === false
+          ? { canonical }
+          : { canonical, languages: languageAlternates(ctx, options.path || "/") }
         : { canonical }
       : undefined,
     openGraph: {

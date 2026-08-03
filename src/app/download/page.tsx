@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, Laptop, Monitor } from "lucide-react";
-import { OfficialShell } from "@/components/official/OfficialShell";
-import { InstallStepsSection, PageHeader } from "@/components/official/sections";
+import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { EditorialPublicHero, EditorialPublicSection } from "@/components/editorial/EditorialPublicPage";
 import { buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { getOfficialMessages, localizeOfficialPath } from "@/i18n/official";
 import { getRequestLocale } from "@/i18n/server";
@@ -25,42 +25,39 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function DownloadPage() {
   const locale = await getRequestLocale();
-  const [siteSettings, ctx, nonce] = await Promise.all([
-    getSiteSettings(),
+  const [downloadUrls, ctx, nonce] = await Promise.all([
+    getSiteSettings()
+      .then((settings) => getDesktopDownloadUrls(settings))
+      .catch(() => getDesktopDownloadUrls()),
     getSeoContext(locale),
     getCspNonce(),
   ]);
   const copy = getOfficialMessages(locale).pages.download;
-  const downloadUrls = getDesktopDownloadUrls(siteSettings);
   const configuredDownloads = new Map(downloadUrls.map((item) => [item.id, item.url]));
   const hasConfiguredDownload = downloadUrls.some((item) => item.url !== null);
 
   return (
-    <OfficialShell>
+    <EditorialShell locale={locale}>
       <JsonLd
         ctx={ctx}
         nonce={nonce}
         variant="extra"
         extra={[buildSoftwareApplicationJsonLd(ctx)]}
       />
-      <PageHeader
+      <EditorialPublicHero
+        eyebrow={locale === "en" ? "GET THE DESKTOP CLIENT" : "获取电脑端工具"}
         title={copy.pageTitle}
         description={copy.description}
       />
-      <section className="official-download-platforms" aria-labelledby="desktop-platform-title">
-        <div className="official-container">
-          <div className="official-download-platform-heading">
-            <h2 id="desktop-platform-title">{copy.platformTitle}</h2>
-            <p>{copy.platformDescription}</p>
-          </div>
-          <div className="official-download-platform-grid">
+      <EditorialPublicSection title={copy.platformTitle} description={copy.platformDescription}>
+          <div className="editorial-public-card-grid editorial-download-grid">
             {copy.platforms.map((platform) => {
               const downloadUrl = configuredDownloads.get(platform.id);
               const PlatformIcon = platform.id === "windows" ? Monitor : Laptop;
 
               return (
-                <article key={platform.id} className="official-download-platform-card">
-                  <span className="official-download-platform-icon" aria-hidden="true">
+                <article key={platform.id} className="editorial-public-card editorial-download-card">
+                  <span className="editorial-public-card-icon" aria-hidden="true">
                     <PlatformIcon size={30} />
                   </span>
                   <div>
@@ -68,12 +65,12 @@ export default async function DownloadPage() {
                     <p>{platform.description}</p>
                   </div>
                   {downloadUrl ? (
-                    <a href={downloadUrl} className="official-btn official-btn-primary">
+                    <a href={downloadUrl} className="editorial-button editorial-button-blue">
                       <Download size={17} aria-hidden="true" />
                       {platform.action}
                     </a>
                   ) : (
-                    <span className="official-download-pending" aria-disabled="true">
+                    <span className="editorial-download-pending" aria-disabled="true">
                       {platform.pending}
                     </span>
                   )}
@@ -81,30 +78,23 @@ export default async function DownloadPage() {
               );
             })}
           </div>
-        </div>
-      </section>
-      <div className="official-container" style={{ paddingBottom: 24 }}>
-        <h2 style={{ fontSize: "1.1rem", marginBottom: 12 }}>{copy.requirementsTitle}</h2>
-        <ul className="official-prose">
+      </EditorialPublicSection>
+      <EditorialPublicSection title={copy.requirementsTitle}>
+        <ul className="editorial-public-checklist">
           {copy.requirements.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      </div>
-      <InstallStepsSection />
-      <div className="official-container official-prose" style={{ paddingBottom: 56 }}>
-        <h2>{copy.packageTitle}</h2>
+      </EditorialPublicSection>
+      <EditorialPublicSection title={copy.packageTitle}>
         {!hasConfiguredDownload ? <p>{copy.packageUnavailable}</p> : null}
         <p>{copy.freeNotice}</p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
-          <Link href={localizeOfficialPath("/store", locale)} className="official-btn official-btn-primary">
-            {copy.storeAction}
-          </Link>
-          <Link href={localizeOfficialPath("/docs", locale)} className="official-btn official-btn-ghost">
+        <div className="editorial-public-actions">
+          <Link href={localizeOfficialPath("/docs", locale)} className="editorial-button editorial-button-blue">
             {copy.docsAction}
           </Link>
         </div>
-      </div>
-    </OfficialShell>
+      </EditorialPublicSection>
+    </EditorialShell>
   );
 }

@@ -66,7 +66,7 @@ export async function EditorialStaticMantouArticle({ locale }: { locale: Officia
           recommendationHref="/download"
           recommendationLabel={locale === "en" ? "Get the tool" : "获取工具"}
         >
-            <MarkdownRenderer content={article.content} />
+            <MarkdownRenderer content={article.content} locale={locale} />
         </EditorialArticleChrome>
       </div>
     </EditorialShell>

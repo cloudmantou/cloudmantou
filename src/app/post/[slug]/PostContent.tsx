@@ -12,6 +12,7 @@ import type { CommentData } from "@/components/blog/CommentItem";
 import { EditorialArticleChrome } from "@/components/editorial/EditorialArticleChrome";
 import { extractArticleHeadings, type AdjacentArticle } from "@/lib/editorial-article";
 import type { OfficialLocale } from "@/i18n/official";
+import { PostPurchaseButton } from "@/components/payment/PostPurchaseButton";
 
 type PostData = {
   id: string;
@@ -159,7 +160,7 @@ export function PostContent({
         )}
       >
         {post.content ? (
-          <MarkdownRenderer content={post.content} />
+          <MarkdownRenderer content={post.content} locale={locale} />
         ) : isPaidOnly ? (
           <div>
             {/* Show excerpt as preview */}
@@ -198,6 +199,14 @@ export function PostContent({
                     ) : null}
                   </div>
                 ) : null}
+                <PostPurchaseButton
+                  postId={post.id}
+                  slug={post.slug}
+                  status={post.status}
+                  accessReason={accessReason}
+                  price={post.paidContent?.price ?? null}
+                  locale={locale}
+                />
               </div>
             </div>
           </div>

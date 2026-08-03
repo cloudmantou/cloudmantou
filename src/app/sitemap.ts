@@ -4,7 +4,7 @@ import { isOfficialSite } from "@/config/site";
 import { getSeoContext } from "@/lib/seo";
 import { localizeOfficialPath } from "@/i18n/official";
 
-// Sitemap includes database-backed posts/store entries, so generate it at request time.
+// Sitemap includes database-backed editorial entries, so generate it at request time.
 // This keeps release builds independent from production database availability.
 export const dynamic = "force-dynamic";
 
@@ -13,11 +13,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const officialPaths = [
     { path: "/features", changeFrequency: "monthly", priority: 0.85 },
-    { path: "/store", changeFrequency: "weekly", priority: 0.95 },
     { path: "/download", changeFrequency: "monthly", priority: 0.95 },
     { path: "/pricing", changeFrequency: "weekly", priority: 0.9 },
     { path: "/docs", changeFrequency: "weekly", priority: 0.75 },
     { path: "/blog", changeFrequency: "daily", priority: 0.65 },
+    { path: "/about", changeFrequency: "monthly", priority: 0.5 },
+    { path: "/privacy", changeFrequency: "monthly", priority: 0.35 },
+    { path: "/disclaimer", changeFrequency: "monthly", priority: 0.35 },
+    { path: "/contact", changeFrequency: "monthly", priority: 0.45 },
   ] as const;
   const officialPages: MetadataRoute.Sitemap = isOfficialSite
     ? officialPaths.flatMap((page) => (["zh", "en"] as const).map((locale) => ({
@@ -31,12 +34,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: baseUrl, changeFrequency: "daily", priority: 1 },
     ...(isOfficialSite ? [{ url: `${baseUrl}/en`, changeFrequency: "daily" as const, priority: 1 }] : []),
     ...officialPages,
-    { url: `${baseUrl}/login`, changeFrequency: "monthly", priority: 0.3 },
-    { url: `${baseUrl}/register`, changeFrequency: "monthly", priority: 0.3 },
-    ...(isOfficialSite ? [
-      { url: `${baseUrl}/en/login`, changeFrequency: "monthly" as const, priority: 0.3 },
-      { url: `${baseUrl}/en/register`, changeFrequency: "monthly" as const, priority: 0.3 },
-    ] : []),
   ];
 
   try {
@@ -55,22 +52,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: isOfficialSite ? 0.6 : 0.8,
       }));
     });
-
-    const storeApps = isOfficialSite
-      ? await prisma.storeApp.findMany({
-          where: { published: true },
-          select: { slug: true, updatedAt: true },
-        })
-      : [];
-
-    const storePages: MetadataRoute.Sitemap = storeApps.flatMap((app) =>
-      (["zh", "en"] as const).map((locale) => ({
-        url: `${baseUrl}${localizeOfficialPath(`/store/${app.slug}`, locale)}`,
-        lastModified: app.updatedAt,
-        changeFrequency: "weekly" as const,
-        priority: 0.88,
-      }))
-    );
 
     const categories = await prisma.category.findMany({ select: { slug: true } });
     const categoryPages: MetadataRoute.Sitemap = categories.flatMap((category) => {
@@ -93,7 +74,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }));
     });
 
-    return [...staticPages, ...storePages, ...postPages, ...categoryPages, ...tagPages];
+    return [...staticPages, ...postPages, ...categoryPages, ...tagPages];
   } catch {
     return staticPages;
   }

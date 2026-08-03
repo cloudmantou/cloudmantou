@@ -1,0 +1,119 @@
+.searchPanel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 34px;
+  padding: clamp(16px, 3vw, 24px);
+  border: 3px solid var(--ed-ink);
+  background: var(--ed-paper-strong);
+  box-shadow: 7px 7px 0 var(--ed-ink);
+}
+
+.searchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.inputWrap {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 2px solid var(--ed-ink);
+  background: var(--ed-paper);
+}
+
+.inputWrap:focus-within {
+  box-shadow: 4px 4px 0 var(--ed-blue);
+}
+
+.input {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  outline: 0;
+  color: var(--ed-ink);
+  background: transparent;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.submit,
+.clear,
+.pageLink {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border: 2px solid var(--ed-ink);
+  color: #fff;
+  background: var(--ed-blue);
+  box-shadow: 4px 4px 0 var(--ed-ink);
+  font-size: .75rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.summary,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  color: var(--ed-muted);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.error {
+  padding: 10px 12px;
+  border-left: 6px solid var(--ed-red);
+  color: var(--ed-ink);
+  background: #ffd9d4;
+}
+
+.clear {
+  min-height: 34px;
+  padding: 6px 10px;
+  color: var(--ed-ink);
+  background: var(--ed-yellow);
+  box-shadow: 3px 3px 0 var(--ed-ink);
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 36px;
+}
+
+.pageLink {
+  min-width: 44px;
+  min-height: 42px;
+  padding: 8px 12px;
+  color: var(--ed-ink);
+  background: var(--ed-paper-strong);
+  box-shadow: 3px 3px 0 var(--ed-ink);
+}
+
+.pageLink[aria-current="page"] {
+  color: #fff;
+  background: var(--ed-blue);
+}
+
+.pageLink[aria-disabled="true"] {
+  opacity: .42;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .searchForm { grid-template-columns: 1fr; }
+  .submit { width: 100%; }
+  .summary { align-items: flex-start; flex-direction: column; }
+}

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { localizeOfficialPath } from "@/i18n/official";
+import { normalizeInternalReturnUrl } from "@/lib/return-url";
 
 function LoginForm() {
   const router = useRouter();
@@ -17,10 +18,14 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const callbackUrl = searchParams.get("callbackUrl") || localizeOfficialPath("/", locale);
+  const callbackUrl = normalizeInternalReturnUrl(
+    searchParams.get("callbackUrl"),
+    localizeOfficialPath("/", locale)
+  );
+  const registerHref = `${localizeOfficialPath("/register", locale)}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
@@ -36,7 +41,6 @@ function LoginForm() {
         setError(result.error === "CredentialsSignin" ? copy.credentialsInvalid : copy.loginFailed);
         return;
       }
-
       if (!result?.ok) {
         setError(copy.loginFailed);
         return;
@@ -44,8 +48,8 @@ function LoginForm() {
 
       router.push(callbackUrl);
       router.refresh();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "";
       setError(locale === "zh" && message.includes("频繁") ? message : copy.loginFailed);
     } finally {
       setLoading(false);
@@ -53,57 +57,61 @@ function LoginForm() {
   };
 
   return (
-    <div className="auth-card">
-      <h2 className="auth-title">{copy.login}</h2>
-
-      {error && <div className="auth-error">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="auth-form">
-        <div className="auth-field">
-          <label htmlFor="email">{copy.usernameOrEmail}</label>
+    <section
+      aria-labelledby="login-title"
+      style={{ border: "3px solid var(--ed-ink)", background: "var(--ed-paper-strong)", boxShadow: "9px 9px 0 var(--ed-blue)", padding: "clamp(22px, 5vw, 36px)" }}
+    >
+      <h2 id="login-title" style={{ margin: 0, color: "var(--ed-ink)", fontSize: "1.5rem", fontWeight: 950 }}>
+        {copy.login}
+      </h2>
+      {error ? (
+        <p role="alert" style={{ margin: "18px 0 0", borderLeft: "6px solid var(--ed-red)", background: "#fff0ed", color: "#8d2118", fontSize: 13, fontWeight: 750, padding: 12 }}>
+          {error}
+        </p>
+      ) : null}
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 17, marginTop: 24 }}>
+        <label style={{ display: "grid", gap: 7, color: "var(--ed-ink)", fontSize: 13, fontWeight: 850 }}>
+          {copy.usernameOrEmail}
           <input
-            id="email"
             type="text"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@example.com"
             required
             autoComplete="username"
+            style={{ width: "100%", border: "2px solid var(--ed-ink)", borderRadius: 0, background: "#fffdf6", color: "var(--ed-ink)", padding: "12px 13px" }}
           />
-        </div>
-
-        <div className="auth-field">
-          <label htmlFor="password">{copy.password}</label>
+        </label>
+        <label style={{ display: "grid", gap: 7, color: "var(--ed-ink)", fontSize: 13, fontWeight: 850 }}>
+          {copy.password}
           <input
-            id="password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(event) => setPassword(event.target.value)}
             placeholder={copy.passwordPlaceholder}
             required
             autoComplete="current-password"
+            style={{ width: "100%", border: "2px solid var(--ed-ink)", borderRadius: 0, background: "#fffdf6", color: "var(--ed-ink)", padding: "12px 13px" }}
           />
-        </div>
-
-        <button type="submit" className="auth-btn" disabled={loading}>
+        </label>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{ minHeight: 46, border: "2px solid var(--ed-ink)", borderRadius: 0, background: "var(--ed-blue)", boxShadow: "4px 4px 0 var(--ed-ink)", color: "#fff", cursor: loading ? "wait" : "pointer", fontWeight: 900, opacity: loading ? 0.7 : 1 }}
+        >
           {loading ? copy.loggingIn : copy.login}
         </button>
       </form>
-
-      <p className="auth-footer">
-        {copy.noAccount}
-        <Link href={localizeOfficialPath("/register", locale)} className="auth-link">
+      <p style={{ margin: "22px 0 0", color: "var(--ed-muted)", fontSize: 13 }}>
+        {copy.noAccount}{" "}
+        <Link href={registerHref} style={{ color: "var(--ed-blue)", fontWeight: 900, textDecoration: "underline", textUnderlineOffset: 3 }}>
           {copy.registerNow}
         </Link>
       </p>
-    </div>
+    </section>
   );
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
-  );
+  return <Suspense><LoginForm /></Suspense>;
 }

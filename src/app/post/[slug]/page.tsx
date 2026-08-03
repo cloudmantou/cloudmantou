@@ -15,6 +15,7 @@ import {
   MANTOU_ASSISTANT_ARTICLE_EN,
 } from "@/config/editorial-blog";
 import { getRequestLocale } from "@/i18n/server";
+import { buildAdjacentPostWhere, EDITORIAL_ADJACENT_ORDER } from "@/lib/editorial-adjacent";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -67,6 +68,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     path: `/post/${slug}`,
     type: "article",
     image: post.coverImage,
+    translated: slug === MANTOU_ASSISTANT_ARTICLE.slug,
   });
 }
 
@@ -164,21 +166,21 @@ export default async function PostPage({ params }: PageProps) {
     countApprovedPostComments(post.id),
     post.publishedAt
       ? prisma.post.findFirst({
-          where: {
-            status: { in: ["PUBLISHED", "PAID_ONLY"] },
-            publishedAt: { lt: post.publishedAt },
-          },
-          orderBy: { publishedAt: "desc" },
+          where: buildAdjacentPostWhere("previous", {
+            id: post.id,
+            publishedAt: post.publishedAt,
+          }),
+          orderBy: EDITORIAL_ADJACENT_ORDER.previous,
           select: { slug: true, title: true },
         })
       : null,
     post.publishedAt
       ? prisma.post.findFirst({
-          where: {
-            status: { in: ["PUBLISHED", "PAID_ONLY"] },
-            publishedAt: { gt: post.publishedAt },
-          },
-          orderBy: { publishedAt: "asc" },
+          where: buildAdjacentPostWhere("next", {
+            id: post.id,
+            publishedAt: post.publishedAt,
+          }),
+          orderBy: EDITORIAL_ADJACENT_ORDER.next,
           select: { slug: true, title: true },
         })
       : null,

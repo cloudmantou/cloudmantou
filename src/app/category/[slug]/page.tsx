@@ -5,86 +5,151 @@ import { buildPageMetadata, getSeoContext, withEditorialSeoContext } from "@/lib
 import { EditorialShell } from "@/components/editorial/EditorialShell";
 import { EditorialArchivePage } from "@/components/editorial/EditorialArchivePage";
 import type { EditorialPostCardData } from "@/components/editorial/EditorialArticleCard";
-import { MANTOU_ASSISTANT_ARTICLE_EN } from "@/config/editorial-blog";
 import { getRequestLocale } from "@/i18n/server";
-import { ENGLISH_EDITORIAL_TAGS, localizeEditorialTaxonomy, type EditorialTaxonomyItem } from "@/lib/editorial-article";
+import { localizeEditorialTaxonomy, type EditorialTaxonomyItem } from "@/lib/editorial-article";
+import {
+  EDITORIAL_ARCHIVE_ORDER_BY,
+  EDITORIAL_ARCHIVE_PAGE_SIZE,
+  EDITORIAL_PUBLIC_POST_STATUSES,
+  buildEditorialSearchWhere,
+  clampEditorialArchivePage,
+  getEnglishEditorialTaxonomyArchive,
+  parseEditorialArchiveParams,
+  type EditorialArchiveSearchParams,
+} from "@/lib/editorial-archive";
 
-type PageProps = { params: Promise<{ slug: string }> };
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<EditorialArchiveSearchParams>;
+};
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getRequestLocale()]);
-  if (locale === "en" && slug !== "product-notes") {
-    return { title: "Category not found" };
-  }
-  const [baseCtx, category] = await Promise.all([
-    getSeoContext(locale),
-    prisma.category.findUnique({ where: { slug }, select: { name: true, description: true, slug: true } }),
-  ]);
+  const baseCtx = await getSeoContext(locale);
   const ctx = withEditorialSeoContext(baseCtx);
-  if (!category) return { title: locale === "en" ? "Category not found" : "分类不存在" };
+  if (locale === "en") {
+    if (!getEnglishEditorialTaxonomyArchive("category", slug, null)) {
+      return { title: "Category not found" };
+    }
+    return buildPageMetadata(ctx, {
+      title: "Product practice — category",
+      description: "Articles filed under Product practice.",
+      path: `/category/${slug}`,
+    });
+  }
+  const category = await prisma.category.findUnique({ where: { slug }, select: { name: true, description: true, slug: true } });
+  if (!category) return { title: "分类不存在" };
   const localized = localizeEditorialTaxonomy("category", category, locale);
   return buildPageMetadata(ctx, {
-    title: locale === "en" ? `${localized.name} — category` : `${localized.name} - 文章分类`,
-    description: locale === "en" ? `Articles filed under ${localized.name}.` : category.description || `${localized.name} 相关文章。`,
+    title: `${localized.name} - 文章分类`,
+    description: category.description || `${localized.name} 相关文章。`,
     path: `/category/${slug}`,
+    translated: slug === "product-notes",
   });
 }
 
-export default async function CategoryPage({ params }: PageProps) {
-  const [{ slug }, locale] = await Promise.all([params, getRequestLocale()]);
-  if (locale === "en" && slug !== "product-notes") notFound();
+export default async function CategoryPage({ params, searchParams }: PageProps) {
+  const [{ slug }, locale, rawSearchParams] = await Promise.all([params, getRequestLocale(), searchParams]);
+  const archiveParams = parseEditorialArchiveParams(rawSearchParams);
+
+  if (locale === "en") {
+    const archive = getEnglishEditorialTaxonomyArchive(
+      "category",
+      slug,
+      archiveParams.query,
+      archiveParams.page,
+      EDITORIAL_ARCHIVE_PAGE_SIZE
+    );
+    if (!archive) notFound();
+    return (
+      <EditorialShell locale={locale}>
+        <EditorialArchivePage
+          locale={locale}
+          title="Product practice"
+          description="Posts filed in Product practice."
+          posts={archiveParams.queryError ? [] : archive.posts}
+          categories={archive.categories}
+          tags={archive.tags}
+          totalPosts={archive.totalPosts}
+          resultCount={archiveParams.queryError ? 0 : archive.total}
+          basePath={`/category/${slug}`}
+          query={archiveParams.query}
+          queryError={archiveParams.queryError}
+          currentPage={archive.page}
+          totalPages={archive.totalPages}
+          activeCategory={slug}
+        />
+      </EditorialShell>
+    );
+  }
+
   const category = await prisma.category.findUnique({ where: { slug }, select: { id: true, name: true, slug: true, description: true } });
   if (!category) notFound();
 
-  const [postRows, categoryRows, tagRows, totalPostCount] = await Promise.all([
-    prisma.post.findMany({
-      where: { status: { in: ["PUBLISHED", "PAID_ONLY"] }, categoryId: category.id },
-      orderBy: [{ isTop: "desc" }, { publishedAt: "desc" }],
+  const where = {
+    status: { in: [...EDITORIAL_PUBLIC_POST_STATUSES] },
+    categoryId: category.id,
+    ...buildEditorialSearchWhere(archiveParams.query),
+  };
+  const [initialPostRows, matchingCount, categoryRows, tagRows, totalPostCount] = await Promise.all([
+    archiveParams.queryError ? Promise.resolve([]) : prisma.post.findMany({
+      where,
+      orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
       select: {
         slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
         category: { select: { name: true } }, author: { select: { username: true, nickname: true } },
       },
+      skip: (archiveParams.page - 1) * EDITORIAL_ARCHIVE_PAGE_SIZE,
+      take: EDITORIAL_ARCHIVE_PAGE_SIZE,
     }),
+    archiveParams.queryError ? Promise.resolve(0) : prisma.post.count({ where }),
     prisma.category.findMany({
-      orderBy: { sortOrder: "asc" },
-      select: { slug: true, name: true, _count: { select: { posts: { where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } } } } } },
+      orderBy: [{ sortOrder: "asc" }, { slug: "asc" }],
+      select: { slug: true, name: true, _count: { select: { posts: { where: { status: { in: [...EDITORIAL_PUBLIC_POST_STATUSES] } } } } } },
     }),
     prisma.tag.findMany({
+      orderBy: [{ name: "asc" }, { slug: "asc" }],
       select: {
         slug: true,
         name: true,
         _count: {
           select: {
-            posts: { where: { post: { status: { in: ["PUBLISHED", "PAID_ONLY"] } } } },
+            posts: { where: { post: { status: { in: [...EDITORIAL_PUBLIC_POST_STATUSES] } } } },
           },
         },
       },
     }),
-    prisma.post.count({ where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } } }),
+    prisma.post.count({ where: { status: { in: [...EDITORIAL_PUBLIC_POST_STATUSES] } } }),
   ]);
 
-  let posts: EditorialPostCardData[] = postRows;
-  if (locale === "en") {
-    posts = postRows.filter((post) => post.slug === MANTOU_ASSISTANT_ARTICLE_EN.slug).map((post) => ({
-      ...post,
-      title: MANTOU_ASSISTANT_ARTICLE_EN.title,
-      excerpt: MANTOU_ASSISTANT_ARTICLE_EN.excerpt,
-      category: { name: "Product practice" },
-      author: { username: "mantou", nickname: "Mantou" },
-    }));
-  }
+  const currentPage = clampEditorialArchivePage(
+    archiveParams.page,
+    matchingCount,
+    EDITORIAL_ARCHIVE_PAGE_SIZE
+  );
+  const postRows = !archiveParams.queryError && currentPage !== archiveParams.page
+    ? await prisma.post.findMany({
+        where,
+        orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
+        select: {
+          slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
+          category: { select: { name: true } }, author: { select: { username: true, nickname: true } },
+        },
+        skip: (currentPage - 1) * EDITORIAL_ARCHIVE_PAGE_SIZE,
+        take: EDITORIAL_ARCHIVE_PAGE_SIZE,
+      })
+    : initialPostRows;
+
+  const posts: EditorialPostCardData[] = postRows;
 
   const categories: EditorialTaxonomyItem[] = categoryRows
     .filter((item) => item._count.posts > 0)
-    .map((item) => localizeEditorialTaxonomy("category", { slug: item.slug, name: item.name, count: locale === "en" ? (item.slug === "product-notes" ? 1 : 0) : item._count.posts }, locale))
-    .filter((item) => locale === "zh" || (item.count ?? 0) > 0);
-  const tags: EditorialTaxonomyItem[] = locale === "en"
-    ? ENGLISH_EDITORIAL_TAGS.map((item) => ({ ...item }))
-    : tagRows
-        .filter((item) => item._count.posts > 0)
-        .map((item) => localizeEditorialTaxonomy("tag", { slug: item.slug, name: item.name, count: item._count.posts }, locale));
+    .map((item) => localizeEditorialTaxonomy("category", { slug: item.slug, name: item.name, count: item._count.posts }, locale));
+  const tags: EditorialTaxonomyItem[] = tagRows
+    .filter((item) => item._count.posts > 0)
+    .map((item) => localizeEditorialTaxonomy("tag", { slug: item.slug, name: item.name, count: item._count.posts }, locale));
   const localizedCategory = localizeEditorialTaxonomy("category", category, locale);
 
   return (
@@ -92,11 +157,17 @@ export default async function CategoryPage({ params }: PageProps) {
       <EditorialArchivePage
         locale={locale}
         title={localizedCategory.name}
-        description={locale === "en" ? `Posts filed in ${localizedCategory.name}.` : category.description || `${localizedCategory.name} 相关实践记录。`}
+        description={category.description || `${localizedCategory.name} 相关实践记录。`}
         posts={posts}
         categories={categories}
         tags={tags}
-        totalPosts={locale === "en" ? 1 : totalPostCount}
+        totalPosts={totalPostCount}
+        resultCount={matchingCount}
+        basePath={`/category/${slug}`}
+        query={archiveParams.query}
+        queryError={archiveParams.queryError}
+        currentPage={currentPage}
+        totalPages={Math.ceil(matchingCount / EDITORIAL_ARCHIVE_PAGE_SIZE)}
         activeCategory={slug}
       />
     </EditorialShell>

@@ -47,10 +47,11 @@ export function EditorialArticleCard({
   const author = post.author?.nickname || post.author?.username || (locale === "en" ? "Mantou" : "馒头");
 
   return (
-    <Link
-      className={`editorial-article editorial-article-${variant} accent-${index % 3}`}
-      href={localizeOfficialPath(`/post/${post.slug}`, locale)}
-    >
+    <article className="editorial-article-item">
+      <Link
+        className={`editorial-article editorial-article-${variant} accent-${index % 3}`}
+        href={localizeOfficialPath(`/post/${post.slug}`, locale)}
+      >
       <span
         className="editorial-article-media"
         style={safeCoverStyle(post.coverImage)}
@@ -70,6 +71,7 @@ export function EditorialArticleCard({
         <span className="editorial-article-byline">{author}</span>
       </span>
       <span className="editorial-article-arrow" aria-hidden="true"><ArrowUpRight size={24} /></span>
-    </Link>
+      </Link>
+    </article>
   );
 }

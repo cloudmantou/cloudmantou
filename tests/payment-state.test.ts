@@ -5,6 +5,7 @@ import {
   canTransitionOrder,
   canTransitionPayment,
   InvalidStateTransitionError,
+  resolvePaymentResultState,
 } from "@/lib/payment-state";
 
 describe("payment-state", () => {
@@ -29,4 +30,17 @@ describe("payment-state", () => {
     expect(() => assertOrderTransition("PAID", "PENDING")).toThrow(InvalidStateTransitionError);
     expect(() => assertPaymentTransition("CLOSED", "WAITING")).toThrow(InvalidStateTransitionError);
   });
+
+  it("maps only actionable states to paid or pending", () => {
+    expect(resolvePaymentResultState("PAID", false)).toBe("paid");
+    expect(resolvePaymentResultState("PAID", true)).toBe("pending");
+    expect(resolvePaymentResultState("PENDING", false)).toBe("pending");
+  });
+
+  it.each(["EXPIRED", "CANCELLED", "REFUNDED", "UNKNOWN"])(
+    "stops polling for terminal or unknown state %s",
+    (status) => {
+      expect(resolvePaymentResultState(status, false)).toBe("error");
+    }
+  );
 });

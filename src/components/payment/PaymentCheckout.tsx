@@ -8,6 +8,7 @@ import clsx from "clsx";
 import QRCode from "qrcode";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
+import { normalizeInternalReturnUrl } from "@/lib/return-url";
 
 export type CheckoutOrder = {
   id: string;
@@ -23,6 +24,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onPaid?: () => void;
+  returnPath?: string;
 };
 
 function detectScene(): PaymentScene {
@@ -33,11 +35,11 @@ function detectScene(): PaymentScene {
   return "pc";
 }
 
-const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
-
-export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
+export function PaymentCheckout({ order, open, onClose, onPaid, returnPath }: Props) {
   const router = useRouter();
   const { locale, messages } = useOfficialI18n();
+  const dashboardOrdersUrl = localizeOfficialPath("/dashboard?paid=1#orders", locale);
+  const paidReturnPath = normalizeInternalReturnUrl(returnPath, dashboardOrdersUrl);
   const copy = messages.payment;
   const { data: session, status: sessionStatus } = useSession();
   const [scene, setScene] = useState<PaymentScene>("pc");
@@ -82,8 +84,8 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     stopPolling();
     onPaidRef.current?.();
     onCloseRef.current();
-    router.push(DASHBOARD_ORDERS_URL);
-  }, [router, stopPolling]);
+    router.push(paidReturnPath);
+  }, [paidReturnPath, router, stopPolling]);
 
   useEffect(() => {
     if (!open) {
@@ -92,7 +94,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
     }
     if (sessionStatus === "unauthenticated") {
       onClose();
-      router.push(`${localizeOfficialPath("/login", locale)}?callbackUrl=${encodeURIComponent(DASHBOARD_ORDERS_URL)}`);
+      router.push(`${localizeOfficialPath("/login", locale)}?callbackUrl=${encodeURIComponent(paidReturnPath)}`);
       return;
     }
     if (sessionStatus === "loading") return;
@@ -135,7 +137,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid }: Props) {
       stopPolling(false);
       previousFocus?.focus();
     };
-  }, [locale, open, order?.id, sessionStatus, onClose, router, stopPolling]);
+  }, [locale, open, order?.id, paidReturnPath, sessionStatus, onClose, router, stopPolling]);
 
   useEffect(() => {
     if (!qrUrl) {

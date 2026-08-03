@@ -174,9 +174,15 @@ export default auth(async (req) => {
 
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
+      const loginUrl = new URL(
+        localeResolution.locale === "en" ? "/en/login" : "/login",
+        req.url
+      );
+      const callbackPath = `${req.nextUrl.pathname}${req.nextUrl.search}`;
+      loginUrl.searchParams.set("callbackUrl", callbackPath);
       return withCsp(
         req,
-        NextResponse.redirect(new URL("/login?callbackUrl=/dashboard", req.url)),
+        NextResponse.redirect(loginUrl),
         nonce
       );
     }

@@ -176,6 +176,17 @@ describe("SEO production exports", () => {
     });
   });
 
+  it("does not advertise a language alternate when a content translation is absent", () => {
+    const metadata = buildPageMetadata(ctx, {
+      title: "Chinese-only article",
+      path: "/post/chinese-only",
+      translated: false,
+    });
+    expect(metadata.alternates).toEqual({
+      canonical: "https://example.test/post/chinese-only",
+    });
+  });
+
   it("builds WebSite, software, and blog structured data", () => {
     expect(buildWebSiteJsonLd(ctx)).toMatchObject({
       "@type": "WebSite",

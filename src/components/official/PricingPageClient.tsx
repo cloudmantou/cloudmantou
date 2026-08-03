@@ -12,6 +12,7 @@ import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { localizeOfficialPath } from "@/i18n/official";
 import { localizeEditorialOrderTitle, localizeEditorialProduct } from "@/lib/editorial-commerce";
 import { EditorialOrbitArt } from "@/components/editorial/EditorialOrbitArt";
+import { readApiEnvelope } from "@/lib/client-api-response";
 
 export function PricingPageClient() {
   const router = useRouter();
@@ -31,12 +32,11 @@ export function PricingPageClient() {
     const controller = new AbortController();
     fetch("/api/products", { signal: controller.signal })
       .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(locale === "en" ? copy.loadError : body.message || copy.loadError);
-        return body;
+        return readApiEnvelope(response, copy.loadError, locale !== "en");
       })
       .then((d) => {
-        if (Array.isArray(d.data)) setProducts(d.data.map((product: Product) => localizeEditorialProduct(product, locale)));
+        if (!Array.isArray(d.data)) throw new Error(copy.loadError);
+        setProducts(d.data.map((product: Product) => localizeEditorialProduct(product, locale)));
         setError("");
       })
       .catch((loadError) => {
@@ -70,21 +70,27 @@ export function PricingPageClient() {
       }),
     })
       .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(locale === "en" ? copy.orderError : data.message || copy.orderError);
+        const data = await readApiEnvelope(r, copy.orderError, locale !== "en");
+        if (!data.data || typeof data.data !== "object" || Array.isArray(data.data)) {
+          throw new Error(copy.orderError);
+        }
+        const order = data.data as Record<string, unknown>;
+        if (typeof order.id !== "string" || typeof order.orderNo !== "string" || typeof order.amount !== "number") {
+          throw new Error(copy.orderError);
+        }
         setCheckoutOrder({
-          id: data.data.id,
-          orderNo: data.data.orderNo,
+          id: order.id,
+          orderNo: order.orderNo,
           title: localizeEditorialOrderTitle(
             {
-              title: data.data.title,
-              productType: data.data.productType ?? product.productType,
-              productId: data.data.productId ?? product.id,
+              title: typeof order.title === "string" ? order.title : product.name,
+              productType: product.productType,
+              productId: typeof order.productId === "string" ? order.productId : product.id,
               product,
             },
             locale
           ),
-          amount: data.data.amount,
+          amount: order.amount,
         });
         setCheckoutOpen(true);
       })

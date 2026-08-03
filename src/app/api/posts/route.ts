@@ -2,6 +2,17 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import {
+  EDITORIAL_ARCHIVE_ORDER_BY,
+  EDITORIAL_ARCHIVE_PAGE_SIZE,
+  EDITORIAL_PUBLIC_POST_STATUSES,
+  EDITORIAL_SEARCH_MAX_LENGTH,
+  buildEditorialSearchWhere,
+  clampEditorialArchivePage,
+  getEnglishEditorialArchive,
+  normalizeEditorialQuery,
+  parseEditorialArchiveParams,
+} from "@/lib/editorial-archive";
 
 /** Extract a snippet around the first match of `q` in `text` */
 function extractSnippet(text: string, q: string, radius = 80): string | null {
@@ -16,64 +27,131 @@ function extractSnippet(text: string, q: string, radius = 80): string | null {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") || "10")));
-    const categoryId = searchParams.get("categoryId") || undefined;
-    const tag = searchParams.get("tag") || undefined;
-    const q = searchParams.get("q") || undefined;
+    const rawQuery = searchParams.get("q");
+    const parsed = parseEditorialArchiveParams({
+      q: rawQuery === null ? undefined : rawQuery,
+      page: searchParams.get("page") ?? undefined,
+    });
+    if (parsed.queryError === "empty") {
+      return fail("搜索关键词不能为空", 40001, 400);
+    }
+    if (parsed.queryError === "too_long") {
+      return fail(`搜索关键词不能超过 ${EDITORIAL_SEARCH_MAX_LENGTH} 个字符`, 40002, 400);
+    }
 
-    const where: any = {
-      status: { in: ["PUBLISHED", "PAID_ONLY"] },
+    const rawPageSize = searchParams.get("pageSize");
+    const parsedPageSize = rawPageSize && /^\d+$/.test(rawPageSize)
+      ? Number(rawPageSize)
+      : EDITORIAL_ARCHIVE_PAGE_SIZE;
+    const pageSize = Math.min(50, Math.max(1, parsedPageSize));
+    const categoryId = normalizeEditorialQuery(searchParams.get("categoryId") || "") || undefined;
+    const tag = normalizeEditorialQuery(searchParams.get("tag") || "") || undefined;
+    if ((categoryId?.length ?? 0) > 100 || (tag?.length ?? 0) > 100) {
+      return fail("筛选参数过长", 40003, 400);
+    }
+
+    if (searchParams.get("locale") === "en") {
+      const archive = getEnglishEditorialArchive(parsed.query, parsed.page, pageSize);
+      const formatted = archive.posts.map((post) => ({
+        id: `static:${post.slug}`,
+        title: post.title,
+        slug: post.slug,
+        excerpt: post.excerpt,
+        coverImage: post.coverImage,
+        publishedAt: post.publishedAt,
+        viewCount: 0,
+        isTop: false,
+        author: post.author,
+        category: post.category,
+        tags: [],
+        premium: post.status === "PAID_ONLY",
+        matchedContent: parsed.query ? post.excerpt : null,
+      }));
+      return ok(formatted, {
+        page: archive.page,
+        pageSize,
+        total: archive.total,
+        totalPages: archive.totalPages,
+      });
+    }
+
+    const where = {
+      status: { in: [...EDITORIAL_PUBLIC_POST_STATUSES] },
       ...(categoryId && { categoryId }),
       ...(tag && {
         tags: { some: { tag: { slug: tag } } },
       }),
-      ...(q && {
-        OR: [
-          { title: { contains: q } },
-          { excerpt: { contains: q } },
-          { content: { contains: q } },
-        ],
-      }),
+      ...buildEditorialSearchWhere(parsed.query),
     };
 
-    const [posts, total] = await Promise.all([
+    const [initialPosts, total] = await Promise.all([
       prisma.post.findMany({
         where,
-        include: {
-          author: { select: { id: true, username: true, nickname: true, avatar: true } },
-          category: { select: { id: true, name: true, slug: true } },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          excerpt: true,
+          coverImage: true,
+          publishedAt: true,
+          viewCount: true,
+          isTop: true,
+          status: true,
+          author: { select: { username: true, nickname: true } },
+          category: { select: { name: true, slug: true } },
           tags: { select: { tag: { select: { id: true, name: true, slug: true, color: true } } } },
         },
-        orderBy: [
-          { isTop: "desc" },
-          { publishedAt: "desc" },
-        ],
-        skip: (page - 1) * pageSize,
+        orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
+        skip: (parsed.page - 1) * pageSize,
         take: pageSize,
       }),
       prisma.post.count({ where }),
     ]);
 
-    const formatted = posts.map((p) => ({
-      ...p,
-      tags: p.tags.map((pt) => pt.tag),
-      premium: p.status === "PAID_ONLY",
-      // Include matched content snippet when searching
-      ...(q
-        ? {
-            matchedContent:
-              extractSnippet(p.content, q) ||
-              extractSnippet(p.excerpt || "", q) ||
-              null,
-          }
-        : {}),
-      // Don't include full content in list response
-      content: undefined,
+    const currentPage = clampEditorialArchivePage(parsed.page, total, pageSize);
+    const posts = currentPage === parsed.page
+      ? initialPosts
+      : await prisma.post.findMany({
+          where,
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            excerpt: true,
+            coverImage: true,
+            publishedAt: true,
+            viewCount: true,
+            isTop: true,
+            status: true,
+            author: { select: { username: true, nickname: true } },
+            category: { select: { name: true, slug: true } },
+            tags: { select: { tag: { select: { id: true, name: true, slug: true, color: true } } } },
+          },
+          orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
+          skip: (currentPage - 1) * pageSize,
+          take: pageSize,
+        });
+
+    const formatted = posts.map((post) => ({
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt,
+      coverImage: post.coverImage,
+      publishedAt: post.publishedAt,
+      viewCount: post.viewCount,
+      isTop: post.isTop,
+      author: post.author,
+      category: post.category,
+      tags: post.tags.map((postTag) => postTag.tag),
+      premium: post.status === "PAID_ONLY",
+      matchedContent: parsed.query
+        ? extractSnippet(post.excerpt || "", parsed.query)
+        : null,
     }));
 
     return ok(formatted, {
-      page,
+      page: currentPage,
       pageSize,
       total,
       totalPages: Math.ceil(total / pageSize),

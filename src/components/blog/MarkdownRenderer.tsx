@@ -9,6 +9,7 @@ import { createHeadingId } from "@/lib/editorial-article";
 type MarkdownRendererProps = {
   content: string;
   className?: string;
+  locale?: "zh" | "en";
 };
 
 function textFromChildren(children: ReactNode): string {
@@ -24,6 +25,7 @@ function textFromChildren(children: ReactNode): string {
 export function MarkdownRenderer({
   content,
   className = "article-prose",
+  locale = "zh",
 }: MarkdownRendererProps) {
   const headingOccurrence = new Map<string, number>();
   const heading = (level: 2 | 3, children: ReactNode) => {
@@ -32,7 +34,11 @@ export function MarkdownRenderer({
     const content = (
       <>
         {children}
-        <a className="article-heading-anchor" href={`#${headingId}`} aria-label={`Link to ${headingText}`}>
+        <a
+          className="article-heading-anchor"
+          href={`#${headingId}`}
+          aria-label={locale === "en" ? `Link to ${headingText}` : `链接到${headingText}`}
+        >
           <span aria-hidden="true">#</span>
         </a>
       </>

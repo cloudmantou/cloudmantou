@@ -7,8 +7,8 @@ import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
 import { localizeEditorialOrderTitle } from "@/lib/editorial-commerce";
-
-const DASHBOARD_ORDERS_URL = "/dashboard?paid=1#orders";
+import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { resolvePaymentResultState } from "@/lib/payment-state";
 
 function collectAlipayReturnParams(searchParams: URLSearchParams) {
   const params: Record<string, string> = {};
@@ -22,6 +22,7 @@ function collectAlipayReturnParams(searchParams: URLSearchParams) {
 function PaymentResultInner() {
   const router = useRouter();
   const { locale, messages } = useOfficialI18n();
+  const dashboardOrdersUrl = localizeOfficialPath("/dashboard?paid=1#orders", locale);
   const copy = messages.payment.result;
   const searchParams = useSearchParams();
   const orderNo = searchParams.get("orderNo") || "";
@@ -69,8 +70,17 @@ function PaymentResultInner() {
           )
         );
         setAmount(data.data?.amount ?? null);
-        if (data.data?.status === "PAID" && !data.data?.deliveryPending) {
+        const paymentResultState = resolvePaymentResultState(
+          data.data?.status || "UNKNOWN",
+          Boolean(data.data?.deliveryPending)
+        );
+        if (paymentResultState === "paid") {
           setStatus("paid");
+          setHint("");
+          return;
+        }
+        if (paymentResultState === "error") {
+          setStatus("error");
           setHint("");
           return;
         }
@@ -100,14 +110,14 @@ function PaymentResultInner() {
   useEffect(() => {
     if (status !== "paid") return;
     const timer = window.setTimeout(() => {
-      router.replace(DASHBOARD_ORDERS_URL);
+      router.replace(dashboardOrdersUrl);
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [status, router]);
+  }, [dashboardOrdersUrl, status, router]);
 
   return (
     <div className="payment-result-page editorial-payment-result">
-      <div className="payment-result-card">
+      <div className="payment-result-card" role="status" aria-live="polite">
         {status === "loading" ? (
           <>
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
@@ -125,7 +135,7 @@ function PaymentResultInner() {
             <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0 0" }}>
               {copy.redirecting}
             </p>
-            <Link href={DASHBOARD_ORDERS_URL} className="payment-result-link">
+            <Link href={dashboardOrdersUrl} className="payment-result-link">
               {copy.viewOrders}
             </Link>
           </>
@@ -153,7 +163,9 @@ function PaymentResultInner() {
 }
 
 export default function PaymentResultPage() {
+  const { locale } = useOfficialI18n();
   return (
+    <EditorialShell locale={locale}>
     <Suspense
       fallback={
         <div className="payment-result-page editorial-payment-result">
@@ -165,5 +177,6 @@ export default function PaymentResultPage() {
     >
       <PaymentResultInner />
     </Suspense>
+    </EditorialShell>
   );
 }

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { OfficialShell } from "@/components/official/OfficialShell";
-import { PageHeader } from "@/components/official/sections";
+import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { EditorialPublicHero, EditorialPublicSection } from "@/components/editorial/EditorialPublicPage";
 import { buildPageMetadata, getSeoContext } from "@/lib/seo";
 import { getOfficialMessages, localizeOfficialPath } from "@/i18n/official";
 import { getRequestLocale } from "@/i18n/server";
@@ -35,50 +35,45 @@ export default async function DocsPage() {
   }
 
   return (
-    <OfficialShell>
-      <PageHeader
+    <EditorialShell locale={locale}>
+      <EditorialPublicHero
+        eyebrow={locale === "en" ? "GUIDES / VERIFIED STEPS" : "指南 / 可验证步骤"}
         title={copy.title}
         description={copy.description}
       />
-      <div className="official-container official-feature-grid" style={{ paddingBottom: 32 }}>
-        {copy.guides.map((guide) => (
-          <Link key={guide.href} href={localizeOfficialPath(guide.href, locale)} className="official-feature-card" style={{ textDecoration: "none", color: "inherit" }}>
+      <EditorialPublicSection title={locale === "en" ? "Start here" : "从这里开始"}>
+      <div className="editorial-public-card-grid">
+        {copy.guides.filter((guide) => guide.href !== "/store").map((guide, index) => (
+          <Link key={guide.href} href={localizeOfficialPath(guide.href, locale)} className={`editorial-public-card editorial-guide-card accent-${index % 3}`}>
+            <span className="editorial-public-index">{String(index + 1).padStart(2, "0")}</span>
             <h3>{guide.title}</h3>
             <p>{guide.desc}</p>
           </Link>
         ))}
       </div>
+      </EditorialPublicSection>
       {posts.length > 0 ? (
-        <div className="official-container" style={{ paddingBottom: 56 }}>
-          <h2 style={{ fontSize: "1.2rem", marginBottom: 16 }}>{copy.related}</h2>
-          <div style={{ display: "grid", gap: 10 }}>
+        <EditorialPublicSection title={copy.related}>
+          <div className="editorial-guide-list">
             {posts.map((post) => (
               <Link
                 key={post.slug}
-                href={`/post/${post.slug}`}
-                style={{
-                  textDecoration: "none",
-                  color: "inherit",
-                  padding: "14px 16px",
-                  borderRadius: 12,
-                  border: "1px solid var(--border)",
-                  background: "var(--card)",
-                }}
+                href={localizeOfficialPath(`/post/${post.slug}`, locale)}
               >
                 <strong>{post.title}</strong>
                 {post.excerpt ? (
-                  <p style={{ margin: "6px 0 0", color: "var(--text-secondary)", fontSize: "0.88rem" }}>
+                  <p>
                     {post.excerpt}
                   </p>
                 ) : null}
               </Link>
             ))}
           </div>
-          <Link href="/blog" className="official-btn official-btn-ghost" style={{ marginTop: 20 }}>
+          <Link href={localizeOfficialPath("/blog", locale)} className="editorial-button editorial-button-paper">
             {copy.allBlog}
           </Link>
-        </div>
+        </EditorialPublicSection>
       ) : null}
-    </OfficialShell>
+    </EditorialShell>
   );
 }
