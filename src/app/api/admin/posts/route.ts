@@ -4,6 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import { coverImageSchema, postSlugSchema } from "@/lib/post-schema";
+import {
+  MAX_PAID_POST_CONTENT_LENGTH,
+  isPublishedPostStatus,
+  isValidPaidPostPrice,
+  validatePaidPostMutation,
+} from "@/lib/paid-post-publishing";
+import { isPrismaUniqueConstraintError } from "@/lib/prisma-errors";
 
 const createPostSchema = z.object({
   title: z.string().min(1, "标题不能为空").max(200),
@@ -16,8 +23,14 @@ const createPostSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "PAID_ONLY"]).default("DRAFT"),
   isTop: z.boolean().default(false),
   paidContent: z.object({
-    content: z.string().min(1),
-    price: z.number().min(0.01),
+    content: z.string().trim().min(1, "付费内容不能为空").max(
+      MAX_PAID_POST_CONTENT_LENGTH,
+      "付费内容过长",
+    ),
+    price: z.number().refine(
+      isValidPaidPostPrice,
+      "付费价格必须是大于等于 0.01 的两位小数",
+    ),
   }).optional(),
 });
 
@@ -86,6 +99,13 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    const paidPostError = validatePaidPostMutation({
+      status: data.status,
+      paidContent: data.paidContent,
+    });
+    if (paidPostError) {
+      return fail(paidPostError, 42200, 422);
+    }
 
     // Check slug uniqueness
     const existing = await prisma.post.findUnique({ where: { slug: data.slug } });
@@ -105,7 +125,7 @@ export async function POST(req: NextRequest) {
           categoryId: data.categoryId || null,
           status: data.status,
           isTop: data.isTop,
-          publishedAt: data.status === "PUBLISHED" ? new Date() : null,
+          publishedAt: isPublishedPostStatus(data.status) ? new Date() : null,
         },
       });
 
@@ -119,8 +139,8 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Create paid content if provided
-      if (data.paidContent && data.status === "PAID_ONLY") {
+      // A draft may keep a complete paid section until it is published.
+      if (data.paidContent) {
         await tx.paidContent.create({
           data: {
             postId: newPost.id,
@@ -135,6 +155,12 @@ export async function POST(req: NextRequest) {
 
     return ok({ id: post.id, slug: post.slug });
   } catch (error) {
+    if (error instanceof ApiError) {
+      return fail(error.message, error.code, error.status);
+    }
+    if (isPrismaUniqueConstraintError(error, "slug")) {
+      return fail("slug 已存在，请换一个", 40900, 409);
+    }
     console.error("[Admin Create Post Error]", error);
     return fail("创建文章失败", 50000, 500);
   }

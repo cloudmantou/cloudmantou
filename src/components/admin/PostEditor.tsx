@@ -6,6 +6,12 @@ import { Save, Send, ImagePlus, Code2, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import { uploadImageFile } from "@/lib/upload-image-client";
+import { readApiEnvelope } from "@/lib/client-api-response";
+import {
+  MAX_PAID_POST_CONTENT_LENGTH,
+  MAX_PAID_POST_PRICE,
+  preparePaidPostSubmission,
+} from "@/lib/paid-post-publishing";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
@@ -58,7 +64,9 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     initialData?.tags?.map((t) => t.id) || []
   );
   const [isTop, setIsTop] = useState(initialData?.isTop || false);
-  const [isPaid, setIsPaid] = useState(initialData?.status === "PAID_ONLY");
+  const [isPaid, setIsPaid] = useState(
+    initialData?.status === "PAID_ONLY" || Boolean(initialData?.paidContent),
+  );
   const [paidContent, setPaidContent] = useState(initialData?.paidContent?.content || "");
   const [paidPrice, setPaidPrice] = useState(initialData?.paidContent?.price?.toString() || "");
 
@@ -271,21 +279,23 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
       setError("slug 不能为空");
       return;
     }
+    const submission = preparePaidPostSubmission({
+      mode,
+      requestedStatus: publishStatus,
+      isPaid,
+      paidContent,
+      paidPrice,
+    });
+    if (!submission.ok) {
+      setError(submission.error);
+      return;
+    }
     setError("");
-
-    const finalStatus = isPaid ? "PAID_ONLY" : publishStatus;
 
     startTransition(async () => {
       try {
         const url = mode === "create" ? "/api/admin/posts" : `/api/admin/posts/${initialData?.id}`;
         const method = mode === "create" ? "POST" : "PUT";
-
-        let paidContentPayload: { content: string; price: number } | null | undefined;
-        if (isPaid && paidContent.trim() && paidPrice) {
-          paidContentPayload = { content: paidContent, price: parseFloat(paidPrice) };
-        } else if (mode === "edit" && !isPaid) {
-          paidContentPayload = null;
-        }
 
         const res = await fetch(url, {
           method,
@@ -298,16 +308,15 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             coverImage: coverImage.trim() || null,
             categoryId: categoryId || null,
             tagIds: selectedTagIds,
-            status: finalStatus,
+            status: submission.status,
             isTop,
-            ...(paidContentPayload !== undefined ? { paidContent: paidContentPayload } : {}),
+            ...(submission.paidContent !== undefined
+              ? { paidContent: submission.paidContent }
+              : {}),
           }),
         });
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.message || "保存失败");
-        }
+        await readApiEnvelope(res, "保存失败");
 
         setSaveState("saved");
         router.push("/admin/posts");
@@ -459,6 +468,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                 <input
                   type="number"
                   min="0.01"
+                  max={MAX_PAID_POST_PRICE}
                   step="0.01"
                   className="form-input"
                   value={paidPrice}
@@ -473,6 +483,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
                   value={paidContent}
                   onChange={(e) => setPaidContent(e.target.value)}
                   placeholder="付费章节内容..."
+                  maxLength={MAX_PAID_POST_CONTENT_LENGTH}
                   rows={5}
                 />
               </div>

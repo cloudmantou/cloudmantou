@@ -4,6 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import { coverImageSchema, postSlugSchema } from "@/lib/post-schema";
+import {
+  MAX_PAID_POST_CONTENT_LENGTH,
+  isPublishedPostStatus,
+  isValidPaidPostPrice,
+  validatePaidPostMutation,
+} from "@/lib/paid-post-publishing";
+import { isPrismaUniqueConstraintError } from "@/lib/prisma-errors";
 
 const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -16,8 +23,14 @@ const updatePostSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "PAID_ONLY"]).optional(),
   isTop: z.boolean().optional(),
   paidContent: z.object({
-    content: z.string().min(1),
-    price: z.number().min(0.01),
+    content: z.string().trim().min(1, "付费内容不能为空").max(
+      MAX_PAID_POST_CONTENT_LENGTH,
+      "付费内容过长",
+    ),
+    price: z.number().refine(
+      isValidPaidPostPrice,
+      "付费价格必须是大于等于 0.01 的两位小数",
+    ),
   }).optional().nullable(),
 });
 
@@ -65,7 +78,10 @@ export async function PUT(
   const { id } = await params;
   try {
     await requireAdminAndAudit(req, "posts.update", { targetType: "post", targetId: id });
-    const post = await prisma.post.findUnique({ where: { id: id } });
+    const post = await prisma.post.findUnique({
+      where: { id: id },
+      include: { paidContent: { select: { id: true } } },
+    });
     if (!post) {
       return fail("文章不存在", 40400, 404);
     }
@@ -77,6 +93,15 @@ export async function PUT(
     }
 
     const data = parsed.data;
+    const effectiveStatus = data.status ?? post.status;
+    const paidPostError = validatePaidPostMutation({
+      status: effectiveStatus,
+      paidContent: data.paidContent,
+      hasExistingPaidContent: Boolean(post.paidContent),
+    });
+    if (paidPostError) {
+      return fail(paidPostError, 42200, 422);
+    }
 
     // Check slug uniqueness if changed
     if (data.slug && data.slug !== post.slug) {
@@ -88,8 +113,11 @@ export async function PUT(
 
     await prisma.$transaction(async (tx) => {
       // Update post
-      await tx.post.update({
-        where: { id: id },
+      const nextUpdatedAt = new Date(
+        Math.max(Date.now(), post.updatedAt.getTime() + 1),
+      );
+      const updateResult = await tx.post.updateMany({
+        where: { id, updatedAt: post.updatedAt },
         data: {
           ...(data.title !== undefined && { title: data.title }),
           ...(data.slug !== undefined && { slug: data.slug }),
@@ -100,13 +128,17 @@ export async function PUT(
           ...(data.status !== undefined && {
             status: data.status,
             publishedAt:
-              data.status === "PUBLISHED" && !post.publishedAt
+              isPublishedPostStatus(data.status) && !post.publishedAt
                 ? new Date()
                 : post.publishedAt,
           }),
           ...(data.isTop !== undefined && { isTop: data.isTop }),
+          updatedAt: nextUpdatedAt,
         },
       });
+      if (updateResult.count !== 1) {
+        throw new ApiError("文章已被其他操作更新，请刷新后重试", 40901, 409);
+      }
 
       // Update tags if provided
       if (data.tagIds !== undefined) {
@@ -118,8 +150,10 @@ export async function PUT(
         }
       }
 
-      // Update paid content
-      if (data.paidContent !== undefined) {
+      // Public posts must never retain a paid section, including direct API updates.
+      if (effectiveStatus === "PUBLISHED") {
+        await tx.paidContent.deleteMany({ where: { postId: id } });
+      } else if (data.paidContent !== undefined) {
         await tx.paidContent.deleteMany({ where: { postId: id } });
         if (data.paidContent) {
           await tx.paidContent.create({
@@ -137,6 +171,9 @@ export async function PUT(
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);
+    }
+    if (isPrismaUniqueConstraintError(error, "slug")) {
+      return fail("slug 已存在", 40900, 409);
     }
     console.error("[Admin Update Post Error]", error);
     return fail("更新文章失败", 50000, 500);
