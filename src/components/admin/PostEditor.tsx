@@ -9,6 +9,7 @@ import { uploadImageFile } from "@/lib/upload-image-client";
 import { importRemoteImagesInMarkdown } from "@/lib/remote-image-client";
 import { replaceImportedImageUrls } from "@/lib/markdown-remote-images";
 import { readApiEnvelope } from "@/lib/client-api-response";
+import { EditorialAiAssistant } from "@/components/admin/EditorialAiAssistant";
 import {
   MAX_PAID_POST_CONTENT_LENGTH,
   MAX_PAID_POST_PRICE,
@@ -593,6 +594,22 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               </button>
             </div>
           </div>
+
+          <EditorialAiAssistant
+            title={title}
+            content={content}
+            excerpt={excerpt}
+            onApplyTitle={(nextTitle) => {
+              const previousTitle = title;
+              setTitle(nextTitle);
+              setSeoTitle((current) => !current || current === previousTitle ? nextTitle : current);
+            }}
+            onApplyExcerpt={(nextExcerpt) => {
+              const previousExcerpt = excerpt;
+              setExcerpt(nextExcerpt);
+              setSeoDesc((current) => !current || current === previousExcerpt ? nextExcerpt : current);
+            }}
+          />
 
           <div className="publish-box">
             <h4>封面图</h4>

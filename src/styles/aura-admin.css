@@ -1525,6 +1525,132 @@
   line-height: 1.55;
 }
 
+.admin-root .editor-ai-assistant {
+  background: linear-gradient(145deg, var(--accent-dim), var(--surface) 52%);
+  border-color: rgba(162, 155, 254, 0.35);
+}
+
+.admin-root .editor-ai-heading,
+.admin-root .editor-ai-heading h4,
+.admin-root .editor-ai-actions,
+.admin-root .editor-ai-candidate button {
+  display: flex;
+  align-items: center;
+}
+
+.admin-root .editor-ai-heading {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-root .editor-ai-heading h4 {
+  gap: 6px;
+  margin: 0;
+}
+
+.admin-root .editor-ai-heading > span {
+  max-width: 150px;
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-root .editor-ai-actions {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-root .editor-ai-actions .e-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.admin-root .editor-ai-notice,
+.admin-root .editor-ai-error {
+  margin: 9px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-root .editor-ai-notice {
+  color: var(--text-muted);
+}
+
+.admin-root .editor-ai-error {
+  color: var(--rose);
+}
+
+.admin-root .editor-ai-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-root .editor-ai-candidate {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(10, 10, 15, 0.42);
+}
+
+.admin-root .editor-ai-candidate strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-root .editor-ai-candidate p,
+.admin-root .editor-ai-candidate li {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.admin-root .editor-ai-candidate p {
+  margin: 5px 0 8px;
+}
+
+.admin-root .editor-ai-candidate ul {
+  margin: 7px 0;
+  padding-left: 18px;
+}
+
+.admin-root .editor-ai-candidate button {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-light);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-root .editor-ai-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0;
+}
+
+.admin-root .editor-ai-keywords span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(111, 76, 255, 0.1);
+  color: var(--accent-light);
+  font-size: 10px;
+}
+
+.admin-root .editor-ai-assistant .spin {
+  animation: editor-ai-spin 0.8s linear infinite;
+}
+
+@keyframes editor-ai-spin {
+  to { transform: rotate(360deg); }
+}
+
 .admin-root .editor-publish-actions .e-btn {
   flex: 1;
   justify-content: center;

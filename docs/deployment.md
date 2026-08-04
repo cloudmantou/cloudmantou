@@ -112,3 +112,32 @@ location ^~ /uploads/ {
 
 文章图片会在服务端校验后统一压缩为 WebP。远程图片按压缩结果的内容哈希
 去重，不写入 Git；备份站点时需同时备份该持久化目录。
+
+## AI 编辑助手
+
+文章编辑器已通过 Vercel AI SDK 接入 OpenAI-compatible Provider，第一阶段提供
+结构化的 5 个标题候选与文章摘要。生成结果只作为建议，管理员点击应用后才会
+写入当前编辑表单，发布流程保持原有确认步骤。
+
+在服务器根目录 `.env` 中配置：
+
+```env
+AI_ENABLED="true"
+AI_PROVIDER_NAME="cloudmantou-ai"
+AI_BASE_URL="https://api.openai.com/v1"
+AI_API_KEY="replace-with-server-side-api-key"
+AI_TEXT_MODEL="replace-with-model-id"
+AI_SUPPORTS_STRUCTURED_OUTPUTS="true"
+```
+
+若通过本机 CC Switch 等 OpenAI-compatible 代理，可使用回环地址，例如：
+
+```env
+AI_BASE_URL="http://127.0.0.1:15721/v1"
+```
+
+- `AI_API_KEY` 仅由 Node.js 服务端读取，前端响应和日志均不包含密钥。
+- 远程 Provider 地址必须使用 HTTPS；HTTP 只接受本机回环地址。
+- 接口要求管理员登录并记录审计事件，每位管理员每 10 分钟最多生成 20 次。
+- 编辑助手只接收标题、摘要和公开正文，付费章节不进入 AI 请求。
+- 修改 AI 环境变量后重新构建并启动应用。
