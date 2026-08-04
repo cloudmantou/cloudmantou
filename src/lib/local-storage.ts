@@ -1,8 +1,23 @@
 import path from "path";
 import { mkdir, writeFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 const DEFAULT_UPLOAD_REL = path.join("public", "uploads");
+let warnedAboutEphemeralProductionUploads = false;
+
+function warnIfProductionUploadRootIsEphemeral(): void {
+  const configured = process.env.UPLOAD_DIR?.trim();
+  if (
+    process.env.NODE_ENV === "production" &&
+    !warnedAboutEphemeralProductionUploads &&
+    (!configured || !path.isAbsolute(configured))
+  ) {
+    warnedAboutEphemeralProductionUploads = true;
+    console.warn(
+      "[uploads] Production UPLOAD_DIR is relative; rebuilds may remove uploaded files. Use a persistent absolute path."
+    );
+  }
+}
 
 function defaultUploadRoot(): string {
   return path.resolve(process.cwd(), DEFAULT_UPLOAD_REL);
@@ -48,6 +63,7 @@ export function resolveUploadRoot(customDir?: string): string {
 
 /** 本地上传根目录，默认 public/uploads，Docker 可通过 UPLOAD_DIR 挂载卷 */
 export function getUploadRoot(): string {
+  warnIfProductionUploadRootIsEphemeral();
   return resolveUploadRoot();
 }
 
@@ -77,6 +93,34 @@ export async function saveUploadBuffer(
     url: `/uploads/${uploadFolder}/${filename}`,
     bytes: buffer.length,
     folder: uploadFolder,
+    filename,
+  };
+}
+
+/**
+ * 按内容哈希保存远程导入图片。同一份压缩结果只落盘一次，避免重复粘贴占用空间。
+ */
+export async function saveUploadBufferDeduplicated(
+  buffer: Buffer,
+  ext: string
+): Promise<{ url: string; bytes: number; folder: string; filename: string }> {
+  const digest = createHash("sha256").update(buffer).digest("hex");
+  const folder = path.posix.join("remote", digest.slice(0, 2));
+  const filename = `${digest}.${ext}`;
+  const uploadDir = path.join(getUploadRoot(), folder);
+  const absolutePath = path.join(uploadDir, filename);
+
+  await mkdir(uploadDir, { recursive: true });
+  try {
+    await writeFile(absolutePath, buffer, { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
+  }
+
+  return {
+    url: `/uploads/${folder}/${filename}`,
+    bytes: buffer.length,
+    folder,
     filename,
   };
 }

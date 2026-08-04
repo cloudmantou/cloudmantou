@@ -128,6 +128,7 @@ describe("htmlToMarkdown", () => {
         element("img", [], { src: "/image.png", alt: "cover" }),
       ]),
       element("img", [], { src: "/standalone.png" }),
+      element("img", [], { src: "data:image/gif;base64,placeholder", "data-src": "https://cdn.example.test/lazy.png", alt: "lazy" }),
     ];
 
     const markdown = htmlToMarkdown("<fixture />");
@@ -136,6 +137,8 @@ describe("htmlToMarkdown", () => {
     expect(markdown).toContain("*italics* [site](https://example.test) plain");
     expect(markdown).toContain("`x` span ![cover](/image.png)");
     expect(markdown).toContain("![image](/standalone.png)");
+    expect(markdown).toContain("![lazy](https://cdn.example.test/lazy.png)");
+    expect(markdown).not.toContain("data:image/gif");
   });
 
   it("converts code blocks, quotes, lists, rules, and fallback containers", () => {

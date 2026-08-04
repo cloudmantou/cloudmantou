@@ -13,6 +13,9 @@ export const UPLOAD_PURPOSES: Record<
 /** 上传前原始文件上限（客户端压缩后通常远小于此值） */
 export const UPLOAD_MAX_INPUT_BYTES = 10 * 1024 * 1024;
 
+/** Sharp 解码像素上限，防止体积很小但尺寸异常的图片耗尽内存。 */
+export const UPLOAD_MAX_INPUT_PIXELS = 25_000_000;
+
 /** 服务端压缩后单文件上限 */
 export const UPLOAD_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 

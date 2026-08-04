@@ -2,9 +2,12 @@ import sharp from "sharp";
 import { detectImageType } from "@/lib/image-magic";
 import {
   UPLOAD_MAX_OUTPUT_BYTES,
+  UPLOAD_MAX_INPUT_PIXELS,
   UPLOAD_PURPOSES,
   type UploadPurpose,
 } from "@/lib/upload-config";
+
+sharp.concurrency(2);
 
 export type ProcessImageResult = {
   buffer: Buffer;
@@ -37,7 +40,11 @@ export async function processUploadImage(
   const preset = UPLOAD_PURPOSES[purpose];
 
   try {
-    const processed = await sharp(input, { failOn: "error", animated: false })
+    const processed = await sharp(input, {
+      failOn: "error",
+      animated: false,
+      limitInputPixels: UPLOAD_MAX_INPUT_PIXELS,
+    })
       .rotate()
       .resize(preset.maxWidth, preset.maxHeight, {
         fit: "inside",

@@ -18,6 +18,7 @@ import {
   getUploadRoot,
   resolveUploadRoot,
   saveUploadBuffer,
+  saveUploadBufferDeduplicated,
 } from "@/lib/local-storage";
 import {
   getClientCompressOptions,
@@ -239,5 +240,27 @@ describe("local upload storage", () => {
       path.join(uploadDir, result.filename),
       buffer
     );
+  });
+
+  it("deduplicates remote imports by the compressed content hash", async () => {
+    const buffer = Buffer.from("same-compressed-image");
+    const result = await saveUploadBufferDeduplicated(buffer, "webp");
+
+    expect(result.folder).toMatch(/^remote\/[0-9a-f]{2}$/);
+    expect(result.filename).toMatch(/^[0-9a-f]{64}\.webp$/);
+    expect(result.url).toBe(`/uploads/${result.folder}/${result.filename}`);
+    expect(writeFileMock).toHaveBeenCalledWith(
+      path.join(getUploadRoot(), result.folder, result.filename),
+      buffer,
+      { flag: "wx" }
+    );
+  });
+
+  it("treats an existing content-hash file as a successful deduplicated save", async () => {
+    writeFileMock.mockRejectedValueOnce(Object.assign(new Error("exists"), { code: "EEXIST" }));
+
+    await expect(
+      saveUploadBufferDeduplicated(Buffer.from("existing-image"), "webp")
+    ).resolves.toMatchObject({ bytes: Buffer.byteLength("existing-image") });
   });
 });

@@ -22,7 +22,20 @@ function inlineNode(node: ChildNode): string {
       return href && inner ? `[${inner}](${href})` : inner;
     }
     case "img": {
-      const src = el.getAttribute("src");
+      const srcset =
+        el.getAttribute("data-srcset") ||
+        el.getAttribute("srcset") ||
+        "";
+      const srcsetFirst = srcset.split(",", 1)[0]?.trim().split(/\s+/, 1)[0] || null;
+      const candidates = [
+        el.getAttribute("data-original"),
+        el.getAttribute("data-original-src"),
+        el.getAttribute("data-src"),
+        srcsetFirst,
+        el.getAttribute("src"),
+      ];
+      const src =
+        candidates.find((value) => value && !/^(?:data|blob):/i.test(value.trim())) || null;
       const alt = el.getAttribute("alt") || "image";
       return src ? `![${alt}](${src})` : "";
     }

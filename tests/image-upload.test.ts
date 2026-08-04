@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { detectImageType, isAllowedImageBuffer } from "@/lib/image-magic";
-import { normalizeUploadPurpose, UPLOAD_PURPOSES } from "@/lib/upload-config";
+import {
+  normalizeUploadPurpose,
+  UPLOAD_MAX_INPUT_PIXELS,
+  UPLOAD_PURPOSES,
+} from "@/lib/upload-config";
 import { processUploadImage } from "@/lib/image-process-server";
 
 // 1x1 PNG
@@ -30,6 +34,7 @@ describe("upload-config", () => {
   it("defines compression presets for each purpose", () => {
     expect(UPLOAD_PURPOSES.cover.maxWidth).toBe(1600);
     expect(UPLOAD_PURPOSES.daily.quality).toBeGreaterThan(0);
+    expect(UPLOAD_MAX_INPUT_PIXELS).toBe(25_000_000);
   });
 });
 

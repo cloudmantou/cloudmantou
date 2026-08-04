@@ -6,6 +6,8 @@ import { Save, Send, ImagePlus, Code2, Loader2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { htmlToMarkdown } from "@/lib/html-to-markdown";
 import { uploadImageFile } from "@/lib/upload-image-client";
+import { importRemoteImagesInMarkdown } from "@/lib/remote-image-client";
+import { replaceImportedImageUrls } from "@/lib/markdown-remote-images";
 import { readApiEnvelope } from "@/lib/client-api-response";
 import {
   MAX_PAID_POST_CONTENT_LENGTH,
@@ -28,6 +30,10 @@ function slugifyTagName(name: string) {
     .replace(/^-|-$/g, "");
   if (ascii.length >= 1) return ascii.slice(0, 30);
   return `tag-${Date.now().toString(36)}`;
+}
+
+function createImagePlaceholder(): string {
+  return `<!-- cloudmantou-image-${Date.now()}-${Math.random().toString(36).slice(2)} -->`;
 }
 
 type PostEditorProps = {
@@ -98,9 +104,19 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploadTaskCount, setUploadTaskCount] = useState(0);
+  const uploading = uploadTaskCount > 0;
+  const [imageStatus, setImageStatus] = useState("");
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [previewHost, setPreviewHost] = useState("");
+
+  const beginImageTask = useCallback(() => {
+    setUploadTaskCount((count) => count + 1);
+  }, []);
+
+  const finishImageTask = useCallback(() => {
+    setUploadTaskCount((count) => Math.max(0, count - 1));
+  }, []);
 
   const insertText = useCallback((text: string, at?: { start: number; end: number }) => {
     const pos = at ?? selection;
@@ -111,21 +127,26 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
   const handleImageFiles = async (files: FileList | null, forCover = false) => {
     if (!files?.length) return;
-    setUploading(true);
+    const file = files[0];
+    const alt = file.name.replace(/\.[^.]+$/, "") || "image";
+    const placeholder = forCover ? null : createImagePlaceholder();
+    if (placeholder) insertText(`\n${placeholder}\n\n`);
+    beginImageTask();
     setError("");
+    setImageStatus("");
     try {
-      const file = files[0];
       const url = await uploadImageFile(file, { forCover });
       if (forCover) {
         setCoverImage(url);
-      } else {
-        const alt = file.name.replace(/\.[^.]+$/, "") || "image";
-        insertText(`\n![${alt}](${url})\n\n`);
+      } else if (placeholder) {
+        setContent((current) => current.replace(placeholder, `![${alt}](${url})`));
       }
+      setImageStatus("图片已压缩并保存");
     } catch (e: unknown) {
+      if (placeholder) setContent((current) => current.replace(placeholder, ""));
       setError(e instanceof Error ? e.message : "图片上传失败");
     } finally {
-      setUploading(false);
+      finishImageTask();
     }
   };
 
@@ -139,14 +160,20 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     const imageFile = imageItem?.getAsFile();
     if (imageFile) {
       e.preventDefault();
-      setUploading(true);
+      const placeholder = createImagePlaceholder();
+      insertText(`\n${placeholder}\n\n`, pos);
+      beginImageTask();
+      setError("");
+      setImageStatus("");
       try {
         const url = await uploadImageFile(imageFile);
-        insertText(`\n![paste](${url})\n\n`, pos);
+        setContent((current) => current.replace(placeholder, `![paste](${url})`));
+        setImageStatus("粘贴图片已压缩并保存");
       } catch (err: unknown) {
+        setContent((current) => current.replace(placeholder, ""));
         setError(err instanceof Error ? err.message : "图片粘贴失败");
       } finally {
-        setUploading(false);
+        finishImageTask();
       }
       return;
     }
@@ -155,7 +182,27 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     if (html && /<(?:p|h\d|ul|ol|li|pre|blockquote|img|table|div|br|strong|em)\b/i.test(html)) {
       e.preventDefault();
       const md = htmlToMarkdown(html);
-      if (md) insertText(`${md}\n\n`, pos);
+      if (!md) return;
+
+      insertText(`${md}\n\n`, pos);
+      beginImageTask();
+      setError("");
+      setImageStatus("");
+      try {
+        const imported = await importRemoteImagesInMarkdown(md, "content");
+        setContent((current) => replaceImportedImageUrls(current, imported.items));
+        if (imported.importedCount > 0 && imported.failedCount === 0) {
+          setImageStatus(`已自动下载并压缩 ${imported.importedCount} 张图片`);
+        } else if (imported.importedCount > 0) {
+          setImageStatus(
+            `已导入 ${imported.importedCount} 张，${imported.failedCount} 张保留原链接`
+          );
+        } else if (imported.failedCount > 0) {
+          setImageStatus(`${imported.failedCount} 张图片保留原链接，可稍后重试`);
+        }
+      } finally {
+        finishImageTask();
+      }
     }
   };
 
@@ -411,8 +458,13 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               上传图片
             </button>
             <span className="editor-insert-hint">
-              支持粘贴富文本 / 截图，自动转 Markdown 并压缩图片
+              支持粘贴富文本 / 截图，自动下载、转 Markdown 并压缩图片
             </span>
+            {imageStatus && (
+              <span className="editor-insert-hint" role="status">
+                {imageStatus}
+              </span>
+            )}
             <input
               ref={imageInputRef}
               type="file"

@@ -90,3 +90,25 @@ curl --fail --silent --show-error \
 
 `.env` 的 `UPLOAD_DIR` 应指向项目发布目录之外的持久化目录，避免 Git 更新
 或重新构建时覆盖已上传文件。
+
+宝塔裸机部署示例：
+
+```env
+UPLOAD_DIR="/www/wwwroot/cloudmantou-data/uploads"
+UPLOAD_ALLOWED_ROOT="/www/wwwroot/cloudmantou-data"
+```
+
+创建目录后让运行 Node 的用户拥有写权限，并在站点 Nginx 配置中直接提供上传文件：
+
+```nginx
+location ^~ /uploads/ {
+    alias /www/wwwroot/cloudmantou-data/uploads/;
+    autoindex off;
+    expires 30d;
+    add_header Cache-Control "public, max-age=2592000, immutable" always;
+    add_header X-Content-Type-Options "nosniff" always;
+}
+```
+
+文章图片会在服务端校验后统一压缩为 WebP。远程图片按压缩结果的内容哈希
+去重，不写入 Git；备份站点时需同时备份该持久化目录。
