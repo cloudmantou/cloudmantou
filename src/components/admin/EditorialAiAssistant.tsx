@@ -11,6 +11,14 @@ type EditorialAiAssistantProps = {
   content: string;
   onApplyTitle: (title: string) => void;
   onApplyExcerpt: (excerpt: string) => void;
+  onApplyMetadata: (metadata: {
+    seoTitle: string;
+    seoDescription: string;
+    seoKeywords: string[];
+    socialTitle: string;
+    socialDescription: string;
+  }) => void;
+  onApplyContent: (content: string) => void;
 };
 
 export function EditorialAiAssistant({
@@ -19,16 +27,19 @@ export function EditorialAiAssistant({
   content,
   onApplyTitle,
   onApplyExcerpt,
+  onApplyMetadata,
+  onApplyContent,
 }: EditorialAiAssistantProps) {
-  const [busyTask, setBusyTask] = useState<"title" | "summary" | null>(null);
+  const [busyTask, setBusyTask] = useState<EditorialAiResponse["task"] | null>(null);
   const [result, setResult] = useState<EditorialAiResponse | null>(null);
   const [error, setError] = useState("");
+  const [focusKeyword, setFocusKeyword] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
   const canGenerate = content.trim().length >= 10;
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
-  async function generate(task: "title" | "summary") {
+  async function generate(task: EditorialAiResponse["task"]) {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -37,7 +48,7 @@ export function EditorialAiAssistant({
 
     try {
       const suggestion = await requestEditorialSuggestion(
-        { task, title, excerpt, content, locale: "auto" },
+        { task, title, excerpt, content, locale: "auto", focusKeyword },
         { signal: controller.signal },
       );
       setResult(suggestion);
@@ -61,6 +72,17 @@ export function EditorialAiAssistant({
       <p className="editor-helper-text">
         根据公开正文生成建议，确认后再应用到文章。
       </p>
+      <label className="editor-ai-focus">
+        <span>核心短语（可选）</span>
+        <input
+          type="text"
+          className="form-input"
+          value={focusKeyword}
+          maxLength={100}
+          onChange={(event) => setFocusKeyword(event.target.value)}
+          placeholder="例如：iOS 应用降级"
+        />
+      </label>
       <div className="editor-ai-actions">
         <button
           type="button"
@@ -79,6 +101,24 @@ export function EditorialAiAssistant({
         >
           {busyTask === "summary" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
           生成摘要
+        </button>
+        <button
+          type="button"
+          className="e-btn e-btn-ghost e-btn-sm"
+          disabled={!canGenerate || busyTask !== null}
+          onClick={() => void generate("metadata")}
+        >
+          {busyTask === "metadata" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
+          生成 SEO / 社交元数据
+        </button>
+        <button
+          type="button"
+          className="e-btn e-btn-ghost e-btn-sm"
+          disabled={!canGenerate || busyTask !== null}
+          onClick={() => void generate("optimize")}
+        >
+          {busyTask === "optimize" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
+          AI 优化正文
         </button>
       </div>
       {!canGenerate && <p className="editor-ai-notice">正文达到 10 个字符后即可生成。</p>}
@@ -111,6 +151,57 @@ export function EditorialAiAssistant({
             </div>
             <button type="button" onClick={() => onApplyExcerpt(result.result.excerpt)}>
               <Check size={12} aria-hidden="true" /> 应用摘要
+            </button>
+          </article>
+        </div>
+      )}
+
+      {result?.task === "metadata" && (
+        <div className="editor-ai-results" aria-live="polite">
+          <article className="editor-ai-candidate">
+            <strong>{result.result.seoTitle}</strong>
+            <p>{result.result.seoDescription}</p>
+            <dl className="editor-ai-metadata">
+              <div><dt>搜索意图</dt><dd>{result.result.searchIntent}</dd></div>
+              <div><dt>社交标题</dt><dd>{result.result.socialTitle}</dd></div>
+              <div><dt>社交摘要</dt><dd>{result.result.socialDescription}</dd></div>
+            </dl>
+            <div className="editor-ai-keywords">
+              {result.result.keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}
+            </div>
+            <button
+              type="button"
+              onClick={() => onApplyMetadata({
+                seoTitle: result.result.seoTitle,
+                seoDescription: result.result.seoDescription,
+                seoKeywords: result.result.keywords,
+                socialTitle: result.result.socialTitle,
+                socialDescription: result.result.socialDescription,
+              })}
+            >
+              <Check size={12} aria-hidden="true" /> 应用全部元数据
+            </button>
+          </article>
+        </div>
+      )}
+
+      {result?.task === "optimize" && (
+        <div className="editor-ai-results" aria-live="polite">
+          <article className="editor-ai-candidate">
+            <strong>正文优化建议</strong>
+            <p>核心短语：{result.result.focusKeyphrase}</p>
+            <ul>
+              {result.result.changes.map((change) => <li key={change}>{change}</li>)}
+            </ul>
+            <div className="editor-ai-keywords">
+              {result.result.supportingKeywords.map((keyword) => <span key={keyword}>{keyword}</span>)}
+            </div>
+            <details className="editor-ai-preview">
+              <summary>预览优化后的 Markdown</summary>
+              <pre>{result.result.optimizedContent.slice(0, 4_000)}{result.result.optimizedContent.length > 4_000 ? "\n\n…（预览已截断，应用时保留完整正文）" : ""}</pre>
+            </details>
+            <button type="button" onClick={() => onApplyContent(result.result.optimizedContent)}>
+              <Check size={12} aria-hidden="true" /> 应用优化正文
             </button>
           </article>
         </div>

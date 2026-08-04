@@ -16,6 +16,7 @@ import {
 } from "@/config/editorial-blog";
 import { getRequestLocale } from "@/i18n/server";
 import { buildAdjacentPostWhere, EDITORIAL_ADJACENT_ORDER } from "@/lib/editorial-adjacent";
+import { readSeoKeywords } from "@/lib/post-schema";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -42,7 +43,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const post = await prisma.post
     .findUnique({
       where: { slug },
-      select: { title: true, excerpt: true, coverImage: true, status: true },
+      select: {
+        title: true,
+        excerpt: true,
+        coverImage: true,
+        status: true,
+        seoTitle: true,
+        seoDescription: true,
+        seoKeywords: true,
+        socialTitle: true,
+        socialDescription: true,
+      },
     })
     .catch((error: unknown) => {
       if (slug === MANTOU_ASSISTANT_ARTICLE.slug) return null;
@@ -63,8 +74,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildPageMetadata(ctx, {
-    title: post.title,
-    description: post.excerpt || undefined,
+    title: post.seoTitle || post.title,
+    description: post.seoDescription || post.excerpt || undefined,
+    keywords: readSeoKeywords(post.seoKeywords),
+    socialTitle: post.socialTitle || undefined,
+    socialDescription: post.socialDescription || undefined,
     path: `/post/${slug}`,
     type: "article",
     image: post.coverImage,
@@ -230,6 +244,9 @@ export default async function PostPage({ params }: PageProps) {
             title: post.title,
             slug: post.slug,
             excerpt: post.excerpt,
+            seoDescription: post.seoDescription,
+            seoKeywords: readSeoKeywords(post.seoKeywords),
+            categoryName: post.category?.name,
             coverImage: post.coverImage,
             publishedAt: post.publishedAt,
             updatedAt: post.updatedAt,

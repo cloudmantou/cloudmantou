@@ -162,6 +162,9 @@ export function buildPageMetadata(
   options: {
     title: string;
     description?: string;
+    keywords?: readonly string[];
+    socialTitle?: string;
+    socialDescription?: string;
     path?: string;
     type?: "website" | "article";
     image?: string | null;
@@ -169,11 +172,14 @@ export function buildPageMetadata(
   }
 ): Metadata {
   const description = options.description || ctx.description;
+  const socialTitle = options.socialTitle || options.title;
+  const socialDescription = options.socialDescription || description;
   const canonical = options.path ? localizedUrl(ctx, options.path) : undefined;
 
   return {
     title: options.title,
     description,
+    ...(options.keywords?.length ? { keywords: [...options.keywords] } : {}),
     alternates: canonical
       ? isOfficialSite
         ? options.translated === false
@@ -186,14 +192,14 @@ export function buildPageMetadata(
       locale: ctx.locale === "en" ? "en_US" : "zh_CN",
       url: canonical,
       siteName: ctx.name,
-      title: options.title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
       ...(options.image ? { images: [{ url: options.image }] } : {}),
     },
     twitter: {
       card: options.image ? "summary_large_image" : "summary",
-      title: options.title,
-      description,
+      title: socialTitle,
+      description: socialDescription,
     },
   };
 }
@@ -259,6 +265,9 @@ export function buildBlogPostingJsonLd(
     title: string;
     slug: string;
     excerpt: string | null;
+    seoDescription?: string | null;
+    seoKeywords?: readonly string[];
+    categoryName?: string | null;
     coverImage: string | null;
     publishedAt: Date | null;
     updatedAt: Date;
@@ -273,7 +282,7 @@ export function buildBlogPostingJsonLd(
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
-    description: post.excerpt || ctx.description,
+    description: post.seoDescription || post.excerpt || ctx.description,
     url: articleUrl,
     datePublished: post.publishedAt?.toISOString(),
     dateModified: post.updatedAt.toISOString(),
@@ -287,6 +296,8 @@ export function buildBlogPostingJsonLd(
       url: ctx.url,
     },
     ...(image ? { image: [image] } : {}),
+    ...(post.seoKeywords?.length ? { keywords: [...post.seoKeywords] } : {}),
+    ...(post.categoryName ? { articleSection: post.categoryName } : {}),
     inLanguage: ctx.locale === "en" ? "en-US" : "zh-CN",
     mainEntityOfPage: articleUrl,
   };

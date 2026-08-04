@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
-import { coverImageSchema, postSlugSchema } from "@/lib/post-schema";
+import { coverImageSchema, postSeoFieldsSchema, postSlugSchema } from "@/lib/post-schema";
 import {
   MAX_PAID_POST_CONTENT_LENGTH,
   isPublishedPostStatus,
@@ -32,6 +32,7 @@ const updatePostSchema = z.object({
       "付费价格必须是大于等于 0.01 的两位小数",
     ),
   }).optional().nullable(),
+  ...postSeoFieldsSchema.shape,
 });
 
 export async function GET(
@@ -124,6 +125,11 @@ export async function PUT(
           ...(data.excerpt !== undefined && { excerpt: data.excerpt }),
           ...(data.content !== undefined && { content: data.content }),
           ...(data.coverImage !== undefined && { coverImage: data.coverImage }),
+          ...(data.seoTitle !== undefined && { seoTitle: data.seoTitle }),
+          ...(data.seoDescription !== undefined && { seoDescription: data.seoDescription }),
+          ...(data.seoKeywords !== undefined && { seoKeywords: data.seoKeywords || [] }),
+          ...(data.socialTitle !== undefined && { socialTitle: data.socialTitle }),
+          ...(data.socialDescription !== undefined && { socialDescription: data.socialDescription }),
           ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
           ...(data.status !== undefined && {
             status: data.status,

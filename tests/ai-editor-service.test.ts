@@ -125,6 +125,89 @@ describe("editorial AI service", () => {
     });
   });
 
+  it("generates search and social metadata around an explicit focus phrase", async () => {
+    mocks.generateText.mockResolvedValue({
+      output: {
+        language: "zh-CN",
+        seoTitle: "iOS 应用降级方法与适用条件",
+        seoDescription: "说明 iOS 应用降级的适用条件、准备工作、操作步骤与常见问题。",
+        keywords: ["iOS 应用降级", "App Store 旧版本", "iPhone 应用版本"],
+        focusKeyphrase: "iOS 应用降级",
+        socialTitle: "iOS 应用降级：先看条件，再按步骤操作",
+        socialDescription: "一篇讲清适用条件、准备工作和常见问题的 iOS 应用降级指南。",
+        searchIntent: "寻找 iOS 应用降级的条件、步骤和限制",
+      },
+      usage: { totalTokens: 320 },
+    });
+
+    const result = await generateEditorialSuggestion({
+      task: "metadata",
+      title: "应用降级",
+      excerpt: "",
+      content: "本文说明 iOS 应用降级的适用条件、准备工作、操作步骤与常见问题。",
+      locale: "zh-CN",
+      focusKeyword: "iOS 应用降级",
+    });
+
+    expect(mocks.generateText).toHaveBeenCalledWith(
+      expect.objectContaining({ temperature: 0.15, maxOutputTokens: 1_800 }),
+    );
+    expect(result).toMatchObject({
+      task: "metadata",
+      result: {
+        focusKeyphrase: "iOS 应用降级",
+        seoTitle: "iOS 应用降级方法与适用条件",
+        keywords: expect.arrayContaining(["iOS 应用降级"]),
+      },
+    });
+  });
+
+  it("rewrites the full public markdown for search and answer-engine discoverability", async () => {
+    mocks.generateText.mockResolvedValue({
+      output: {
+        language: "zh-CN",
+        optimizedContent: "## iOS 应用降级是什么\n\n本文先说明适用条件，再给出操作步骤。",
+        focusKeyphrase: "iOS 应用降级",
+        supportingKeywords: ["App Store 旧版本", "iPhone 应用版本"],
+        changes: ["增加回答式开头", "重组章节标题"],
+      },
+      usage: { totalTokens: 640 },
+    });
+
+    const result = await generateEditorialSuggestion({
+      task: "optimize",
+      title: "应用降级",
+      excerpt: "",
+      content: "这是一篇介绍应用版本调整条件和具体操作步骤的公开文章正文。",
+      locale: "zh-CN",
+      focusKeyword: "iOS 应用降级",
+    });
+
+    const call = mocks.generateText.mock.calls[0]?.[0];
+    expect(call).toMatchObject({ temperature: 0.1, maxOutputTokens: 12_000 });
+    expect(call.prompt).toContain("保留原文中的链接、引用、代码块、版本号和风险说明");
+    expect(result).toMatchObject({
+      task: "optimize",
+      result: { focusKeyphrase: "iOS 应用降级" },
+    });
+  });
+
+  it("keeps the full source when optimizing a long article", () => {
+    const middleMarker = "必须保留的中段证据";
+    const content = `${"开头".repeat(13_000)}${middleMarker}${"结尾".repeat(13_000)}`;
+    const prompt = buildEditorialPrompt({
+      task: "optimize",
+      title: "长文",
+      excerpt: "",
+      content,
+      locale: "zh-CN",
+      focusKeyword: "长文优化",
+    });
+
+    expect(prompt).toContain(middleMarker);
+    expect(prompt).not.toContain("[中间内容已截断]");
+  });
+
   it("rejects malformed model output after generation", async () => {
     mocks.generateText.mockResolvedValue({
       output: {

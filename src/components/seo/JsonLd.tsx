@@ -5,6 +5,7 @@ import {
   buildWebSiteJsonLd,
   type SeoContext,
 } from "@/lib/seo";
+import { serializeJsonLd } from "@/lib/json-ld";
 
 type Props = {
   ctx: SeoContext;
@@ -30,7 +31,7 @@ export function JsonLd({ ctx, extra = [], nonce, variant = "auto" }: Props) {
       type="application/ld+json"
       {...(nonce ? { nonce } : {})}
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(graphs) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(graphs) }}
     />
   );
 }

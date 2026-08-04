@@ -18,6 +18,7 @@ export async function requestEditorialSuggestion(
       excerpt: input.excerpt,
       content: input.content,
       locale: input.locale,
+      focusKeyword: input.focusKeyword || "",
     }),
     ...(options.signal ? { signal: options.signal } : {}),
   });

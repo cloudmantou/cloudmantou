@@ -77,7 +77,7 @@ describe("POST /api/admin/ai/editor", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.generateEditorialSuggestion).toHaveBeenCalledWith(
-      validBody,
+      { ...validBody, focusKeyword: "" },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

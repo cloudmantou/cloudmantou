@@ -46,6 +46,11 @@ type PostEditorProps = {
     excerpt: string | null;
     content: string;
     coverImage: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    seoKeywords: unknown;
+    socialTitle: string | null;
+    socialDescription: string | null;
     categoryId: string | null;
     tags: Array<{ id: string }>;
     status: string;
@@ -56,6 +61,17 @@ type PostEditorProps = {
 
 const SEO_TITLE_LIMIT = 60;
 const SEO_DESC_LIMIT = 160;
+const SOCIAL_TITLE_LIMIT = 70;
+const SOCIAL_DESC_LIMIT = 200;
+
+function formatInitialSeoKeywords(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value.filter((item): item is string => typeof item === "string").join(", ");
+}
+
+function parseSeoKeywords(value: string): string[] {
+  return [...new Set(value.split(/[,，\n]/u).map((item) => item.trim()).filter(Boolean))].slice(0, 12);
+}
 
 export function PostEditor({ mode, initialData }: PostEditorProps) {
   const router = useRouter();
@@ -77,9 +93,13 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const [paidContent, setPaidContent] = useState(initialData?.paidContent?.content || "");
   const [paidPrice, setPaidPrice] = useState(initialData?.paidContent?.price?.toString() || "");
 
-  const [seoTitle, setSeoTitle] = useState(initialData?.title || "");
-  const [seoDesc, setSeoDesc] = useState(initialData?.excerpt || "");
-  const [seoKeyword, setSeoKeyword] = useState("");
+  const [seoTitle, setSeoTitle] = useState(initialData?.seoTitle || initialData?.title || "");
+  const [seoDescription, setSeoDescription] = useState(
+    initialData?.seoDescription || initialData?.excerpt || "",
+  );
+  const [seoKeywords, setSeoKeywords] = useState(formatInitialSeoKeywords(initialData?.seoKeywords));
+  const [socialTitle, setSocialTitle] = useState(initialData?.socialTitle || "");
+  const [socialDescription, setSocialDescription] = useState(initialData?.socialDescription || "");
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
@@ -260,7 +280,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     if (mode === "create" && !title && !content) return;
     setSaveState("unsaved");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, slug, excerpt, content, coverImage, categoryId, selectedTagIds, isTop, isPaid, paidContent, paidPrice]);
+  }, [title, slug, excerpt, content, coverImage, categoryId, selectedTagIds, isTop, isPaid, paidContent, paidPrice, seoTitle, seoDescription, seoKeywords, socialTitle, socialDescription]);
 
   // Auto-clear saving badge after 1.2s (cosmetic only — no real autosave)
   useEffect(() => {
@@ -354,6 +374,11 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             excerpt: excerpt.trim() || null,
             content,
             coverImage: coverImage.trim() || null,
+            seoTitle: seoTitle.trim() || null,
+            seoDescription: seoDescription.trim() || null,
+            seoKeywords: parseSeoKeywords(seoKeywords),
+            socialTitle: socialTitle.trim() || null,
+            socialDescription: socialDescription.trim() || null,
             categoryId: categoryId || null,
             tagIds: selectedTagIds,
             status: submission.status,
@@ -390,10 +415,10 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     { ok: !!coverImage, warn: false, text: "封面图片已设置" },
     { ok: !!seoTitle.trim(), warn: false, text: "SEO 标题已设置" },
     {
-      ok: seoDesc.length >= 120,
-      warn: seoDesc.length > 0 && seoDesc.length < 120,
-      no: seoDesc.length === 0,
-      text: `Meta 描述${seoDesc.length === 0 ? "未设置" : seoDesc.length < 120 ? "偏短 (建议 >120 字)" : "已达标"}`,
+      ok: seoDescription.length >= 80,
+      warn: seoDescription.length > 0 && seoDescription.length < 80,
+      no: seoDescription.length === 0,
+      text: `Meta 描述${seoDescription.length === 0 ? "未设置" : seoDescription.length < 80 ? "偏短 (建议 >80 字)" : "已达标"}`,
     },
     { ok: !!excerpt.trim(), warn: false, text: "文章摘要已填写" },
     { ok: headCount > 0, warn: false, text: `已使用 ${headCount} 个标题` },
@@ -607,8 +632,16 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             onApplyExcerpt={(nextExcerpt) => {
               const previousExcerpt = excerpt;
               setExcerpt(nextExcerpt);
-              setSeoDesc((current) => !current || current === previousExcerpt ? nextExcerpt : current);
+              setSeoDescription((current) => !current || current === previousExcerpt ? nextExcerpt : current);
             }}
+            onApplyMetadata={(metadata) => {
+              setSeoTitle(metadata.seoTitle);
+              setSeoDescription(metadata.seoDescription);
+              setSeoKeywords(metadata.seoKeywords.join(", "));
+              setSocialTitle(metadata.socialTitle);
+              setSocialDescription(metadata.socialDescription);
+            }}
+            onApplyContent={setContent}
           />
 
           <div className="publish-box">
@@ -741,7 +774,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               <div className="seo-preview-url">
                 https://{previewHost || "your-domain"}/post/{slug || "url-slug"}
               </div>
-              <div className="seo-preview-desc">{seoDesc || excerpt || "文章摘要会显示在搜索结果中…"}</div>
+              <div className="seo-preview-desc">{seoDescription || excerpt || "文章摘要会显示在搜索结果中…"}</div>
             </div>
             <div className="form-group">
               <label className="form-label">
@@ -760,15 +793,56 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             <div className="form-group">
               <label className="form-label">
                 SEO 描述
-                <span className="field-counter">{seoDesc.length}/{SEO_DESC_LIMIT}</span>
+                <span className="field-counter">{seoDescription.length}/{SEO_DESC_LIMIT}</span>
               </label>
               <textarea
                 className="form-textarea"
-                value={seoDesc}
-                onChange={(e) => setSeoDesc(e.target.value)}
+                value={seoDescription}
+                onChange={(e) => setSeoDescription(e.target.value)}
                 maxLength={SEO_DESC_LIMIT}
                 rows={3}
                 placeholder="自定义 SEO 描述"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">SEO / 主题关键词</label>
+              <textarea
+                className="form-textarea"
+                value={seoKeywords}
+                onChange={(event) => setSeoKeywords(event.target.value)}
+                rows={2}
+                placeholder="iOS 应用降级, App Store 旧版本, iPhone 应用版本"
+              />
+              <p className="editor-helper-text">
+                最多 12 个，以逗号分隔。用于正文规划、结构化数据和 AI 主题提示；Google 排名不读取 meta keywords。
+              </p>
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                社交分享标题
+                <span className="field-counter">{socialTitle.length}/{SOCIAL_TITLE_LIMIT}</span>
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                value={socialTitle}
+                onChange={(event) => setSocialTitle(event.target.value)}
+                maxLength={SOCIAL_TITLE_LIMIT}
+                placeholder="留空时使用 SEO 标题"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                社交分享描述
+                <span className="field-counter">{socialDescription.length}/{SOCIAL_DESC_LIMIT}</span>
+              </label>
+              <textarea
+                className="form-textarea"
+                value={socialDescription}
+                onChange={(event) => setSocialDescription(event.target.value)}
+                maxLength={SOCIAL_DESC_LIMIT}
+                rows={3}
+                placeholder="留空时使用 SEO 描述"
               />
             </div>
           </div>

@@ -1558,13 +1558,23 @@
 }
 
 .admin-root .editor-ai-actions {
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
 
 .admin-root .editor-ai-actions .e-btn {
-  flex: 1;
+  flex: 1 1 132px;
   justify-content: center;
+}
+
+.admin-root .editor-ai-focus {
+  display: grid;
+  gap: 5px;
+  margin-top: 11px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .admin-root .editor-ai-notice,
@@ -1641,6 +1651,50 @@
   background: rgba(111, 76, 255, 0.1);
   color: var(--accent-light);
   font-size: 10px;
+}
+
+.admin-root .editor-ai-metadata {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0;
+}
+
+.admin-root .editor-ai-metadata div {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.admin-root .editor-ai-metadata dt,
+.admin-root .editor-ai-metadata dd {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.admin-root .editor-ai-metadata dt { color: var(--text-muted); }
+.admin-root .editor-ai-metadata dd { color: var(--text-secondary); }
+
+.admin-root .editor-ai-preview {
+  margin: 10px 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.admin-root .editor-ai-preview summary { cursor: pointer; }
+.admin-root .editor-ai-preview pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .admin-root .editor-ai-assistant .spin {

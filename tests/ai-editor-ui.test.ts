@@ -11,8 +11,13 @@ describe("PostEditor AI assistant integration", () => {
     expect(assistant).toContain("requestEditorialSuggestion");
     expect(assistant).toContain("生成标题");
     expect(assistant).toContain("生成摘要");
+    expect(assistant).toContain("生成 SEO / 社交元数据");
+    expect(assistant).toContain("AI 优化正文");
+    expect(assistant).toContain("focusKeyword");
     expect(assistant).toContain("onApplyTitle");
     expect(assistant).toContain("onApplyExcerpt");
+    expect(assistant).toContain("onApplyMetadata");
+    expect(assistant).toContain("onApplyContent");
   });
 
   it("passes only public article fields from PostEditor and never paid content", () => {
@@ -24,6 +29,8 @@ describe("PostEditor AI assistant integration", () => {
     expect(integration).toContain("title={title}");
     expect(integration).toContain("content={content}");
     expect(integration).toContain("excerpt={excerpt}");
+    expect(integration).toContain("onApplyMetadata");
+    expect(integration).toContain("onApplyContent");
     expect(integration).not.toContain("paidContent");
   });
 });

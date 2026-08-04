@@ -40,9 +40,14 @@ model Post {
   title        String
   slug         String     @unique
   excerpt      String?    @db.Text
-  content      String     @db.LongText
-  coverImage   String?
-  authorId     String
+  content           String     @db.LongText
+  coverImage        String?
+  seoTitle          String?    @db.VarChar(120)
+  seoDescription    String?    @db.VarChar(320)
+  seoKeywords       Json?
+  socialTitle       String?    @db.VarChar(140)
+  socialDescription String?    @db.VarChar(400)
+  authorId          String
   categoryId   String?
   status       PostStatus @default(DRAFT)
   isTop        Boolean    @default(false)

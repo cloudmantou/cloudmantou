@@ -45,6 +45,7 @@ describe("editorial AI browser client", () => {
         excerpt: "",
         content: "公开文章正文，不包含付费章节。",
         locale: "auto",
+        focusKeyword: "",
       }),
     });
     expect(result).toMatchObject({ task: "summary", result: { excerpt: "简洁摘要" } });
