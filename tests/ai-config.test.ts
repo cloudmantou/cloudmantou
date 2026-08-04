@@ -23,11 +23,63 @@ describe("AI provider configuration", () => {
         }),
       ),
     ).toEqual({
+      providerType: "openai-compatible",
       providerName: "cc-switch",
       baseURL: "http://127.0.0.1:15721/v1",
       apiKey: "fixture-secret",
       textModel: "fixture-model",
       supportsStructuredOutputs: true,
+      requestTimeoutMs: 30_000,
+    });
+  });
+
+  it("maps MiniMax Anthropic-compatible server variables without exposing the token", () => {
+    expect(
+      readAiConfig(
+        env({
+          AI_ENABLED: "true",
+          AI_PROVIDER_TYPE: "anthropic-compatible",
+          AI_PROVIDER_NAME: "minimax",
+          ANTHROPIC_BASE_URL: "https://api.minimaxi.com/anthropic",
+          ANTHROPIC_AUTH_TOKEN: "fixture-minimax-token",
+          ANTHROPIC_MODEL: "MiniMax-M3",
+          AI_REQUEST_TIMEOUT_MS: "120000",
+        }),
+      ),
+    ).toEqual({
+      providerType: "anthropic-compatible",
+      providerName: "minimax",
+      baseURL: "https://api.minimaxi.com/anthropic",
+      apiKey: "fixture-minimax-token",
+      textModel: "MiniMax-M3",
+      supportsStructuredOutputs: true,
+      requestTimeoutMs: 120_000,
+      anthropicAuthMode: "auth-token",
+    });
+  });
+
+  it("prefers project-scoped AI variables over inherited Claude Code variables", () => {
+    expect(
+      readAiConfig(
+        env({
+          AI_ENABLED: "true",
+          AI_PROVIDER_TYPE: "anthropic-compatible",
+          AI_PROVIDER_NAME: "minimax",
+          AI_BASE_URL: "https://api.minimaxi.com/anthropic",
+          AI_API_KEY: "project-token",
+          AI_TEXT_MODEL: "MiniMax-M3",
+          AI_ANTHROPIC_AUTH_MODE: "auth-token",
+          ANTHROPIC_BASE_URL: "https://inherited.example.test",
+          ANTHROPIC_AUTH_TOKEN: "inherited-token",
+          ANTHROPIC_MODEL: "inherited-model",
+        }),
+      ),
+    ).toMatchObject({
+      providerType: "anthropic-compatible",
+      baseURL: "https://api.minimaxi.com/anthropic",
+      apiKey: "project-token",
+      textModel: "MiniMax-M3",
+      anthropicAuthMode: "auth-token",
     });
   });
 
@@ -49,6 +101,34 @@ describe("AI provider configuration", () => {
         AI_API_KEY: "key",
         AI_TEXT_MODEL: "model",
         AI_BASE_URL: "https://user:pass@provider.example.test/v1",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_PROVIDER_TYPE: "unsupported",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_REQUEST_TIMEOUT_MS: "3000000",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_PROVIDER_TYPE: "anthropic-compatible",
+        AI_ANTHROPIC_AUTH_MODE: "unsupported",
       },
       "AI_INVALID_CONFIG",
     ],

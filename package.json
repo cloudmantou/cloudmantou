@@ -13,6 +13,7 @@
     "content:mantou-article": "node --env-file=.env scripts/upsert-mantou-article.mjs"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "3.0.80",
     "@ai-sdk/openai-compatible": "3.0.22",
     "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^5.22.0",

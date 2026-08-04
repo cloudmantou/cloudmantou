@@ -81,7 +81,7 @@ export async function generateEditorialSuggestion(
       model,
       prompt: buildEditorialPrompt(input),
       maxRetries: 1,
-      timeout: 30_000,
+      timeout: config.requestTimeoutMs,
       abortSignal: options.signal,
     } as const;
 

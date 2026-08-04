@@ -115,28 +115,48 @@ location ^~ /uploads/ {
 
 ## AI 编辑助手
 
-文章编辑器已通过 Vercel AI SDK 接入 OpenAI-compatible Provider，第一阶段提供
-结构化的 5 个标题候选与文章摘要。生成结果只作为建议，管理员点击应用后才会
-写入当前编辑表单，发布流程保持原有确认步骤。
+文章编辑器已通过 Vercel AI SDK 接入 Anthropic-compatible 与
+OpenAI-compatible 两类 Provider，第一阶段提供结构化的 5 个标题候选与文章摘要。
+生成结果只作为建议，管理员点击应用后才会写入当前编辑表单，发布流程保持原有
+确认步骤。
 
-在服务器根目录 `.env` 中配置：
+MiniMax-M3 服务端配置：
 
 ```env
 AI_ENABLED="true"
-AI_PROVIDER_NAME="cloudmantou-ai"
-AI_BASE_URL="https://api.openai.com/v1"
+AI_PROVIDER_TYPE="anthropic-compatible"
+AI_PROVIDER_NAME="minimax"
+AI_BASE_URL="https://api.minimaxi.com/anthropic"
 AI_API_KEY="replace-with-server-side-api-key"
-AI_TEXT_MODEL="replace-with-model-id"
+AI_TEXT_MODEL="MiniMax-M3"
+AI_ANTHROPIC_AUTH_MODE="auth-token"
+AI_REQUEST_TIMEOUT_MS="120000"
 AI_SUPPORTS_STRUCTURED_OUTPUTS="true"
 ```
 
-若通过本机 CC Switch 等 OpenAI-compatible 代理，可使用回环地址，例如：
+Provider 会把 MiniMax 的基础地址规范化为 Vercel Anthropic Provider 所需的
+`https://api.minimaxi.com/anthropic/v1`，实际请求发送到 `/messages`。
+
+也可以使用 MiniMax/Claude Code 风格变量；项目专用的 `AI_*` 配置优先级更高：
 
 ```env
+ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic"
+ANTHROPIC_AUTH_TOKEN="replace-with-server-side-api-key"
+ANTHROPIC_MODEL="MiniMax-M3"
+```
+
+若通过本机 CC Switch 等 OpenAI-compatible 代理：
+
+```env
+AI_PROVIDER_TYPE="openai-compatible"
 AI_BASE_URL="http://127.0.0.1:15721/v1"
 ```
 
 - `AI_API_KEY` 仅由 Node.js 服务端读取，前端响应和日志均不包含密钥。
+- `AI_REQUEST_TIMEOUT_MS` 范围为 5000 至 300000；Claude Code 的
+  `API_TIMEOUT_MS`、模型别名和流量开关不会进入网站运行时。
+- 宝塔进程若继承了其他 `ANTHROPIC_*` 变量，使用 `AI_BASE_URL`、`AI_API_KEY`、
+  `AI_TEXT_MODEL` 与 `AI_ANTHROPIC_AUTH_MODE` 可明确覆盖。
 - 远程 Provider 地址必须使用 HTTPS；HTTP 只接受本机回环地址。
 - 接口要求管理员登录并记录审计事件，每位管理员每 10 分钟最多生成 20 次。
 - 编辑助手只接收标题、摘要和公开正文，付费章节不进入 AI 请求。

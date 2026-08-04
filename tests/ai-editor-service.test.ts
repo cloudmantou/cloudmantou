@@ -28,6 +28,7 @@ describe("editorial AI service", () => {
       config: {
         providerName: "fixture-provider",
         textModel: "fixture-model",
+        requestTimeoutMs: 120_000,
       },
     });
   });
@@ -75,6 +76,7 @@ describe("editorial AI service", () => {
         model: "model-fixture",
         maxRetries: 1,
         temperature: 0.65,
+        timeout: 120_000,
         output: expect.objectContaining({ kind: "object" }),
       }),
     );
