@@ -510,15 +510,16 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               </select>
             </div>
             <div className="toggle-row">
-              <span className="toggle-label">置顶文章</span>
+              <span className="toggle-label">首页精选 / 置顶</span>
               <button
                 type="button"
                 className={`e-toggle${isTop ? " on" : ""}`}
                 onClick={() => setIsTop(!isTop)}
                 aria-pressed={isTop}
-                aria-label="置顶文章"
+                aria-label="首页精选 / 置顶"
               />
             </div>
+            <p className="editor-helper-text">置顶文章优先进入首页精选，最多展示 5 篇；草稿不会公开显示。</p>
             <div className="editor-publish-actions">
               <button
                 type="button"

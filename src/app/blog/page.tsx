@@ -66,7 +66,7 @@ export default async function BlogPage({ searchParams }: PageProps) {
           where,
           orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
           select: {
-            slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
+            slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true, isTop: true,
             category: { select: { name: true } },
             author: { select: { username: true, nickname: true } },
           },
@@ -100,7 +100,7 @@ export default async function BlogPage({ searchParams }: PageProps) {
             where,
             orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
             select: {
-              slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
+              slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true, isTop: true,
               category: { select: { name: true } },
               author: { select: { username: true, nickname: true } },
             },

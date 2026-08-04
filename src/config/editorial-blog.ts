@@ -41,6 +41,8 @@ export const EDITORIAL_BLOG = {
     description: "持续构建有用的工具，也把过程、方法和问题如实记录下来。",
   },
   sections: {
+    featuredEyebrow: "精选长文",
+    featured: "先看这几篇",
     latest: "最近文章",
     projects: "项目与实验",
     allArticles: "查看全部文章",
@@ -128,6 +130,8 @@ export const EDITORIAL_BLOG_EN = {
     description: "Building useful tools and documenting the process, methods, and problems without hiding the rough edges.",
   },
   sections: {
+    featuredEyebrow: "Featured essays",
+    featured: "Start with these picks",
     latest: "Latest articles",
     projects: "Projects & experiments",
     allArticles: "View all articles",

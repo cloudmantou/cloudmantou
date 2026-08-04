@@ -98,7 +98,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
       where,
       orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
       select: {
-        slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
+        slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true, isTop: true,
         category: { select: { name: true } }, author: { select: { username: true, nickname: true } },
       },
       skip: (archiveParams.page - 1) * EDITORIAL_ARCHIVE_PAGE_SIZE,
@@ -134,7 +134,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         where,
         orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
         select: {
-          slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true,
+          slug: true, title: true, excerpt: true, coverImage: true, publishedAt: true, status: true, isTop: true,
           category: { select: { name: true } }, author: { select: { username: true, nickname: true } },
         },
         skip: (currentPage - 1) * EDITORIAL_ARCHIVE_PAGE_SIZE,

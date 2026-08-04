@@ -9,6 +9,7 @@ export type EditorialPostCardData = {
   coverImage: string | null;
   publishedAt: Date | null;
   status: "DRAFT" | "PUBLISHED" | "PAID_ONLY";
+  isTop: boolean;
   category: { name: string } | null;
   author?: { username: string; nickname: string | null };
 };
@@ -34,7 +35,7 @@ export function EditorialArticleCard({
 }: {
   post: EditorialPostCardData;
   locale: "zh" | "en";
-  variant?: "feature" | "lead" | "card" | "row";
+  variant?: "feature" | "lead" | "card" | "row" | "featured-lead" | "featured-card";
   index?: number;
 }) {
   const date = post.publishedAt

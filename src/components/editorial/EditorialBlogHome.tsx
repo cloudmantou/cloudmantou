@@ -11,6 +11,7 @@ import {
 } from "@/config/editorial-blog";
 import { EditorialArticleCard, type EditorialPostCardData } from "@/components/editorial/EditorialArticleCard";
 import { EditorialShell } from "@/components/editorial/EditorialShell";
+import { selectEditorialHomepagePosts } from "@/lib/editorial-featured";
 
 function getMantouAssistantPost(posts: EditorialPostCardData[], locale: OfficialLocale): EditorialPostCardData {
   const article = locale === "en" ? MANTOU_ASSISTANT_ARTICLE_EN : MANTOU_ASSISTANT_ARTICLE;
@@ -18,6 +19,7 @@ function getMantouAssistantPost(posts: EditorialPostCardData[], locale: Official
     ...article,
     publishedAt: new Date("2026-08-02T00:00:00+08:00"),
     status: "PUBLISHED",
+    isTop: false,
     category: { name: article.category },
     author: { username: "mantou", nickname: locale === "en" ? "Mantou" : "馒头" },
   };
@@ -27,9 +29,9 @@ const PROJECT_ICONS = [Code2, Layers3, Rocket] as const;
 
 export function EditorialBlogHome({ posts, locale }: { posts: EditorialPostCardData[]; locale: OfficialLocale }) {
   const copy = getEditorialBlogCopy(locale);
-  const featuredPost = getMantouAssistantPost(posts, locale);
   const projects = getEditorialProjects(locale);
-  const recentPosts = posts.filter((post) => post.slug !== featuredPost.slug).slice(0, 5);
+  const homepagePosts = posts.length > 0 ? posts : [getMantouAssistantPost(posts, locale)];
+  const { featuredPosts, recentPosts } = selectEditorialHomepagePosts(homepagePosts);
   const primaryRecent = recentPosts[0];
   const compactRecent = recentPosts.slice(1);
 
@@ -68,9 +70,26 @@ export function EditorialBlogHome({ posts, locale }: { posts: EditorialPostCardD
         </div>
       </section>
 
-      <section className="editorial-feature-section">
+      <section className="editorial-feature-section" aria-labelledby="featured-articles-title">
         <div className="editorial-container">
-          <EditorialArticleCard post={featuredPost} locale={locale} variant="feature" index={1} />
+          <div className="editorial-feature-heading">
+            <span>{copy.sections.featuredEyebrow}</span>
+            <h2 id="featured-articles-title">{copy.sections.featured}</h2>
+            <Link href={localizeOfficialPath("/blog", locale)}>
+              {copy.sections.allArticles}<ArrowRight size={18} />
+            </Link>
+          </div>
+          <div className={`editorial-feature-grid editorial-feature-count-${featuredPosts.length}`}>
+            {featuredPosts.map((post, index) => (
+              <EditorialArticleCard
+                key={post.slug}
+                post={post}
+                locale={locale}
+                variant={index === 0 ? "featured-lead" : "featured-card"}
+                index={index}
+              />
+            ))}
+          </div>
         </div>
       </section>
 

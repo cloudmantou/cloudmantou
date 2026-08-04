@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, Edit, Eye, Pin } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Eye, Pin, PinOff } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 type Post = {
@@ -40,6 +40,8 @@ export default function AdminPostsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [togglingPostId, setTogglingPostId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const loadPosts = useCallback(async (p: number, status?: string, q?: string) => {
@@ -80,6 +82,25 @@ export default function AdminPostsPage() {
         // ignore
       }
     });
+  };
+
+  const handleToggleTop = async (post: Post) => {
+    if (togglingPostId) return;
+    setActionError(null);
+    setTogglingPostId(post.id);
+    try {
+      const res = await fetch(`/api/admin/posts/${post.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isTop: !post.isTop }),
+      });
+      if (!res.ok) throw new Error("toggle featured failed");
+      await loadPosts(page, statusFilter, search);
+    } catch {
+      setActionError(post.isTop ? "取消置顶失败，请稍后重试" : "置顶失败，请稍后重试");
+    } finally {
+      setTogglingPostId(null);
+    }
   };
 
   const handleSearch = () => {
@@ -158,6 +179,12 @@ export default function AdminPostsPage() {
         </div>
       </div>
 
+      {actionError ? (
+        <p className="mb-3 text-xs" style={{ color: "var(--rose)" }} role="alert">
+          {actionError}
+        </p>
+      ) : null}
+
       {/* Table */}
       <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>
         <table className="w-full text-sm" style={{ borderCollapse: "collapse" }}>
@@ -220,6 +247,18 @@ export default function AdminPostsPage() {
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTop(post)}
+                        className="p-1.5 rounded-md transition-colors hover:bg-[var(--accent-dim)]"
+                        style={{ color: post.isTop ? "var(--accent)" : "var(--text-muted)" }}
+                        title={post.isTop ? "取消置顶" : "置顶"}
+                        aria-label={post.isTop ? "取消置顶" : "置顶"}
+                        aria-pressed={post.isTop}
+                        disabled={isPending || togglingPostId !== null}
+                      >
+                        {post.isTop ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+                      </button>
                       <Link
                         href={`/post/${post.slug}`}
                         className="p-1.5 rounded-md transition-colors hover:bg-[var(--card)]"

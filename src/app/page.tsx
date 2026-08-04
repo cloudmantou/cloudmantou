@@ -7,6 +7,18 @@ import { getRequestLocale } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
+const EDITORIAL_HOME_POST_SELECT = {
+  slug: true,
+  title: true,
+  excerpt: true,
+  coverImage: true,
+  publishedAt: true,
+  status: true,
+  isTop: true,
+  category: { select: { name: true } },
+  author: { select: { username: true, nickname: true } },
+} as const;
+
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
   const ctx = withEditorialSeoContext(await getSeoContext(locale));
@@ -25,22 +37,23 @@ export default async function HomePage() {
 
   if (locale === "zh") {
     try {
-      posts = await prisma.post.findMany({
-        where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } },
-        orderBy: [{ isTop: "desc" }, { publishedAt: "desc" }],
-        take: 8,
-        select: {
-          slug: true,
-          title: true,
-          excerpt: true,
-          coverImage: true,
-          publishedAt: true,
-          status: true,
-          category: { select: { name: true } },
-          author: { select: { username: true, nickname: true } },
-        },
-      });
-    } catch {
+      const [featuredCandidates, recentCandidates] = await Promise.all([
+        prisma.post.findMany({
+          where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } },
+          orderBy: [{ isTop: "desc" }, { publishedAt: "desc" }, { id: "desc" }],
+          take: 5,
+          select: EDITORIAL_HOME_POST_SELECT,
+        }),
+        prisma.post.findMany({
+          where: { status: { in: ["PUBLISHED", "PAID_ONLY"] } },
+          orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+          take: 10,
+          select: EDITORIAL_HOME_POST_SELECT,
+        }),
+      ]);
+      posts = [...featuredCandidates, ...recentCandidates];
+    } catch (error) {
+      console.error("[Editorial Home] Unable to load posts; using static fallback", error);
       posts = [];
     }
   }

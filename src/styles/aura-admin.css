@@ -1518,6 +1518,13 @@
   margin-top: 12px;
 }
 
+.admin-root .editor-helper-text {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .admin-root .editor-publish-actions .e-btn {
   flex: 1;
   justify-content: center;

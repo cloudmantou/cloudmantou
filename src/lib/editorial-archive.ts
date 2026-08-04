@@ -117,6 +117,7 @@ function getEnglishMantouPost(): EditorialPostCardData {
     coverImage: MANTOU_ASSISTANT_ARTICLE_EN.coverImage,
     publishedAt: new Date(MANTOU_ASSISTANT_ARTICLE_EN.publishedAt),
     status: "PUBLISHED",
+    isTop: false,
     category: { name: "Product practice" },
     author: { username: "mantou", nickname: "Mantou" },
   };
