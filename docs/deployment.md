@@ -29,7 +29,6 @@ git pull --ff-only origin main
 chmod 600 .env
 corepack enable
 pnpm install --frozen-lockfile
-pnpm prisma generate
 pnpm prisma migrate deploy
 pnpm run content:mantou-article
 pnpm run build
@@ -43,8 +42,9 @@ npm run build
 npm run start
 ```
 
-`pnpm run build` 会把 `.next/static` 与 `public` 自动整理进 standalone
-目录。`pnpm run start` / `npm run start` 会读取根目录 `.env`，然后通过
+`pnpm run build` 会先按当前 `prisma/schema.prisma` 重新生成 Prisma Client，
+再把 `.next/static` 与 `public` 自动整理进 standalone 目录。因此新增数据库字段后，
+直接执行构建也不会继续使用旧的 Prisma 类型。`pnpm run start` / `npm run start` 会读取根目录 `.env`，然后通过
 Node.js 运行 `.next/standalone/server.js`。
 
 启动命令是前台进程。在宝塔 Node 项目中将启动命令配置为

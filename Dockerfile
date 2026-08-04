@@ -12,8 +12,7 @@ FROM base AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN pnpm prisma generate
-RUN pnpm build --webpack
+RUN pnpm build
 
 # --- Production ---
 FROM base AS runner

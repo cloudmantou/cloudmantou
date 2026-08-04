@@ -142,7 +142,7 @@ describe("release configuration", () => {
     for (const [dependency, version] of Object.entries(expectedOverrides)) {
       expect(workspace).toContain(`${dependency}: ${version}`);
     }
-    expect(packageJson.pnpm?.overrides).toEqual(expectedOverrides);
+    expect(packageJson.pnpm).toBeUndefined();
   });
 
   it("supports a git-pull, build, and npm-run-start deployment", () => {
@@ -154,7 +154,13 @@ describe("release configuration", () => {
     const deploymentGuide = readProjectFile("docs/deployment.md");
     const gitignore = readProjectFile(".gitignore");
 
-    expect(packageJson.scripts.build).toContain("scripts/prepare-standalone.mjs");
+    expect(packageJson.scripts.build).toMatch(
+      /^prisma generate && next build --webpack && node scripts\/prepare-standalone\.mjs$/
+    );
+    expect(readProjectFile("Dockerfile")).toContain("RUN pnpm build");
+    expect(readProjectFile("Dockerfile")).not.toMatch(
+      /RUN pnpm prisma generate\s+RUN pnpm build/
+    );
     expect(packageJson.scripts.start).toBe(
       "node --env-file=.env .next/standalone/server.js"
     );
