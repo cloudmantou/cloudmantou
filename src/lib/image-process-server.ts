@@ -40,22 +40,43 @@ export async function processUploadImage(
   const preset = UPLOAD_PURPOSES[purpose];
 
   try {
-    const processed = await sharp(input, {
-      failOn: "error",
-      animated: false,
-      limitInputPixels: UPLOAD_MAX_INPUT_PIXELS,
-    })
-      .rotate()
-      .resize(preset.maxWidth, preset.maxHeight, {
-        fit: "inside",
-        withoutEnlargement: true,
+    const attempts = [
+      { width: preset.maxWidth, height: preset.maxHeight, quality: preset.quality },
+      { width: preset.maxWidth, height: preset.maxHeight, quality: Math.max(56, preset.quality - 10) },
+      { width: preset.maxWidth, height: preset.maxHeight, quality: 50 },
+      ...(purpose === "cover"
+        ? [
+            { width: 1100, height: 619, quality: 56 },
+            { width: 960, height: 540, quality: 50 },
+            { width: 800, height: 450, quality: 45 },
+          ]
+        : []),
+    ];
+
+    let processed: { data: Buffer; info: { width: number; height: number } } | null = null;
+    for (const attempt of attempts) {
+      processed = await sharp(input, {
+        failOn: "error",
+        animated: false,
+        limitInputPixels: UPLOAD_MAX_INPUT_PIXELS,
       })
-      .webp({
-        quality: preset.quality,
-        effort: 4,
-        smartSubsample: true,
-      })
-      .toBuffer({ resolveWithObject: true });
+        .rotate()
+        .resize(attempt.width, attempt.height, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({
+          quality: attempt.quality,
+          effort: 5,
+          smartSubsample: true,
+        })
+        .toBuffer({ resolveWithObject: true });
+      if (processed.data.length <= preset.targetBytes) break;
+    }
+
+    if (!processed) {
+      throw new ImageProcessError("PROCESS_FAILED", "图片处理失败");
+    }
 
     if (processed.data.length > UPLOAD_MAX_OUTPUT_BYTES) {
       throw new ImageProcessError("OUTPUT_TOO_LARGE", "压缩后图片仍超过大小限制");

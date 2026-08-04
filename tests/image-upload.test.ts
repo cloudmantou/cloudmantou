@@ -32,7 +32,10 @@ describe("upload-config", () => {
   });
 
   it("defines compression presets for each purpose", () => {
-    expect(UPLOAD_PURPOSES.cover.maxWidth).toBe(1600);
+    expect(UPLOAD_PURPOSES.cover.maxWidth).toBe(1280);
+    expect(UPLOAD_PURPOSES.cover.maxHeight).toBe(720);
+    expect(UPLOAD_PURPOSES.cover.quality).toBeLessThanOrEqual(74);
+    expect(UPLOAD_PURPOSES.cover.targetBytes).toBeLessThanOrEqual(420 * 1024);
     expect(UPLOAD_PURPOSES.daily.quality).toBeGreaterThan(0);
     expect(UPLOAD_MAX_INPUT_PIXELS).toBe(25_000_000);
   });
@@ -46,5 +49,24 @@ describe("image-process-server", () => {
     expect(result.height).toBeGreaterThan(0);
     expect(result.compressedBytes).toBeGreaterThan(0);
     expect(result.buffer.subarray(0, 4).toString()).toBe("RIFF");
+  });
+
+  it("keeps a photographic cover below its delivery budget", async () => {
+    const width = 1280;
+    const height = 720;
+    const pixels = Buffer.allocUnsafe(width * height * 3);
+    for (let index = 0; index < pixels.length; index += 1) {
+      pixels[index] = (index * 31 + Math.floor(index / 97)) % 256;
+    }
+    const source = await (await import("sharp"))
+      .default(pixels, { raw: { width, height, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const result = await processUploadImage(source, "cover");
+
+    expect(result.width).toBeLessThanOrEqual(1280);
+    expect(result.height).toBeLessThanOrEqual(720);
+    expect(result.compressedBytes).toBeLessThanOrEqual(UPLOAD_PURPOSES.cover.targetBytes);
   });
 });

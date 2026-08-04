@@ -2,12 +2,12 @@ export type UploadPurpose = "cover" | "content" | "daily" | "general";
 
 export const UPLOAD_PURPOSES: Record<
   UploadPurpose,
-  { maxWidth: number; maxHeight: number; quality: number; label: string }
+  { maxWidth: number; maxHeight: number; quality: number; targetBytes: number; label: string }
 > = {
-  cover: { maxWidth: 1600, maxHeight: 900, quality: 85, label: "封面" },
-  content: { maxWidth: 1920, maxHeight: 1920, quality: 82, label: "正文插图" },
-  daily: { maxWidth: 1600, maxHeight: 1600, quality: 85, label: "日常动态" },
-  general: { maxWidth: 1920, maxHeight: 1920, quality: 82, label: "通用" },
+  cover: { maxWidth: 1280, maxHeight: 720, quality: 72, targetBytes: 420 * 1024, label: "封面" },
+  content: { maxWidth: 1600, maxHeight: 1600, quality: 78, targetBytes: 900 * 1024, label: "正文插图" },
+  daily: { maxWidth: 1280, maxHeight: 1280, quality: 76, targetBytes: 640 * 1024, label: "日常动态" },
+  general: { maxWidth: 1600, maxHeight: 1600, quality: 78, targetBytes: 900 * 1024, label: "通用" },
 };
 
 /** 上传前原始文件上限（客户端压缩后通常远小于此值） */

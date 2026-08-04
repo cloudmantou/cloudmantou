@@ -19,6 +19,24 @@ describe("editorial public-surface closure", () => {
     const card = source("src/components/editorial/EditorialArticleCard.tsx");
     expect(card).toMatch(/<article className="editorial-article-item">/);
     expect(card).toMatch(/<Link[\s\S]*editorial-article/);
+    expect(card).toMatch(/import Image from ["']next\/image["']/);
+    expect(card).toMatch(/<Image[\s\S]*sizes=/);
+    expect(card).not.toMatch(/backgroundImage:/);
+  });
+
+  it("renders the article hero cover as a prioritized image instead of a CSS background", () => {
+    const chrome = source("src/components/editorial/EditorialArticleChrome.tsx");
+    expect(chrome).toMatch(/import Image from ["']next\/image["']/);
+    expect(chrome).toMatch(/<Image[\s\S]*fetchPriority="high"/);
+    expect(chrome).not.toMatch(/backgroundImage:/);
+  });
+
+  it("sets immutable cache headers for content-addressed and UUID upload assets", () => {
+    const nextConfig = source("next.config.mjs");
+    expect(nextConfig).toMatch(/source:\s*["']\/uploads\/:path\*["']/);
+    expect(nextConfig).toMatch(/public, max-age=2592000, immutable/);
+    expect(nextConfig).toMatch(/qualities:\s*\[72,\s*75\]/);
+    expect(nextConfig).toMatch(/minimumCacheTTL:\s*2592000/);
   });
 
   it("localizes heading-anchor labels in Chinese and English article bodies", () => {

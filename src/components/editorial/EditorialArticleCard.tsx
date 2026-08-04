@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight, LockKeyhole } from "lucide-react";
 import { localizeOfficialPath } from "@/i18n/official";
+import { isSafeCoverImageUrl } from "@/lib/safe-image-url";
 
 export type EditorialPostCardData = {
   slug: string;
@@ -14,17 +16,17 @@ export type EditorialPostCardData = {
   author?: { username: string; nickname: string | null };
 };
 
-function safeCoverStyle(value: string | null) {
+function safeCoverSource(value: string | null): string | null {
   const cover = value?.trim();
-  if (!cover) return undefined;
-  const isLocal = /^\/(uploads|brand|editorial)\/[\w./-]+$/.test(cover);
-  let isHttps = false;
-  try {
-    isHttps = new URL(cover).protocol === "https:";
-  } catch {
-    isHttps = false;
-  }
-  return isLocal || isHttps ? { backgroundImage: `url(${JSON.stringify(cover)})` } : undefined;
+  return cover && isSafeCoverImageUrl(cover) ? cover : null;
+}
+
+function coverSizes(variant: NonNullable<Parameters<typeof EditorialArticleCard>[0]["variant"]>): string {
+  if (variant === "feature") return "(max-width: 760px) calc(100vw - 32px), 240px";
+  if (variant === "lead") return "(max-width: 760px) calc(100vw - 32px), (max-width: 1180px) 42vw, 430px";
+  if (variant === "row") return "(max-width: 760px) calc(100vw - 32px), 220px";
+  if (variant === "featured-lead") return "(max-width: 760px) calc(100vw - 32px), (max-width: 1180px) 48vw, 520px";
+  return "(max-width: 760px) calc(100vw - 32px), (max-width: 1180px) 40vw, 360px";
 }
 
 export function EditorialArticleCard({
@@ -46,6 +48,7 @@ export function EditorialArticleCard({
       })
     : locale === "en" ? "Draft note" : "持续更新";
   const author = post.author?.nickname || post.author?.username || (locale === "en" ? "Mantou" : "馒头");
+  const coverImage = variant === "card" ? null : safeCoverSource(post.coverImage);
 
   return (
     <article className="editorial-article-item">
@@ -55,11 +58,17 @@ export function EditorialArticleCard({
       >
       <span
         className="editorial-article-media"
-        style={safeCoverStyle(post.coverImage)}
-        role={post.coverImage ? "img" : undefined}
-        aria-label={post.coverImage ? post.title : undefined}
       >
-        {!post.coverImage ? <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span> : null}
+        {coverImage ? (
+          <Image
+            src={coverImage}
+            alt=""
+            fill
+            sizes={coverSizes(variant)}
+            quality={72}
+            unoptimized={coverImage.startsWith("/uploads/") || !coverImage.startsWith("/")}
+          />
+        ) : <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>}
       </span>
       <span className="editorial-article-copy">
         <span className="editorial-article-meta">

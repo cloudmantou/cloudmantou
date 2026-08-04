@@ -110,15 +110,21 @@ location ^~ /uploads/ {
 }
 ```
 
-文章图片会在服务端校验后统一压缩为 WebP。远程图片按压缩结果的内容哈希
+文章图片会在服务端校验后统一压缩为 WebP。封面最大为 1280×720、默认质量
+72，并以 420KB 为交付目标自适应降低质量或尺寸。远程图片按压缩结果的内容哈希
 去重，不写入 Git；备份站点时需同时备份该持久化目录。
 
 ## AI 编辑助手
 
 文章编辑器已通过 Vercel AI SDK 接入 Anthropic-compatible 与
-OpenAI-compatible 两类 Provider，第一阶段提供结构化的 5 个标题候选与文章摘要。
+OpenAI-compatible 两类 Provider，提供结构化的标题、摘要、SEO 元数据与正文优化。
 生成结果只作为建议，管理员点击应用后才会写入当前编辑表单，发布流程保持原有
 确认步骤。
+
+后台“系统设置 → AI 模型”内置 DeepSeek、小米 MiMo、MiniMax，以及两种自定义
+兼容接口。默认继续读取 `.env`；切换为“系统设置”后，API Key 使用
+`SETTINGS_ENCRYPTION_KEY` 加密保存到 `site_settings`，管理接口只返回是否已配置。
+连接测试会先使用候选配置发送一条限额最小请求，成功后再保存，并受管理员鉴权、审计和限流保护。
 
 MiniMax-M3 服务端配置：
 
@@ -153,6 +159,8 @@ AI_BASE_URL="http://127.0.0.1:15721/v1"
 ```
 
 - `AI_API_KEY` 仅由 Node.js 服务端读取，前端响应和日志均不包含密钥。
+- MiMo OpenAI-compatible 预设使用 `api-key` 请求头；其他 OpenAI-compatible
+  服务默认使用 `Authorization: Bearer`，可通过 `AI_OPENAI_AUTH_MODE` 或后台修改。
 - `AI_REQUEST_TIMEOUT_MS` 范围为 5000 至 300000；Claude Code 的
   `API_TIMEOUT_MS`、模型别名和流量开关不会进入网站运行时。
 - 宝塔进程若继承了其他 `ANTHROPIC_*` 变量，使用 `AI_BASE_URL`、`AI_API_KEY`、

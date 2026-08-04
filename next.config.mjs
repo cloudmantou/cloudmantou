@@ -30,6 +30,10 @@ const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
   serverExternalPackages: ["ioredis", "sharp"],
+  images: {
+    qualities: [72, 75],
+    minimumCacheTTL: 2592000,
+  },
   turbopack: {},
   webpack(config, { dev }) {
     if (dev) {
@@ -49,6 +53,19 @@ const nextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/uploads/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000, immutable",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+        ],
+      },
       {
         // 支付跳转页不叠加全站 CSP，由 route handler 返回独立策略
         source: "/((?!payment/alipay-launch).*)",

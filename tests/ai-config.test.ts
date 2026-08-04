@@ -30,6 +30,7 @@ describe("AI provider configuration", () => {
       textModel: "fixture-model",
       supportsStructuredOutputs: true,
       requestTimeoutMs: 30_000,
+      openAiAuthMode: "bearer",
     });
   });
 
@@ -92,6 +93,41 @@ describe("AI provider configuration", () => {
         AI_API_KEY: "key",
         AI_TEXT_MODEL: "model",
         AI_BASE_URL: "http://provider.example.test/v1",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_BASE_URL: "https://169.254.169.254/v1",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_BASE_URL: "https://provider.example.test:8443/v1",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "ｓｋ-full-width",
+        AI_TEXT_MODEL: "model",
+      },
+      "AI_INVALID_CONFIG",
+    ],
+    [
+      {
+        AI_ENABLED: "true",
+        AI_API_KEY: "key",
+        AI_TEXT_MODEL: "model",
+        AI_OPENAI_AUTH_MODE: "unsupported",
       },
       "AI_INVALID_CONFIG",
     ],

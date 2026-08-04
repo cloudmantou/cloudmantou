@@ -115,7 +115,7 @@ describe("upload configuration", () => {
     expect(getClientCompressOptions("cover")).toEqual({
       maxWidth: UPLOAD_PURPOSES.cover.maxWidth,
       maxHeight: UPLOAD_PURPOSES.cover.maxHeight,
-      quality: 0.85,
+      quality: UPLOAD_PURPOSES.cover.quality / 100,
       mimeType: "image/webp",
     });
     expect(UPLOAD_MAX_INPUT_BYTES).toBe(10 * 1024 * 1024);
@@ -152,7 +152,11 @@ describe("compressImage", () => {
 
     expect(browser.canvas.width).toBe(800);
     expect(browser.canvas.height).toBe(450);
-    expect(browser.toBlob).toHaveBeenCalledWith(expect.any(Function), "image/webp", 0.85);
+    expect(browser.toBlob).toHaveBeenCalledWith(
+      expect.any(Function),
+      "image/webp",
+      UPLOAD_PURPOSES.cover.quality / 100,
+    );
     expect(result.name).toBe("cover.webp");
   });
 

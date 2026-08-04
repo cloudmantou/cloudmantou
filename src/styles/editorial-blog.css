@@ -131,6 +131,7 @@
 .editorial-article:hover { transform: translate(-2px, -2px); box-shadow: 11px 11px 0 var(--ed-ink); }
 .editorial-article:focus-visible { outline: 3px solid var(--ed-red); outline-offset: 4px; }
 .editorial-article-media { position: relative; display: grid; place-items: center; overflow: hidden; color: var(--ed-ink); background-color: var(--ed-blue); background-position: center; background-size: cover; font-size: clamp(3rem, 7vw, 7rem); font-weight: 950; }
+.editorial-article-media img { object-fit: cover; }
 .editorial-article-copy { min-width: 0; display: flex; flex-direction: column; }
 .editorial-article-meta { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; color: var(--ed-muted); font-family: "DM Mono", monospace; font-size: .68rem; }
 .editorial-article-meta > span:first-child { color: var(--ed-blue); font-weight: 800; }
@@ -449,7 +450,8 @@
 .editorial-article-cover-frame { position: relative; min-width: 0; }
 .editorial-article-cover-frame .editorial-orbit-art { width: 100%; }
 .editorial-article-cover-frame.has-cover .editorial-orbit-art { position: absolute; right: -16px; bottom: -18px; z-index: 2; width: 42%; border-width: 2px; box-shadow: 6px 6px 0 var(--ed-yellow); }
-.editorial-article-cover-image { display: block; width: 100%; aspect-ratio: 1; border: var(--ed-line); background-color: var(--ed-red); background-position: center; background-size: cover; box-shadow: 10px 10px 0 var(--ed-blue); }
+.editorial-article-cover-image { position: relative; display: block; width: 100%; aspect-ratio: 1; overflow: hidden; border: var(--ed-line); background-color: var(--ed-red); box-shadow: 10px 10px 0 var(--ed-blue); }
+.editorial-article-cover-image img { object-fit: cover; }
 .editorial-reading-layout { display: grid; grid-template-columns: minmax(220px, 285px) minmax(0, 860px); justify-content: center; gap: clamp(34px, 5vw, 78px); margin-top: clamp(56px, 7vw, 94px); }
 .article-toc { position: sticky; top: 112px; align-self: start; max-height: calc(100vh - 138px); overflow: auto; padding: 21px; border: var(--ed-line); background: var(--ed-paper-strong); box-shadow: 7px 7px 0 var(--ed-ink); }
 .article-toc > strong { display: block; padding-bottom: 12px; border-bottom: 3px solid var(--ed-blue); font-size: .88rem; font-weight: 950; }

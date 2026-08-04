@@ -94,7 +94,7 @@ export async function generateEditorialSuggestion(
   options: { signal?: AbortSignal } = {},
 ): Promise<EditorialAiResponse> {
   try {
-    const { model, config } = getAiTextModel();
+    const { model, config } = await getAiTextModel();
     const base = {
       provider: config.providerName,
       model: config.textModel,

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Save, Loader2 } from "lucide-react";
 import { ContactLinksEditor } from "@/components/admin/ContactLinksEditor";
+import { AiSettingsEditor } from "@/components/admin/AiSettingsEditor";
 import type { ContactLink } from "@/lib/contact-links";
 
 const TIMEZONES = [
@@ -59,10 +60,10 @@ export default function AdminSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const flash = (text: string, type: "ok" | "err" = "ok") => {
+  const flash = useCallback((text: string, type: "ok" | "err" = "ok") => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 2400);
-  };
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -115,6 +116,8 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="settings-grid">
+        <AiSettingsEditor onNotify={flash} />
+
         {/* Basic Settings */}
         <section className="data-panel">
           <div className="data-panel-header">

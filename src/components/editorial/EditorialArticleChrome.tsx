@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
@@ -184,10 +185,17 @@ export function EditorialArticleChrome(props: EditorialArticleChromeProps) {
           {safeCoverImage ? (
             <span
               className="editorial-article-cover-image"
-              style={{ backgroundImage: `url(${JSON.stringify(safeCoverImage)})` }}
-              role="img"
-              aria-label={locale === "en" ? `Cover image for ${title}` : `${title}的封面图`}
-            />
+            >
+              <Image
+                src={safeCoverImage}
+                alt={locale === "en" ? `Cover image for ${title}` : `${title}的封面图`}
+                fill
+                sizes="(max-width: 760px) calc(100vw - 64px), (max-width: 1200px) 34vw, 370px"
+                quality={72}
+                fetchPriority="high"
+                unoptimized={safeCoverImage.startsWith("/uploads/") || !safeCoverImage.startsWith("/")}
+              />
+            </span>
           ) : null}
           <EditorialOrbitArt label={locale === "en" ? "Editorial black hole and orbit illustration" : "黑洞与轨道编辑插画"} />
         </div>
