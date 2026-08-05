@@ -40,8 +40,12 @@ describe("Alipay PKCS#8 private key", () => {
 
     expect(result.type).toBe("form");
     if (result.type === "form") {
+      const action = result.html.match(/<form[^>]+action="([^"]+)"/)?.[1];
       expect(result.html).toContain("openapi-sandbox.dl.alipaydev.com");
-      expect(result.html).toContain('name="sign"');
+      expect(action).toContain("charset=utf-8");
+      expect(action).toContain("sign=");
+      expect(result.html).not.toContain('name="sign"');
+      expect(result.html).toContain('name="biz_content"');
     }
   });
 });

@@ -23,8 +23,12 @@ describe("payment providers", () => {
 
     expect(result.type).toBe("form");
     if (result.type === "form") {
+      const action = result.html.match(/<form[^>]+action="([^"]+)"/)?.[1];
       expect(result.html).toContain("alipay.trade.page.pay");
-      expect(result.html).toContain('name="sign"');
+      expect(action).toContain("charset=utf-8");
+      expect(action).toContain("sign=");
+      expect(result.html).not.toContain('name="sign"');
+      expect(result.html).toContain('name="biz_content"');
       expect(result.html).toContain("FAST_INSTANT_TRADE_PAY");
       expect(result.html).toContain('<script nonce="test-launch-nonce">');
       expect(result.html).not.toContain("<script>");

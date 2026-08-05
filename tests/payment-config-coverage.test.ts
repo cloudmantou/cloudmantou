@@ -265,9 +265,18 @@ describe("payment provider production exports", () => {
 
     expect(result).toMatchObject({ type: "form", mode: "alipay_h5" });
     if (result.type === "form") {
+      const action = result.html.match(/<form[^>]+action="([^"]+)"/)?.[1];
+      expect(action).toBeDefined();
+      expect(action).toContain("charset=utf-8");
+      expect(action).toContain("method=alipay.trade.wap.pay");
+      expect(action).toContain("sign=test-signature");
+      expect(action).not.toContain("biz_content=");
       expect(result.html).toContain("alipay.trade.wap.pay");
       expect(result.html).toContain("QUICK_WAP_WAY");
       expect(result.html).toContain("test-signature");
+      expect(result.html).toContain('name="biz_content"');
+      expect(result.html).not.toContain('name="charset"');
+      expect(result.html).not.toContain('name="sign"');
       expect(result.html).toContain("&amp;");
       expect(result.html).toContain("&quot;");
       expect(result.html).toContain("&lt;Membership&gt;");

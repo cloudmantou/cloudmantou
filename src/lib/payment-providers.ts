@@ -38,10 +38,15 @@ function buildAlipayForm(
   params: Record<string, string>,
   scriptNonce: string
 ): string {
-  const inputs = Object.entries(params)
-    .map(([k, v]) => `<input type="hidden" name="${k}" value="${escapeHtml(v)}" />`)
-    .join("");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>跳转支付宝</title></head><body><form id="alipay" method="post" action="${escapeHtml(gatewayUrl)}">${inputs}</form><script nonce="${escapeHtml(scriptNonce)}">document.getElementById('alipay').submit();</script></body></html>`;
+  // Alipay pageExecute expects signed common parameters (including charset and
+  // sign) in the gateway query string. Only biz_content belongs in the POST
+  // body. Keeping every parameter as a hidden input makes the gateway reject
+  // the request with invalid-signature before the payment page is rendered.
+  const { biz_content: bizContent = "", ...commonParams } = params;
+  const separator = gatewayUrl.includes("?") ? "&" : "?";
+  const actionUrl = `${gatewayUrl}${separator}${new URLSearchParams(commonParams).toString()}`;
+  const bizContentInput = `<input type="hidden" name="biz_content" value="${escapeHtml(bizContent)}" />`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>跳转支付宝</title></head><body><form id="alipay" method="post" action="${escapeHtml(actionUrl)}">${bizContentInput}</form><script nonce="${escapeHtml(scriptNonce)}">document.getElementById('alipay').submit();</script></body></html>`;
 }
 
 function escapeHtml(value: string): string {
