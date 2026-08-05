@@ -21,6 +21,8 @@ describe("PostEditor AI assistant integration", () => {
     expect(assistant).toContain('/api/admin/settings/ai');
     expect(assistant).toContain('AI 模型尚未配置');
     expect(assistant).toContain('/admin/settings#ai-model-settings');
+    expect(assistant).toContain('aiAvailability !== "ready"');
+    expect(assistant).toContain('AI 配置状态检查失败');
   });
 
   it("passes only public article fields from PostEditor and never paid content", () => {

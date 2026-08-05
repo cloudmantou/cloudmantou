@@ -6,6 +6,13 @@ type EditOptions = {
   invalidateApiKey?: boolean;
 };
 
+function getDraftStatus(
+  state: AiSettingsFormState,
+): AiSettingsFormState["status"] {
+  if (!state.enabled) return "disabled";
+  return state.apiKey.trim() || state.apiKeyConfigured ? "ready" : "incomplete";
+}
+
 export function beginDatabaseEditing(
   state: AiSettingsFormState,
 ): AiSettingsFormState {
@@ -35,6 +42,6 @@ export function editAiSettings(
   };
   return {
     ...next,
-    status: next.enabled ? "incomplete" : "disabled",
+    status: getDraftStatus(next),
   };
 }

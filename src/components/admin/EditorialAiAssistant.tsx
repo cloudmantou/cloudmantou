@@ -5,6 +5,10 @@ import Link from "next/link";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { requestEditorialSuggestion } from "@/lib/ai/editor-client";
 import type { EditorialAiResponse } from "@/lib/ai/editor-types";
+import {
+  classifyAiAvailability,
+  type AiAvailabilityState,
+} from "@/lib/ai/editor-availability";
 
 type EditorialAiAssistantProps = {
   title: string;
@@ -22,7 +26,7 @@ type EditorialAiAssistantProps = {
   onApplyContent: (content: string) => void;
 };
 
-type AiAvailability = "checking" | "ready" | "needs-setup" | "unknown";
+type AiAvailability = "checking" | AiAvailabilityState;
 
 export function EditorialAiAssistant({
   title,
@@ -38,9 +42,10 @@ export function EditorialAiAssistant({
   const [error, setError] = useState("");
   const [focusKeyword, setFocusKeyword] = useState("");
   const [aiAvailability, setAiAvailability] = useState<AiAvailability>("checking");
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
   const controllerRef = useRef<AbortController | null>(null);
   const canGenerate = content.trim().length >= 10;
-  const aiActionsBlocked = aiAvailability === "checking" || aiAvailability === "needs-setup";
+  const aiActionsBlocked = aiAvailability !== "ready";
 
   const checkAiAvailability = useCallback(async (signal?: AbortSignal) => {
     setAiAvailability("checking");
@@ -50,14 +55,14 @@ export function EditorialAiAssistant({
         ...(signal ? { signal } : {}),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.data) {
-        setAiAvailability("unknown");
-        return;
-      }
-      setAiAvailability(body.data.status === "ready" ? "ready" : "needs-setup");
+      const availability = classifyAiAvailability(response.status, body);
+      setAiAvailability(availability.state);
+      setAvailabilityMessage(availability.message);
     } catch (caught) {
       if (caught instanceof Error && caught.name === "AbortError") return;
-      setAiAvailability("unknown");
+      const availability = classifyAiAvailability(0, null);
+      setAiAvailability(availability.state);
+      setAvailabilityMessage(availability.message);
     }
   }, []);
 
@@ -157,6 +162,11 @@ export function EditorialAiAssistant({
       {aiAvailability === "needs-setup" && (
         <p className="editor-ai-setup" role="alert">
           AI 模型尚未配置。<Link href="/admin/settings#ai-model-settings">前往系统设置</Link>
+        </p>
+      )}
+      {aiAvailability === "unavailable" && (
+        <p className="editor-ai-error" role="alert">
+          {availabilityMessage || "AI 配置状态检查失败，请刷新页面后重试"}
         </p>
       )}
       {error && <p className="editor-ai-error" role="alert">{error}</p>}

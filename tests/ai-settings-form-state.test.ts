@@ -49,11 +49,23 @@ describe("AI settings form editing", () => {
     const databaseSettings = { ...environmentSettings, mode: "database" as const };
 
     expect(editAiSettings(databaseSettings, { textModel: "another-model" }))
-      .toMatchObject({ apiKeyConfigured: true, status: "incomplete" });
+      .toMatchObject({ apiKeyConfigured: true, status: "ready" });
     expect(editAiSettings(
       databaseSettings,
       { baseURL: "https://provider.example/v1" },
       { invalidateApiKey: true },
     )).toMatchObject({ apiKey: "", apiKeyConfigured: false, status: "incomplete" });
+  });
+
+  it("becomes ready when a database draft receives a new key", () => {
+    const databaseSettings = {
+      ...environmentSettings,
+      mode: "database" as const,
+      apiKeyConfigured: false,
+      status: "incomplete" as const,
+    };
+
+    expect(editAiSettings(databaseSettings, { apiKey: "sk-new-key" }))
+      .toMatchObject({ apiKey: "sk-new-key", status: "ready" });
   });
 });
