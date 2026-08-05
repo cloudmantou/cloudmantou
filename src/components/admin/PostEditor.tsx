@@ -108,6 +108,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
   const [tagInput, setTagInput] = useState("");
   const [tagCreating, setTagCreating] = useState(false);
+  const tagCreateInFlightRef = useRef(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
 
@@ -301,7 +302,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
   const addTagFromInput = async () => {
     const trimmed = tagInput.trim().replace(/^#/, "");
-    if (!trimmed || tagCreating) return;
+    if (!trimmed || tagCreating || tagCreateInFlightRef.current) return;
 
     const matched = tags.find((t) => t.name.toLowerCase() === trimmed.toLowerCase());
     if (matched) {
@@ -312,12 +313,17 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
       return;
     }
 
+    tagCreateInFlightRef.current = true;
     setTagCreating(true);
     try {
       const res = await fetch("/api/admin/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, slug: slugifyTagName(trimmed) }),
+        body: JSON.stringify({
+          name: trimmed,
+          slug: slugifyTagName(trimmed),
+          reuseExisting: true,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "创建标签失败");
@@ -328,12 +334,15 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
         slug: data.data.slug,
         color: data.data.color,
       };
-      setTags((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "zh-CN")));
-      setSelectedTagIds((prev) => [...prev, created.id]);
+      setTags((prev) => prev.some((tag) => tag.id === created.id)
+        ? prev
+        : [...prev, created].sort((a, b) => a.name.localeCompare(b.name, "zh-CN")));
+      setSelectedTagIds((prev) => prev.includes(created.id) ? prev : [...prev, created.id]);
       setTagInput("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "创建标签失败");
     } finally {
+      tagCreateInFlightRef.current = false;
       setTagCreating(false);
     }
   };
