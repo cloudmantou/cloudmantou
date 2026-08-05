@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, Loader2, Sparkles } from "lucide-react";
 import { requestEditorialSuggestion } from "@/lib/ai/editor-client";
 import type { EditorialAiResponse } from "@/lib/ai/editor-types";
@@ -21,6 +22,8 @@ type EditorialAiAssistantProps = {
   onApplyContent: (content: string) => void;
 };
 
+type AiAvailability = "checking" | "ready" | "needs-setup" | "unknown";
+
 export function EditorialAiAssistant({
   title,
   excerpt,
@@ -34,10 +37,38 @@ export function EditorialAiAssistant({
   const [result, setResult] = useState<EditorialAiResponse | null>(null);
   const [error, setError] = useState("");
   const [focusKeyword, setFocusKeyword] = useState("");
+  const [aiAvailability, setAiAvailability] = useState<AiAvailability>("checking");
   const controllerRef = useRef<AbortController | null>(null);
   const canGenerate = content.trim().length >= 10;
+  const aiActionsBlocked = aiAvailability === "checking" || aiAvailability === "needs-setup";
 
-  useEffect(() => () => controllerRef.current?.abort(), []);
+  const checkAiAvailability = useCallback(async (signal?: AbortSignal) => {
+    setAiAvailability("checking");
+    try {
+      const response = await fetch("/api/admin/settings/ai", {
+        cache: "no-store",
+        ...(signal ? { signal } : {}),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.data) {
+        setAiAvailability("unknown");
+        return;
+      }
+      setAiAvailability(body.data.status === "ready" ? "ready" : "needs-setup");
+    } catch (caught) {
+      if (caught instanceof Error && caught.name === "AbortError") return;
+      setAiAvailability("unknown");
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void checkAiAvailability(controller.signal);
+    return () => {
+      controller.abort();
+      controllerRef.current?.abort();
+    };
+  }, [checkAiAvailability]);
 
   async function generate(task: EditorialAiResponse["task"]) {
     controllerRef.current?.abort();
@@ -87,7 +118,7 @@ export function EditorialAiAssistant({
         <button
           type="button"
           className="e-btn e-btn-ghost e-btn-sm"
-          disabled={!canGenerate || busyTask !== null}
+          disabled={!canGenerate || busyTask !== null || aiActionsBlocked}
           onClick={() => void generate("title")}
         >
           {busyTask === "title" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
@@ -96,7 +127,7 @@ export function EditorialAiAssistant({
         <button
           type="button"
           className="e-btn e-btn-ghost e-btn-sm"
-          disabled={!canGenerate || busyTask !== null}
+          disabled={!canGenerate || busyTask !== null || aiActionsBlocked}
           onClick={() => void generate("summary")}
         >
           {busyTask === "summary" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
@@ -105,7 +136,7 @@ export function EditorialAiAssistant({
         <button
           type="button"
           className="e-btn e-btn-ghost e-btn-sm"
-          disabled={!canGenerate || busyTask !== null}
+          disabled={!canGenerate || busyTask !== null || aiActionsBlocked}
           onClick={() => void generate("metadata")}
         >
           {busyTask === "metadata" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
@@ -114,7 +145,7 @@ export function EditorialAiAssistant({
         <button
           type="button"
           className="e-btn e-btn-ghost e-btn-sm"
-          disabled={!canGenerate || busyTask !== null}
+          disabled={!canGenerate || busyTask !== null || aiActionsBlocked}
           onClick={() => void generate("optimize")}
         >
           {busyTask === "optimize" ? <Loader2 className="spin" size={13} /> : <Sparkles size={13} />}
@@ -122,6 +153,12 @@ export function EditorialAiAssistant({
         </button>
       </div>
       {!canGenerate && <p className="editor-ai-notice">正文达到 10 个字符后即可生成。</p>}
+      {aiAvailability === "checking" && <p className="editor-ai-notice">正在检查 AI 模型配置…</p>}
+      {aiAvailability === "needs-setup" && (
+        <p className="editor-ai-setup" role="alert">
+          AI 模型尚未配置。<Link href="/admin/settings#ai-model-settings">前往系统设置</Link>
+        </p>
+      )}
       {error && <p className="editor-ai-error" role="alert">{error}</p>}
 
       {result?.task === "title" && (

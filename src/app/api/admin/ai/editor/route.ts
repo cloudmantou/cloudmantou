@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof AiConfigurationError) {
       const message = error.code === "AI_INVALID_CONFIG"
         ? "AI 服务配置无效"
-        : "AI 服务尚未配置";
+        : "AI 模型尚未配置，请前往系统设置完成配置";
       return fail(message, 50310, 503);
     }
     if (error instanceof AiGenerationError) {

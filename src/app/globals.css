@@ -4404,6 +4404,25 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   line-height: 1.65;
 }
 
+.ai-settings-mode-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 14px 18px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 10px;
+  background: var(--accent-dim);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.ai-settings-mode-notice .secondary-button {
+  flex: 0 0 auto;
+}
+
 .ai-settings-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4455,6 +4474,11 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   }
 
   .ai-settings-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ai-settings-mode-notice {
     align-items: flex-start;
     flex-direction: column;
   }

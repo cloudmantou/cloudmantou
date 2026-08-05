@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { AiConfigurationError } from "@/lib/ai/config";
 
 const mocks = vi.hoisted(() => ({
   requireAdminAndAudit: vi.fn(),
@@ -99,5 +100,19 @@ describe("POST /api/admin/ai/editor", () => {
 
     expect(response.status).toBe(413);
     expect(mocks.generateEditorialSuggestion).not.toHaveBeenCalled();
+  });
+
+  it("directs an admin to AI settings when the provider is not configured", async () => {
+    mocks.generateEditorialSuggestion.mockRejectedValue(
+      new AiConfigurationError("AI_NOT_CONFIGURED", "AI 服务配置不完整"),
+    );
+
+    const response = await POST(request(validBody));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 50310,
+      message: "AI 模型尚未配置，请前往系统设置完成配置",
+    });
   });
 });

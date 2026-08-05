@@ -56,7 +56,7 @@ describe("editorial AI browser client", () => {
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(
-          JSON.stringify({ code: 50310, message: "AI 服务尚未配置", data: null }),
+          JSON.stringify({ code: 50310, message: "AI 模型尚未配置，请前往系统设置完成配置", data: null }),
           { status: 503, headers: { "content-type": "application/json" } },
         ),
       ),
@@ -70,6 +70,6 @@ describe("editorial AI browser client", () => {
         content: "这是一段用于错误响应验证的文章正文。",
         locale: "auto",
       }),
-    ).rejects.toThrow("AI 服务尚未配置");
+    ).rejects.toThrow("AI 模型尚未配置，请前往系统设置完成配置");
   });
 });

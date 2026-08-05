@@ -7,29 +7,16 @@ import {
   getAiProviderPreset,
   type AiProviderPresetId,
 } from "@/lib/ai/presets";
-
-type AiSettingsState = {
-  mode: "environment" | "database";
-  enabled: boolean;
-  preset: AiProviderPresetId;
-  providerType: "openai-compatible" | "anthropic-compatible";
-  providerName: string;
-  baseURL: string;
-  apiKey: string;
-  clearApiKey: boolean;
-  textModel: string;
-  supportsStructuredOutputs: boolean;
-  requestTimeoutMs: number;
-  openAiAuthMode: "bearer" | "api-key";
-  anthropicAuthMode: "auth-token" | "api-key";
-  apiKeyConfigured: boolean;
-  status: "ready" | "disabled" | "incomplete" | "invalid";
-};
+import {
+  beginDatabaseEditing,
+  editAiSettings,
+  type AiSettingsFormState,
+} from "@/lib/ai/admin-form-state";
 
 type Notify = (text: string, type?: "ok" | "err") => void;
 
 const DEFAULT_PRESET = getAiProviderPreset("minimax");
-const DEFAULT_SETTINGS: AiSettingsState = {
+const DEFAULT_SETTINGS: AiSettingsFormState = {
   mode: "environment",
   enabled: false,
   preset: DEFAULT_PRESET.id,
@@ -64,7 +51,7 @@ function Field({ label, hint, children }: {
 }
 
 export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
-  const [settings, setSettings] = useState<AiSettingsState>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AiSettingsFormState>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -87,14 +74,16 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       .finally(() => setLoading(false));
   }, [loadSettings, onNotify]);
 
-  const update = <Key extends keyof AiSettingsState>(key: Key, value: AiSettingsState[Key]) => {
-    setSettings((previous) => ({ ...previous, [key]: value }));
+  const edit = (
+    patch: Partial<AiSettingsFormState>,
+    options: { invalidateApiKey?: boolean } = {},
+  ) => {
+    setSettings((previous) => editAiSettings(previous, patch, options));
   };
 
   const applyPreset = (presetId: AiProviderPresetId) => {
     const preset = getAiProviderPreset(presetId);
-    setSettings((previous) => ({
-      ...previous,
+    setSettings((previous) => editAiSettings(previous, {
       preset: preset.id,
       providerType: preset.providerType,
       providerName: preset.providerName,
@@ -103,11 +92,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       supportsStructuredOutputs: preset.supportsStructuredOutputs,
       openAiAuthMode: preset.openAiAuthMode,
       anthropicAuthMode: preset.anthropicAuthMode,
-      apiKey: "",
-      apiKeyConfigured: false,
-      clearApiKey: false,
-      status: previous.enabled ? "incomplete" : "disabled",
-    }));
+    }, { invalidateApiKey: true }));
   };
 
   const buildPayload = () => ({
@@ -187,7 +172,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
         : "配置异常";
 
   return (
-    <section className="data-panel ai-settings-panel">
+    <section className="data-panel ai-settings-panel" id="ai-model-settings">
       <div className="data-panel-header">
         <span className="data-panel-title"><Bot size={14} aria-hidden="true" /> AI 模型</span>
         <span className={`ai-settings-status is-${settings.status}`}>{statusLabel}</span>
@@ -195,19 +180,23 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       <div className="ai-settings-intro">
         支持 DeepSeek、小米 MiMo、MiniMax，以及任意 OpenAI / Anthropic 兼容接口。API Key 仅在服务端加密保存，页面只显示配置状态。
       </div>
+      {!databaseMode ? (
+        <div className="ai-settings-mode-notice" role="status">
+          <span>当前使用服务器环境变量。编辑任一模型字段会自动切换为可保存的后台加密配置。</span>
+          <button type="button" className="secondary-button" onClick={() => setSettings(beginDatabaseEditing)}>
+            切换到后台配置
+          </button>
+        </div>
+      ) : null}
       <div className="settings-form ai-settings-form">
         <Field label="配置来源" hint="后台配置保存到数据库并覆盖服务器环境变量">
           <select
             value={settings.mode}
             onChange={(event) => {
-              const mode = event.target.value as AiSettingsState["mode"];
-              setSettings((previous) => ({
-                ...previous,
-                mode,
-                ...(mode === "database" && previous.mode !== "database"
-                  ? { apiKeyConfigured: false, status: previous.enabled ? "incomplete" : "disabled" }
-                  : {}),
-              }));
+              const mode = event.target.value as AiSettingsFormState["mode"];
+              setSettings((previous) => mode === "database"
+                ? beginDatabaseEditing(previous)
+                : { ...previous, mode: "environment" });
             }}
             className="form-input"
           >
@@ -220,7 +209,6 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
             value={settings.preset}
             onChange={(event) => applyPreset(event.target.value as AiProviderPresetId)}
             className="form-input"
-            disabled={!databaseMode}
           >
             {AI_PROVIDER_PRESETS.map((preset) => (
               <option key={preset.id} value={preset.id}>{preset.label} — {preset.description}</option>
@@ -230,36 +218,31 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
         <Field label="兼容协议" hint="由服务商接口格式决定">
           <select
             value={settings.providerType}
-            onChange={(event) => setSettings((previous) => ({
-              ...previous,
-              providerType: event.target.value as AiSettingsState["providerType"],
-              apiKey: "",
-              apiKeyConfigured: false,
-              status: previous.enabled ? "incomplete" : "disabled",
-            }))}
+            onChange={(event) => edit(
+              { providerType: event.target.value as AiSettingsFormState["providerType"] },
+              { invalidateApiKey: true },
+            )}
             className="form-input"
-            disabled={!databaseMode}
           >
             <option value="openai-compatible">OpenAI Compatible</option>
             <option value="anthropic-compatible">Anthropic Compatible</option>
           </select>
         </Field>
         <Field label="Provider 名称" hint="用于日志和 AI SDK Provider 标识">
-          <input type="text" value={settings.providerName} onChange={(event) => update("providerName", event.target.value)} className="form-input mono" disabled={!databaseMode} maxLength={64} />
+          <input type="text" value={settings.providerName} onChange={(event) => edit({ providerName: event.target.value })} className="form-input mono" maxLength={64} />
         </Field>
         <Field label="Base URL" hint="系统设置仅允许标准 HTTPS 公网接口；本机代理请继续使用服务器环境变量">
-          <input type="url" value={settings.baseURL} onChange={(event) => setSettings((previous) => ({ ...previous, baseURL: event.target.value, apiKey: "", apiKeyConfigured: false, status: previous.enabled ? "incomplete" : "disabled" }))} className="form-input mono" disabled={!databaseMode} maxLength={500} />
+          <input type="url" value={settings.baseURL} onChange={(event) => edit({ baseURL: event.target.value }, { invalidateApiKey: true })} className="form-input mono" maxLength={500} />
         </Field>
         <Field label="模型 ID" hint="例如 deepseek-v4-flash、mimo-v2.5-pro、MiniMax-M3">
-          <input type="text" value={settings.textModel} onChange={(event) => update("textModel", event.target.value)} className="form-input mono" disabled={!databaseMode} maxLength={200} />
+          <input type="text" value={settings.textModel} onChange={(event) => edit({ textModel: event.target.value })} className="form-input mono" maxLength={200} />
         </Field>
         <Field label="API Key" hint={settings.apiKeyConfigured ? "已配置；留空保留原密钥，输入新值可轮换" : "后台模式启用前必须填写"}>
           <input
             type="password"
             value={settings.apiKey}
-            onChange={(event) => setSettings((previous) => ({ ...previous, apiKey: event.target.value, clearApiKey: false }))}
+            onChange={(event) => edit({ apiKey: event.target.value, clearApiKey: false })}
             className="form-input mono"
-            disabled={!databaseMode}
             autoComplete="new-password"
             maxLength={512}
             placeholder={settings.apiKeyConfigured ? "••••••••••••（已加密保存）" : "sk-..."}
@@ -267,19 +250,19 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
         </Field>
         <Field label="认证方式" hint="MiMo 默认 api-key；DeepSeek 默认 Bearer；MiniMax Anthropic 默认 Auth Token">
           {settings.providerType === "openai-compatible" ? (
-            <select value={settings.openAiAuthMode} onChange={(event) => setSettings((previous) => ({ ...previous, openAiAuthMode: event.target.value as AiSettingsState["openAiAuthMode"], apiKey: "", apiKeyConfigured: false, status: previous.enabled ? "incomplete" : "disabled" }))} className="form-input" disabled={!databaseMode}>
+            <select value={settings.openAiAuthMode} onChange={(event) => edit({ openAiAuthMode: event.target.value as AiSettingsFormState["openAiAuthMode"] }, { invalidateApiKey: true })} className="form-input">
               <option value="bearer">Authorization: Bearer</option>
               <option value="api-key">api-key</option>
             </select>
           ) : (
-            <select value={settings.anthropicAuthMode} onChange={(event) => setSettings((previous) => ({ ...previous, anthropicAuthMode: event.target.value as AiSettingsState["anthropicAuthMode"], apiKey: "", apiKeyConfigured: false, status: previous.enabled ? "incomplete" : "disabled" }))} className="form-input" disabled={!databaseMode}>
+            <select value={settings.anthropicAuthMode} onChange={(event) => edit({ anthropicAuthMode: event.target.value as AiSettingsFormState["anthropicAuthMode"] }, { invalidateApiKey: true })} className="form-input">
               <option value="auth-token">Authorization: Bearer</option>
               <option value="api-key">x-api-key</option>
             </select>
           )}
         </Field>
         <Field label="请求超时" hint="5–300 秒；长文优化建议 120 秒以上">
-          <input type="number" min={5} max={300} value={Math.round(settings.requestTimeoutMs / 1000)} onChange={(event) => update("requestTimeoutMs", Number(event.target.value) * 1000)} className="form-input mono" disabled={!databaseMode} />
+          <input type="number" min={5} max={300} value={Math.round(settings.requestTimeoutMs / 1000)} onChange={(event) => edit({ requestTimeoutMs: Number(event.target.value) * 1000 })} className="form-input mono" />
         </Field>
       </div>
       <div className="toggle-list">
@@ -288,7 +271,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
             <div className="toggle-label">启用 AI 编辑助手</div>
             <div className="toggle-desc">用于标题、摘要、SEO 元数据和文章优化；关闭后不发起模型请求</div>
           </div>
-          <button type="button" onClick={() => update("enabled", !settings.enabled)} className={`switch${settings.enabled ? " on" : ""}`} aria-pressed={settings.enabled} aria-label="启用 AI 编辑助手" disabled={!databaseMode}>
+          <button type="button" onClick={() => edit({ enabled: !settings.enabled })} className={`switch${settings.enabled ? " on" : ""}`} aria-pressed={settings.enabled} aria-label="启用 AI 编辑助手">
             <span className="switch-knob" />
           </button>
         </div>
@@ -297,7 +280,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
             <div className="toggle-label">结构化输出</div>
             <div className="toggle-desc">Provider 支持时生成严格的标题、摘要与 SEO 字段结构</div>
           </div>
-          <button type="button" onClick={() => update("supportsStructuredOutputs", !settings.supportsStructuredOutputs)} className={`switch${settings.supportsStructuredOutputs ? " on" : ""}`} aria-pressed={settings.supportsStructuredOutputs} aria-label="启用结构化输出" disabled={!databaseMode}>
+          <button type="button" onClick={() => edit({ supportsStructuredOutputs: !settings.supportsStructuredOutputs })} className={`switch${settings.supportsStructuredOutputs ? " on" : ""}`} aria-pressed={settings.supportsStructuredOutputs} aria-label="启用结构化输出">
             <span className="switch-knob" />
           </button>
         </div>

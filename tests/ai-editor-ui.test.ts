@@ -18,6 +18,9 @@ describe("PostEditor AI assistant integration", () => {
     expect(assistant).toContain("onApplyExcerpt");
     expect(assistant).toContain("onApplyMetadata");
     expect(assistant).toContain("onApplyContent");
+    expect(assistant).toContain('/api/admin/settings/ai');
+    expect(assistant).toContain('AI 模型尚未配置');
+    expect(assistant).toContain('/admin/settings#ai-model-settings');
   });
 
   it("passes only public article fields from PostEditor and never paid content", () => {

@@ -27,4 +27,12 @@ describe("admin AI settings UI", () => {
     expect(source).toContain("apiKeyConfigured");
     expect(source).not.toMatch(/body\.data\.apiKey\s*[^=]/);
   });
+
+  it("allows direct editing and automatically switches environment settings to database mode", () => {
+    expect(source).toContain("beginDatabaseEditing");
+    expect(source).toContain("editAiSettings");
+    expect(source).toContain("编辑任一模型字段会自动切换");
+    expect(source).not.toContain("disabled={!databaseMode}");
+    expect(source).toContain('id="ai-model-settings"');
+  });
 });
