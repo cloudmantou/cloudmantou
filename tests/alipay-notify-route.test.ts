@@ -73,4 +73,18 @@ describe("Alipay notification idempotency", () => {
     expect(mocks.verifyAlipaySign).toHaveBeenCalledOnce();
     expect(mocks.finalizeAlipayOrder).not.toHaveBeenCalled();
   });
+
+  it("does not acknowledge a verified notification rejected by the payment identity guard", async () => {
+    mocks.verifyAlipaySign.mockReturnValue(true);
+    mocks.finalizeAlipayOrder.mockResolvedValue(false);
+
+    const response = await POST(request());
+
+    expect(await response.text()).toBe("failure");
+    expect(mocks.recordPaymentNotifyAudit).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "ALIPAY",
+      orderNo: "ORDER-PAID-1",
+      status: "FINALIZE_REJECTED",
+    }));
+  });
 });

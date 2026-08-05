@@ -9,6 +9,11 @@ const paymentHarness = vi.hoisted(() => ({
     update: vi.fn(),
     sign: vi.fn(() => "test-signature"),
   })),
+  verifyResponse: vi.fn(() => true),
+  createVerify: vi.fn(() => ({
+    update: vi.fn(),
+    verify: vi.fn(() => paymentHarness.verifyResponse()),
+  })),
   createHash: vi.fn(() => {
     const hash = {
       update: vi.fn(),
@@ -31,8 +36,10 @@ vi.mock("@/lib/secret-crypto", () => ({
 vi.mock("crypto", () => ({
   default: {
     createSign: paymentHarness.createSign,
+    createVerify: paymentHarness.createVerify,
     createHash: paymentHarness.createHash,
     randomBytes: paymentHarness.randomBytes,
+    timingSafeEqual: (left: Buffer, right: Buffer) => left.equals(right),
   },
 }));
 
@@ -49,6 +56,7 @@ import {
   createAlipayPayment,
   createWechatPayment,
   queryAlipayTrade,
+  queryWechatTrade,
 } from "@/lib/payment-providers";
 import {
   detectPaymentScene,
@@ -89,6 +97,9 @@ const wechatConfig: WechatGatewayConfig = {
   mchId: "mch-test",
   apiKey: "api-key",
 };
+
+// WeChat V2 returns its own signed random string; it does not echo the request nonce.
+const WECHAT_RESPONSE_NONCE = "IITRi8Iabbblz1Jc";
 
 function mockFetchText(text: string) {
   const fetchMock = vi.fn().mockResolvedValue({ text: vi.fn().mockResolvedValue(text) });
@@ -231,6 +242,9 @@ describe("payment provider production exports", () => {
     paymentHarness.createSign.mockClear();
     paymentHarness.createHash.mockClear();
     paymentHarness.randomBytes.mockClear();
+    paymentHarness.createVerify.mockClear();
+    paymentHarness.verifyResponse.mockReset();
+    paymentHarness.verifyResponse.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -246,6 +260,7 @@ describe("payment provider production exports", () => {
       amount: 12.3,
       notifyUrl: "https://example.test/notify?x=1&y=2",
       returnUrl: "https://example.test/result",
+      scriptNonce: 'nonce-<&"',
     });
 
     expect(result).toMatchObject({ type: "form", mode: "alipay_h5" });
@@ -256,6 +271,8 @@ describe("payment provider production exports", () => {
       expect(result.html).toContain("&amp;");
       expect(result.html).toContain("&quot;");
       expect(result.html).toContain("&lt;Membership&gt;");
+      expect(result.html).toContain('nonce="nonce-&lt;&amp;&quot;"');
+      expect(result.html).not.toContain("<script>");
     }
   });
 
@@ -266,12 +283,13 @@ describe("payment provider production exports", () => {
       .mockResolvedValueOnce({ text: async () => "{}" })
       .mockResolvedValueOnce({
         text: async () =>
-          JSON.stringify({ alipay_trade_query_response: { code: "40004", sub_msg: "not found" } }),
+          JSON.stringify({ alipay_trade_query_response: { code: "40004", sub_msg: "not found" }, sign: "server-sign" }),
       })
       .mockResolvedValueOnce({
         text: async () =>
           JSON.stringify({
             alipay_trade_query_response: { code: "10000", trade_status: "WAIT_BUYER_PAY" },
+            sign: "server-sign",
           }),
       })
       .mockResolvedValueOnce({
@@ -280,9 +298,11 @@ describe("payment provider production exports", () => {
             alipay_trade_query_response: {
               code: "10000",
               trade_status: "TRADE_FINISHED",
+              out_trade_no: "E",
               trade_no: "TRADE-1",
               total_amount: "12.30",
             },
+            sign: "server-sign",
           }),
       });
     vi.stubGlobal("fetch", fetchMock);
@@ -293,7 +313,7 @@ describe("payment provider production exports", () => {
     });
     await expect(queryAlipayTrade({ config: alipayConfig, orderNo: "B" })).resolves.toMatchObject({
       paid: false,
-      message: "支付宝查单响应缺少 trade_query 节点",
+      message: "支付宝查单响应节点缺失或重复",
     });
     await expect(queryAlipayTrade({ config: alipayConfig, orderNo: "C" })).resolves.toMatchObject({
       paid: false,
@@ -311,16 +331,73 @@ describe("payment provider production exports", () => {
     expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
+  it("does not mark an Alipay query paid when order identity or amount is missing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        text: async () => JSON.stringify({
+          alipay_trade_query_response: {
+            code: "10000",
+            trade_status: "TRADE_SUCCESS",
+            out_trade_no: "OTHER-ORDER",
+            trade_no: "TRADE-OTHER",
+            total_amount: "12.30",
+          },
+          sign: "server-sign",
+        }),
+      })
+      .mockResolvedValueOnce({
+        text: async () => JSON.stringify({
+          alipay_trade_query_response: {
+            code: "10000",
+            trade_status: "TRADE_SUCCESS",
+            out_trade_no: "ORDER-2",
+            trade_no: "TRADE-NO-AMOUNT",
+          },
+          sign: "server-sign",
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(queryAlipayTrade({ config: alipayConfig, orderNo: "ORDER-1" })).resolves.toMatchObject({
+      paid: false,
+      message: "支付宝查单响应订单不匹配",
+    });
+    await expect(queryAlipayTrade({ config: alipayConfig, orderNo: "ORDER-2" })).resolves.toMatchObject({
+      paid: false,
+      message: "支付宝查单响应缺少交易号或金额",
+    });
+  });
+
+  it("rejects an Alipay query response whose root signature is invalid", async () => {
+    paymentHarness.verifyResponse.mockReturnValue(false);
+    mockFetchText(JSON.stringify({
+      alipay_trade_query_response: {
+        code: "10000",
+        trade_status: "TRADE_SUCCESS",
+        out_trade_no: "ORDER-1",
+        trade_no: "TRADE-1",
+        total_amount: "12.30",
+      },
+      sign: "invalid-server-sign",
+    }));
+
+    await expect(queryAlipayTrade({ config: alipayConfig, orderNo: "ORDER-1" })).resolves.toMatchObject({
+      paid: false,
+      message: "支付宝查单响应签名无效",
+    });
+  });
+
   it("creates WeChat native QR and H5 redirect payments", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
         text: async () =>
-          "<xml><return_code><![CDATA[SUCCESS]]></return_code><result_code>SUCCESS</result_code><code_url><![CDATA[weixin://qr/test]]></code_url></xml>",
+          `<xml><return_code><![CDATA[SUCCESS]]></return_code><result_code>SUCCESS</result_code><appid>wx-test</appid><mch_id>mch-test</mch_id><nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str><code_url><![CDATA[weixin://qr/test]]></code_url><sign>TESTHASH</sign></xml>`,
       })
       .mockResolvedValueOnce({
         text: async () =>
-          "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><mweb_url><![CDATA[https://wx.example/pay?a=1]]></mweb_url></xml>",
+          `<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><appid>wx-test</appid><mch_id>mch-test</mch_id><nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str><mweb_url><![CDATA[https://wx.example/pay?a=1]]></mweb_url><sign>TESTHASH</sign></xml>`,
       });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -340,6 +417,23 @@ describe("payment provider production exports", () => {
     expect(requestBody).toContain("<scene_info>");
   });
 
+  it("rejects an unsigned or mismatched WeChat unified-order response", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        text: async () =>
+          "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><appid>wx-test</appid><mch_id>mch-test</mch_id><code_url>weixin://qr/test</code_url></xml>",
+      })
+      .mockResolvedValueOnce({
+        text: async () =>
+          `<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><appid>wx-other</appid><mch_id>mch-test</mch_id><nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str><code_url>weixin://qr/test</code_url><sign>TESTHASH</sign></xml>`,
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(createWechatPayment(wechatInput("native"))).rejects.toThrow("微信下单响应签名无效");
+    await expect(createWechatPayment(wechatInput("native"))).rejects.toThrow("微信下单响应商户不匹配");
+  });
+
   it("surfaces WeChat provider errors and missing launch URLs", async () => {
     const fetchMock = vi
       .fn()
@@ -349,11 +443,11 @@ describe("payment provider production exports", () => {
       })
       .mockResolvedValueOnce({
         text: async () =>
-          "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code></xml>",
+          `<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><appid>wx-test</appid><mch_id>mch-test</mch_id><nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str><sign>TESTHASH</sign></xml>`,
       })
       .mockResolvedValueOnce({
         text: async () =>
-          "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code></xml>",
+          `<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code><appid>wx-test</appid><mch_id>mch-test</mch_id><nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str><sign>TESTHASH</sign></xml>`,
       });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -361,6 +455,66 @@ describe("payment provider production exports", () => {
     await expect(createWechatPayment(wechatInput("native"))).rejects.toThrow("微信未返回二维码链接");
     await expect(createWechatPayment(wechatInput("mweb"))).rejects.toThrow("微信未返回 H5 支付链接");
   });
+
+  it("actively queries and verifies a paid WeChat order", async () => {
+    const fetchMock = mockFetchText(
+      "<xml>" +
+      "<return_code>SUCCESS</return_code>" +
+      "<result_code>SUCCESS</result_code>" +
+      "<appid>wx-test</appid>" +
+      "<mch_id>mch-test</mch_id>" +
+      "<out_trade_no>ORDER-1</out_trade_no>" +
+      `<nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str>` +
+      "<trade_state>SUCCESS</trade_state>" +
+      "<transaction_id>4200000000202608050000000001</transaction_id>" +
+      "<total_fee>1235</total_fee>" +
+      "<sign>TESTHASH</sign>" +
+      "</xml>"
+    );
+
+    await expect(queryWechatTrade({
+      config: wechatConfig,
+      orderNo: "ORDER-1",
+    })).resolves.toMatchObject({
+      paid: true,
+      transactionId: "4200000000202608050000000001",
+      totalFee: 1235,
+      tradeState: "SUCCESS",
+    });
+    expect(String(fetchMock.mock.calls[0]?.[1]?.body)).toContain("<out_trade_no>");
+  });
+
+  it("rejects an unsigned WeChat query response", async () => {
+    mockFetchText(
+      "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code>" +
+      "<trade_state>SUCCESS</trade_state><transaction_id>4200000000202608050000000001</transaction_id>" +
+      "<total_fee>1235</total_fee></xml>"
+    );
+
+    await expect(queryWechatTrade({
+      config: wechatConfig,
+      orderNo: "ORDER-1",
+    })).resolves.toMatchObject({ paid: false, message: "微信查单响应签名无效" });
+  });
+
+  it("rejects a signed WeChat query response for another order or merchant", async () => {
+    mockFetchText(
+      "<xml><return_code>SUCCESS</return_code><result_code>SUCCESS</result_code>" +
+      "<appid>wx-other</appid><mch_id>mch-test</mch_id><out_trade_no>ORDER-OTHER</out_trade_no>" +
+      `<nonce_str>${WECHAT_RESPONSE_NONCE}</nonce_str>` +
+      "<trade_state>SUCCESS</trade_state><transaction_id>4200000000202608050000000001</transaction_id>" +
+      "<total_fee>1235</total_fee><sign>TESTHASH</sign></xml>"
+    );
+
+    await expect(queryWechatTrade({
+      config: wechatConfig,
+      orderNo: "ORDER-1",
+    })).resolves.toMatchObject({
+      paid: false,
+      message: "微信查单响应订单或商户不匹配",
+    });
+  });
+
 });
 
 describe("payment scene production exports", () => {

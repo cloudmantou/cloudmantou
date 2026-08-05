@@ -3,14 +3,17 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
-import { queryAlipayTrade } from "@/lib/payment-providers";
+import { queryAlipayTrade, queryWechatTrade } from "@/lib/payment-providers";
 import { expireStalePendingOrders, ensureOrderPayable } from "@/lib/order-lifecycle";
 import {
   finalizeAlipayOrder,
+  finalizePaidOrder,
   isValidAlipayTradeNo,
+  isValidWechatTradeNo,
   verifyAlipaySign,
   verifyAmount,
 } from "@/lib/payment";
+import { checkRateLimit } from "@/lib/rate-limit-server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +26,7 @@ function pickAlipayReturnParams(searchParams: URLSearchParams): Record<string, s
   return params;
 }
 
-async function syncAlipayOrder(orderNo: string, returnParams: Record<string, string>) {
+async function syncPaymentOrder(orderNo: string, returnParams: Record<string, string>) {
   const order = await prisma.order.findUnique({
     where: { orderNo },
     include: { payment: true },
@@ -49,6 +52,37 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
   }
 
   const config = await getPaymentRuntimeConfig();
+  if (order.payment?.channel === "WECHAT") {
+    const wechatConfig = config.wechat;
+    if (!wechatConfig?.enabled) {
+      return fail("微信支付未配置", 40000, 400);
+    }
+    const query = await queryWechatTrade({ config: wechatConfig, orderNo });
+    if (!query.paid) {
+      return ok({
+        status: "PENDING",
+        synced: false,
+        tradeStatus: query.tradeState,
+        message: query.message,
+      });
+    }
+    if (!query.transactionId || !isValidWechatTradeNo(query.transactionId)) {
+      return fail("无效的微信交易号", 40000, 400);
+    }
+    if (query.totalFee == null || !verifyAmount(order.amount, (query.totalFee / 100).toFixed(2))) {
+      return fail("支付金额与订单不一致", 40000, 400);
+    }
+
+    const finalized = await finalizePaidOrder({
+      order,
+      channel: "WECHAT",
+      tradeNo: query.transactionId,
+      rawCallback: query.raw,
+    });
+    if (!finalized) return authoritativePaymentStatus(orderNo);
+    return ok({ status: "PAID", synced: true, source: "wechat_query" });
+  }
+
   const alipayConfig = config.alipay;
   if (!alipayConfig?.enabled) {
     return fail("支付宝未配置", 40000, 400);
@@ -77,11 +111,13 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
         return fail("无效的交易号", 40000, 400);
       }
 
-      await finalizeAlipayOrder({
+      const finalized = await finalizeAlipayOrder({
         order,
         tradeNo: returnParams.trade_no,
         rawCallback: new URLSearchParams(returnParams).toString(),
       });
+
+      if (!finalized) return authoritativePaymentStatus(orderNo);
 
       return ok({ status: "PAID", synced: true, source: "return" });
     }
@@ -105,17 +141,47 @@ async function syncAlipayOrder(orderNo: string, returnParams: Record<string, str
     return fail("无效的交易号", 40000, 400);
   }
 
-  if (query.totalAmount && !verifyAmount(order.amount, query.totalAmount)) {
+  if (!query.totalAmount || !verifyAmount(order.amount, query.totalAmount)) {
     return fail("支付金额与订单不一致", 40000, 400);
   }
 
-  await finalizeAlipayOrder({
+  const finalized = await finalizeAlipayOrder({
     order,
     tradeNo: query.tradeNo,
     rawCallback: query.raw,
   });
 
+  if (!finalized) return authoritativePaymentStatus(orderNo);
+
   return ok({ status: "PAID", synced: true, source: "query" });
+}
+
+async function authoritativePaymentStatus(orderNo: string) {
+  const current = await prisma.order.findUnique({
+    where: { orderNo },
+    select: { status: true },
+  });
+  const status = current?.status ?? "UNKNOWN";
+  return ok({
+    status,
+    synced: status === "PAID",
+    source: "authoritative",
+  });
+}
+
+async function checkSyncRateLimits(req: NextRequest, userId: string, orderNo: string) {
+  const userLimit = await checkRateLimit(req, {
+    limit: 60,
+    windowMs: 60_000,
+    scope: "payment-sync",
+  }, userId);
+  if (userLimit) return userLimit;
+
+  return checkRateLimit(req, {
+    limit: 30,
+    windowMs: 60_000,
+    scope: `payment-sync:${orderNo}`,
+  }, userId);
 }
 
 export async function POST(req: NextRequest) {
@@ -136,12 +202,15 @@ export async function POST(req: NextRequest) {
       return fail("订单不存在", 40400, 404);
     }
 
+    const rateLimited = await checkSyncRateLimits(req, session.user.id, orderNo);
+    if (rateLimited) return rateLimited;
+
     const returnParams =
       body.returnParams && typeof body.returnParams === "object"
         ? (body.returnParams as Record<string, string>)
         : {};
 
-    return await syncAlipayOrder(orderNo, returnParams);
+    return await syncPaymentOrder(orderNo, returnParams);
   } catch (error) {
     console.error("[Payment Sync Error]", error);
     return fail("同步支付状态失败", 50000, 500);
@@ -165,8 +234,11 @@ export async function GET(req: NextRequest) {
       return fail("订单不存在", 40400, 404);
     }
 
+    const rateLimited = await checkSyncRateLimits(req, session.user.id, orderNo);
+    if (rateLimited) return rateLimited;
+
     const returnParams = pickAlipayReturnParams(req.nextUrl.searchParams);
-    return await syncAlipayOrder(orderNo, returnParams);
+    return await syncPaymentOrder(orderNo, returnParams);
   } catch (error) {
     console.error("[Payment Sync Error]", error);
     return fail("同步支付状态失败", 50000, 500);

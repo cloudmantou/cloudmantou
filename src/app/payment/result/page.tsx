@@ -1,39 +1,37 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, XCircle } from "lucide-react";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { interpolateMessage, localizeOfficialPath } from "@/i18n/official";
 import { localizeEditorialOrderTitle } from "@/lib/editorial-commerce";
 import { EditorialShell } from "@/components/editorial/EditorialShell";
 import { resolvePaymentResultState } from "@/lib/payment-state";
+import type { OrderFulfillment } from "@/lib/order-fulfillment";
 
 function collectAlipayReturnParams(searchParams: URLSearchParams) {
-  const params: Record<string, string> = {};
-  for (const [key, value] of searchParams.entries()) {
-    if (key === "orderNo") continue;
-    params[key] = value;
-  }
-  return params;
+  return Object.fromEntries(
+    Array.from(searchParams.entries()).filter(([key]) => key !== "orderNo")
+  );
 }
 
 function PaymentResultInner() {
-  const router = useRouter();
   const { locale, messages } = useOfficialI18n();
+  const paymentCopy = messages.payment;
+  const copy = paymentCopy.result;
   const dashboardOrdersUrl = localizeOfficialPath("/dashboard?paid=1#orders", locale);
-  const copy = messages.payment.result;
   const searchParams = useSearchParams();
   const orderNo = searchParams.get("orderNo") || "";
-  const returnParams = useMemo(
-    () => collectAlipayReturnParams(searchParams),
-    [searchParams]
-  );
+  const returnParams = useMemo(() => collectAlipayReturnParams(searchParams), [searchParams]);
   const [status, setStatus] = useState<"loading" | "paid" | "pending" | "error">("loading");
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState<number | null>(null);
+  const [fulfillment, setFulfillment] = useState<OrderFulfillment | null>(null);
   const [hint, setHint] = useState("");
+  const [copyError, setCopyError] = useState("");
+  const [copied, setCopied] = useState<"cardNo" | "cardSecret" | null>(null);
 
   useEffect(() => {
     if (!orderNo) {
@@ -42,7 +40,19 @@ function PaymentResultInner() {
     }
 
     let cancelled = false;
+    let timer: number | null = null;
     const started = Date.now();
+    const scheduleRetry = (nextHint: string) => {
+      if (cancelled) return;
+      if (Date.now() - started < 180_000) {
+        setStatus("pending");
+        setHint(nextHint);
+        timer = window.setTimeout(check, 2000);
+      } else {
+        setStatus("pending");
+        setHint(copy.delayed);
+      }
+    };
     const check = async () => {
       try {
         await fetch("/api/payment/sync", {
@@ -51,28 +61,31 @@ function PaymentResultInner() {
           body: JSON.stringify({ orderNo, returnParams }),
         });
 
-        const res = await fetch(`/api/payment/status?orderNo=${encodeURIComponent(orderNo)}`);
-        const data = await res.json();
+        const response = await fetch(`/api/payment/status?orderNo=${encodeURIComponent(orderNo)}`);
         if (cancelled) return;
-        if (!res.ok) {
-          setStatus("error");
+        if (!response.ok) {
+          if ([401, 403, 404].includes(response.status)) {
+            setStatus("error");
+          } else {
+            scheduleRetry(copy.confirmingProvider);
+          }
           return;
         }
-        setTitle(
-          localizeEditorialOrderTitle(
-            {
-              title: data.data?.title || "",
-              productType: data.data?.productType,
-              productId: data.data?.productId,
-              product: data.data?.product,
-            },
-            locale
-          )
-        );
-        setAmount(data.data?.amount ?? null);
+        const payload = await response.json();
+
+        const data = payload.data;
+        setTitle(localizeEditorialOrderTitle({
+          title: data?.title || "",
+          productType: data?.productType,
+          productId: data?.productId,
+          product: data?.product,
+        }, locale));
+        setAmount(typeof data?.amount === "number" ? data.amount : null);
+        setFulfillment(data?.fulfillment || null);
+
         const paymentResultState = resolvePaymentResultState(
-          data.data?.status || "UNKNOWN",
-          Boolean(data.data?.deliveryPending)
+          data?.status || "UNKNOWN",
+          Boolean(data?.deliveryPending)
         );
         if (paymentResultState === "paid") {
           setStatus("paid");
@@ -84,36 +97,36 @@ function PaymentResultInner() {
           setHint("");
           return;
         }
-        if (Date.now() - started < 180_000) {
-          setStatus("pending");
-          setHint(
-            data.data?.deliveryPending
-              ? copy.deliveryPending
-              : copy.confirmingProvider
-          );
-          window.setTimeout(check, 2000);
-        } else {
-          setStatus("pending");
-          setHint(copy.delayed);
-        }
+        scheduleRetry(data?.deliveryPending ? copy.deliveryPending : copy.confirmingProvider);
       } catch {
-        if (!cancelled) setStatus("error");
+        scheduleRetry(copy.confirmingProvider);
       }
     };
 
-    check();
+    void check();
     return () => {
       cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [copy.confirmingProvider, copy.delayed, copy.deliveryPending, locale, orderNo, returnParams]);
 
-  useEffect(() => {
-    if (status !== "paid") return;
-    const timer = window.setTimeout(() => {
-      router.replace(dashboardOrdersUrl);
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [dashboardOrdersUrl, status, router]);
+  const copyValue = async (kind: "cardNo" | "cardSecret", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
+      setCopyError("");
+    } catch {
+      setCopyError(paymentCopy.copyFailed);
+    }
+  };
+
+  const fulfillmentMessage = fulfillment?.kind === "membership"
+    ? paymentCopy.membershipDelivered
+    : fulfillment?.kind === "article"
+      ? paymentCopy.articleDelivered
+      : fulfillment?.kind === "card" && !fulfillment.card
+        ? paymentCopy.cardDelivering
+        : null;
 
   return (
     <div className="payment-result-page editorial-payment-result">
@@ -122,7 +135,7 @@ function PaymentResultInner() {
           <>
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
             <h1>{copy.confirming}</h1>
-            <p>{interpolateMessage(messages.payment.orderNo, { orderNo })}</p>
+            <p>{interpolateMessage(paymentCopy.orderNo, { orderNo })}</p>
           </>
         ) : null}
 
@@ -131,13 +144,29 @@ function PaymentResultInner() {
             <CheckCircle2 size={40} style={{ color: "var(--teal)" }} />
             <h1>{copy.success}</h1>
             <p>{title}</p>
+            <p className="payment-result-order">{interpolateMessage(paymentCopy.orderNo, { orderNo })}</p>
             {amount != null ? <div className="payment-result-amount">¥{amount.toFixed(2)}</div> : null}
-            <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "8px 0 0" }}>
-              {copy.redirecting}
-            </p>
-            <Link href={dashboardOrdersUrl} className="payment-result-link">
-              {copy.viewOrders}
-            </Link>
+            {fulfillment?.card ? (
+              <div className="payment-result-delivery">
+                <div>
+                  <span>{paymentCopy.cardNumber}</span>
+                  <code>{fulfillment.card.cardNo}</code>
+                  <button type="button" onClick={() => void copyValue("cardNo", fulfillment.card!.cardNo)}>
+                    <Copy size={14} />{copied === "cardNo" ? paymentCopy.copied : paymentCopy.copy}
+                  </button>
+                </div>
+                <div>
+                  <span>{paymentCopy.cardSecret}</span>
+                  <code>{fulfillment.card.cardSecret}</code>
+                  <button type="button" onClick={() => void copyValue("cardSecret", fulfillment.card!.cardSecret)}>
+                    <Copy size={14} />{copied === "cardSecret" ? paymentCopy.copied : paymentCopy.copy}
+                  </button>
+                </div>
+              </div>
+            ) : fulfillmentMessage ? <p>{fulfillmentMessage}</p> : null}
+            <p className="payment-result-saved">{copy.redirecting}</p>
+            {copyError ? <p className="payment-result-copy-error" role="alert">{copyError}</p> : null}
+            <Link href={dashboardOrdersUrl} className="payment-result-link">{copy.viewOrders}</Link>
           </>
         ) : null}
 
@@ -146,7 +175,7 @@ function PaymentResultInner() {
             <Loader2 size={32} className="animate-spin" style={{ color: "var(--orange)" }} />
             <h1>{copy.processing}</h1>
             <p>{hint || copy.pendingFallback}</p>
-            <Link href={localizeOfficialPath("/", locale)} className="payment-result-link">{copy.home}</Link>
+            <Link href={dashboardOrdersUrl} className="payment-result-link">{copy.viewOrders}</Link>
           </>
         ) : null}
 
@@ -154,7 +183,7 @@ function PaymentResultInner() {
           <>
             <XCircle size={40} style={{ color: "var(--rose)" }} />
             <h1>{copy.queryFailed}</h1>
-            <Link href={localizeOfficialPath("/", locale)} className="payment-result-link">{copy.home}</Link>
+            <Link href={dashboardOrdersUrl} className="payment-result-link">{copy.viewOrders}</Link>
           </>
         ) : null}
       </div>
@@ -166,17 +195,9 @@ export default function PaymentResultPage() {
   const { locale } = useOfficialI18n();
   return (
     <EditorialShell locale={locale}>
-    <Suspense
-      fallback={
-        <div className="payment-result-page editorial-payment-result">
-          <div className="payment-result-card">
-            <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
-          </div>
-        </div>
-      }
-    >
-      <PaymentResultInner />
-    </Suspense>
+      <Suspense fallback={<div className="payment-result-page editorial-payment-result"><div className="payment-result-card"><Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} /></div></div>}>
+        <PaymentResultInner />
+      </Suspense>
     </EditorialShell>
   );
 }

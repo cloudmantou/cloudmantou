@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { createAlipayPayment } from "@/lib/payment-providers";
 import { detectPaymentScene, resolveAlipayMode, type PaymentScene } from "@/lib/payment-scene";
-import { ALIPAY_LAUNCH_CSP } from "@/config/csp";
+import {
+  buildAlipayLaunchContentSecurityPolicy,
+  resolveCspNonce,
+} from "@/config/csp";
+import { ensureOrderPayable, expireStalePendingOrders } from "@/lib/order-lifecycle";
+import { claimPaymentChannel } from "@/lib/payment-channel";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +37,8 @@ export async function GET(req: NextRequest) {
     return new NextResponse("支付宝未配置或未启用", { status: 400 });
   }
 
+  await expireStalePendingOrders({ userId: session.user.id });
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { payment: true },
@@ -45,29 +52,36 @@ export async function GET(req: NextRequest) {
     return new NextResponse("订单已支付", { status: 400 });
   }
 
+  const payable = await ensureOrderPayable(order);
+  if (payable.expired) {
+    return new NextResponse("订单已过期，请重新下单", { status: 400 });
+  }
+
   if (order.status !== "PENDING") {
     return new NextResponse("订单状态不可支付", { status: 400 });
   }
+  if (order.payment && order.payment.channel !== "ALIPAY") {
+    return new NextResponse("该订单已绑定微信支付，请使用原渠道完成支付或重新下单", {
+      status: 409,
+    });
+  }
 
   const scene = resolveScene(req, sceneParam);
+  const scriptNonce = resolveCspNonce(req.headers.get("x-nonce"));
   const amount = Number(order.amount);
   const notifyUrl = `${config.siteUrl}/api/payment/notify/alipay`;
   const returnUrl = `${config.siteUrl}/payment/result?orderNo=${encodeURIComponent(order.orderNo)}`;
 
-  await prisma.payment.upsert({
-    where: { orderId: order.id },
-    create: {
-      orderId: order.id,
-      channel: "ALIPAY",
-      amount: order.amount,
-      status: "WAITING",
-    },
-    update: {
-      channel: "ALIPAY",
-      amount: order.amount,
-      status: "WAITING",
-    },
+  const channelClaimed = await claimPaymentChannel({
+    orderId: order.id,
+    channel: "ALIPAY",
+    amount: order.amount,
   });
+  if (!channelClaimed) {
+    return new NextResponse("该订单已绑定微信支付，请使用原渠道完成支付或重新下单", {
+      status: 409,
+    });
+  }
 
   const launch = createAlipayPayment({
     config: config.alipay,
@@ -77,6 +91,7 @@ export async function GET(req: NextRequest) {
     amount,
     notifyUrl,
     returnUrl,
+    scriptNonce,
   });
 
   if (launch.type !== "form") {
@@ -87,8 +102,8 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Content-Security-Policy": ALIPAY_LAUNCH_CSP,
-      "Cache-Control": "no-store",
+      "Content-Security-Policy": buildAlipayLaunchContentSecurityPolicy(scriptNonce),
+      "Cache-Control": "private, no-store",
     },
   });
 }

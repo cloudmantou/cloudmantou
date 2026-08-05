@@ -1,6 +1,9 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { NextRequest } from "next/server";
-import { buildContentSecurityPolicy } from "@/config/csp";
+import {
+  buildAlipayLaunchContentSecurityPolicy,
+  buildContentSecurityPolicy,
+} from "@/config/csp";
 import { checkLoginRateLimit } from "@/lib/login-rate-limit";
 import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
 import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
@@ -10,6 +13,13 @@ function uniqueId(label: string): string {
 }
 
 describe("buildContentSecurityPolicy", () => {
+  it("支付宝启动页只允许同一 nonce 的自动提交脚本", () => {
+    const csp = buildAlipayLaunchContentSecurityPolicy("launch123");
+    expect(csp).toContain("script-src 'nonce-launch123'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).not.toContain("unsafe-inline");
+  });
+
   it("生产环境 script 使用 nonce 且不含 unsafe-inline", () => {
     const csp = buildContentSecurityPolicy("abc123", false);
     const scriptSrc = csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";

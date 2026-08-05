@@ -215,12 +215,23 @@ export async function POST(req: NextRequest) {
       return wechatNotifySuccess(version);
     }
 
-    await finalizePaidOrder({
+    const finalized = await finalizePaidOrder({
       order,
       channel: "WECHAT",
       tradeNo: transaction_id,
       rawCallback: rawBody,
     });
+    if (!finalized) {
+      console.warn("[WeChat] Payment identity rejected during finalization:", out_trade_no);
+      await recordPaymentNotifyAudit({
+        channel: "WECHAT",
+        orderNo: out_trade_no,
+        status: "FINALIZE_REJECTED",
+        reason: transaction_id,
+        rawBody,
+      });
+      return wechatNotifyFailure(version, "支付身份不匹配", 409);
+    }
 
     return wechatNotifySuccess(version);
   } catch (error) {

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { ensureCardDeliveryForPaidOrder } from "@/lib/card-delivery";
+import { buildOrderFulfillment } from "@/lib/order-fulfillment";
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,7 +54,8 @@ export async function GET(req: NextRequest) {
         })
       : null;
 
-    return ok({
+    const fulfillment = buildOrderFulfillment(order);
+    const response = ok({
       orderNo: order.orderNo,
       status: order.status,
       title: order.title,
@@ -74,11 +76,14 @@ export async function GET(req: NextRequest) {
             status: order.payment.status,
           }
         : null,
+      fulfillment,
       deliveryPending:
         order.status === "PAID" &&
         order.productType === "CARD_PACKAGE" &&
         !order.delivery,
     });
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   } catch (error) {
     console.error("[Payment Status Error]", error);
     return fail("查询支付状态失败", 50000, 500);

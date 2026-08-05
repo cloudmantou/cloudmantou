@@ -12,6 +12,8 @@ beforeAll(async () => {
 function createTransactionMock(options?: {
   currentOrderStatus?: string;
   currentPaymentStatus?: string | null;
+  currentPaymentChannel?: "ALIPAY" | "WECHAT";
+  currentTradeNo?: string | null;
   updateCount?: number;
 }) {
   const currentOrderStatus = options?.currentOrderStatus ?? "PENDING";
@@ -23,7 +25,14 @@ function createTransactionMock(options?: {
       findUnique: vi.fn(async () => ({
         status: currentOrderStatus,
         payment: currentPaymentStatus
-          ? { id: "payment-1", status: currentPaymentStatus }
+          ? {
+              id: "payment-1",
+              status: currentPaymentStatus,
+              channel: options?.currentPaymentChannel ?? "WECHAT",
+              tradeNo: options?.currentTradeNo === undefined
+                ? "wx-duplicate"
+                : options.currentTradeNo,
+            }
           : null,
       })),
       updateMany: vi.fn(async () => ({ count: updateCount })),
@@ -90,7 +99,12 @@ describe("finalizePaidOrderInTransaction", () => {
   });
 
   it("treats a concurrently paid order as an idempotent success without granting twice", async () => {
-    const tx = createTransactionMock({ currentOrderStatus: "PAID" });
+    const tx = createTransactionMock({
+      currentOrderStatus: "PAID",
+      currentPaymentStatus: "SUCCESS",
+      currentPaymentChannel: "WECHAT",
+      currentTradeNo: "wx-duplicate",
+    });
     const grantOrder = vi.fn(async () => undefined);
 
     const finalized = await finalizePaidOrderInTransaction(tx as never, {
@@ -107,8 +121,28 @@ describe("finalizePaidOrderInTransaction", () => {
     expect(grantOrder).not.toHaveBeenCalled();
   });
 
+  it("rejects an already-paid callback whose channel or trade number differs", async () => {
+    const tx = createTransactionMock({
+      currentOrderStatus: "PAID",
+      currentPaymentStatus: "SUCCESS",
+      currentPaymentChannel: "ALIPAY",
+      currentTradeNo: "alipay-original",
+    });
+
+    await expect(finalizePaidOrderInTransaction(tx as never, {
+      order: order as never,
+      channel: "WECHAT",
+      tradeNo: "wx-other",
+      rawCallback: "{}",
+    })).resolves.toBe(false);
+  });
+
   it("updates an existing pending payment through the same provider-neutral path", async () => {
-    const tx = createTransactionMock({ currentPaymentStatus: "WAITING" });
+    const tx = createTransactionMock({
+      currentPaymentStatus: "WAITING",
+      currentPaymentChannel: "ALIPAY",
+      currentTradeNo: null,
+    });
     const grantOrder = vi.fn(async () => undefined);
 
     const finalized = await finalizePaidOrderInTransaction(tx as never, {
@@ -125,6 +159,27 @@ describe("finalizePaidOrderInTransaction", () => {
       data: expect.objectContaining({ channel: "ALIPAY", status: "SUCCESS" }),
     });
     expect(tx.payment.create).not.toHaveBeenCalled();
+  });
+
+  it("does not finalize through a channel different from the atomic order claim", async () => {
+    const tx = createTransactionMock({
+      currentPaymentStatus: "WAITING",
+      currentPaymentChannel: "ALIPAY",
+      currentTradeNo: null,
+    });
+    const grantOrder = vi.fn(async () => undefined);
+
+    await expect(finalizePaidOrderInTransaction(tx as never, {
+      order: { ...order, payment: { id: "payment-1" } } as never,
+      channel: "WECHAT",
+      tradeNo: "wx-stale-session",
+      rawCallback: "{}",
+      grantOrder,
+    })).resolves.toBe(false);
+
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+    expect(tx.payment.update).not.toHaveBeenCalled();
+    expect(grantOrder).not.toHaveBeenCalled();
   });
 
   it("commits paid card-package orders without coupling the payment transaction to stock", async () => {

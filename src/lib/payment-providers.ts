@@ -13,6 +13,12 @@ export type PaymentLaunchResult =
   | { type: "redirect"; url: string; mode: string }
   | { type: "qrcode"; codeUrl: string; mode: string };
 
+const PAYMENT_PROVIDER_TIMEOUT_MS = 12_000;
+
+function paymentProviderSignal(): AbortSignal {
+  return AbortSignal.timeout(PAYMENT_PROVIDER_TIMEOUT_MS);
+}
+
 function formatAmountYuan(amount: number): string {
   return amount.toFixed(2);
 }
@@ -27,11 +33,15 @@ function signAlipay(params: Record<string, string>, privateKey: string): string 
   return signer.sign(privateKey, "base64");
 }
 
-function buildAlipayForm(gatewayUrl: string, params: Record<string, string>): string {
+function buildAlipayForm(
+  gatewayUrl: string,
+  params: Record<string, string>,
+  scriptNonce: string
+): string {
   const inputs = Object.entries(params)
     .map(([k, v]) => `<input type="hidden" name="${k}" value="${escapeHtml(v)}" />`)
     .join("");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>跳转支付宝</title></head><body><form id="alipay" method="post" action="${gatewayUrl}">${inputs}</form><script>document.getElementById('alipay').submit();</script></body></html>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>跳转支付宝</title></head><body><form id="alipay" method="post" action="${escapeHtml(gatewayUrl)}">${inputs}</form><script nonce="${escapeHtml(scriptNonce)}">document.getElementById('alipay').submit();</script></body></html>`;
 }
 
 function escapeHtml(value: string): string {
@@ -50,6 +60,7 @@ export function createAlipayPayment(input: {
   amount: number;
   notifyUrl: string;
   returnUrl: string;
+  scriptNonce: string;
 }): PaymentLaunchResult {
   const method = input.mode === "page" ? "alipay.trade.page.pay" : "alipay.trade.wap.pay";
   const productCode = input.mode === "page" ? "FAST_INSTANT_TRADE_PAY" : "QUICK_WAP_WAY";
@@ -80,18 +91,68 @@ export function createAlipayPayment(input: {
     : normalizePem(input.config.privateKey, "private");
   params.sign = signAlipay(params, privateKey);
 
-  const html = buildAlipayForm(gatewayUrl, params);
+  const html = buildAlipayForm(gatewayUrl, params, input.scriptNonce);
   return { type: "form", html, mode: input.mode === "page" ? "alipay_pc" : "alipay_h5" };
 }
 
 export type AlipayTradeQueryResult = {
   paid: boolean;
+  outTradeNo?: string;
   tradeNo?: string;
   totalAmount?: string;
   tradeStatus?: string;
   raw: string;
   message?: string;
 };
+
+function extractJsonObject(raw: string, key: string): string | null {
+  const marker = `"${key}"`;
+  const markerIndex = raw.indexOf(marker);
+  if (markerIndex < 0) return null;
+  if (raw.indexOf(marker, markerIndex + marker.length) >= 0) return null;
+  const colonIndex = raw.indexOf(":", markerIndex + marker.length);
+  const objectStart = raw.indexOf("{", colonIndex + 1);
+  if (colonIndex < 0 || objectStart < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = objectStart; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return raw.slice(objectStart, index + 1);
+    }
+  }
+  return null;
+}
+
+function verifyAlipayResponseSign(
+  signContent: string,
+  payload: Record<string, unknown>,
+  publicKey: string
+): boolean {
+  const signature = typeof payload.sign === "string" ? payload.sign : "";
+  if (!signature || !signContent) return false;
+  try {
+    const key = isPemEncoded(publicKey) ? publicKey : normalizePem(publicKey, "public");
+    const verifier = crypto.createVerify("RSA-SHA256");
+    verifier.update(signContent, "utf8");
+    return verifier.verify(key, signature, "base64");
+  } catch {
+    return false;
+  }
+}
 
 export async function queryAlipayTrade(input: {
   config: AlipayGatewayConfig;
@@ -118,6 +179,7 @@ export async function queryAlipayTrade(input: {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
     body: new URLSearchParams(params).toString(),
+    signal: paymentProviderSignal(),
   });
 
   const raw = await response.text();
@@ -128,19 +190,32 @@ export async function queryAlipayTrade(input: {
     return { paid: false, raw, message: "支付宝查单响应解析失败" };
   }
 
-  const tradeResponse = payload.alipay_trade_query_response as
-    | {
-        code?: string;
-        msg?: string;
-        sub_msg?: string;
-        trade_status?: string;
-        trade_no?: string;
-        total_amount?: string;
-      }
-    | undefined;
+  // Alipay signs the exact raw `*_response` JSON node, not a re-serialized object.
+  const signContent = extractJsonObject(raw, "alipay_trade_query_response");
+  if (!signContent) {
+    return { paid: false, raw, message: "支付宝查单响应节点缺失或重复" };
+  }
+  if (!verifyAlipayResponseSign(
+    signContent,
+    payload,
+    input.config.publicKey
+  )) {
+    return { paid: false, raw, message: "支付宝查单响应签名无效" };
+  }
 
-  if (!tradeResponse) {
-    return { paid: false, raw, message: "支付宝查单响应缺少 trade_query 节点" };
+  let tradeResponse: {
+    code?: string;
+    msg?: string;
+    sub_msg?: string;
+    trade_status?: string;
+    out_trade_no?: string;
+    trade_no?: string;
+    total_amount?: string;
+  };
+  try {
+    tradeResponse = JSON.parse(signContent) as typeof tradeResponse;
+  } catch {
+    return { paid: false, raw, message: "支付宝查单响应解析失败" };
   }
 
   if (tradeResponse.code !== "10000") {
@@ -156,8 +231,28 @@ export async function queryAlipayTrade(input: {
     tradeResponse.trade_status === "TRADE_SUCCESS" ||
     tradeResponse.trade_status === "TRADE_FINISHED";
 
+  if (paid && tradeResponse.out_trade_no !== input.orderNo) {
+    return {
+      paid: false,
+      outTradeNo: tradeResponse.out_trade_no,
+      tradeStatus: tradeResponse.trade_status,
+      raw,
+      message: "支付宝查单响应订单不匹配",
+    };
+  }
+  if (paid && (!tradeResponse.trade_no || !tradeResponse.total_amount)) {
+    return {
+      paid: false,
+      outTradeNo: tradeResponse.out_trade_no,
+      tradeStatus: tradeResponse.trade_status,
+      raw,
+      message: "支付宝查单响应缺少交易号或金额",
+    };
+  }
+
   return {
     paid,
+    outTradeNo: tradeResponse.out_trade_no,
     tradeNo: tradeResponse.trade_no,
     totalAmount: tradeResponse.total_amount,
     tradeStatus: tradeResponse.trade_status,
@@ -175,7 +270,7 @@ function signWechatV2(params: Record<string, string>, apiKey: string): string {
 
 function buildWechatXml(params: Record<string, string>): string {
   const body = Object.entries(params)
-    .map(([k, v]) => `<${k}><![CDATA[${v}]]></${k}>`)
+    .map(([k, v]) => `<${k}><![CDATA[${v.replace(/\]\]>/g, "]]]]><![CDATA[>")}]]></${k}>`)
     .join("");
   return `<xml>${body}</xml>`;
 }
@@ -188,6 +283,79 @@ function parseWechatXml(xml: string): Record<string, string> {
     result[match[1]] = (match[2] ?? match[3] ?? "").trim();
   }
   return result;
+}
+
+function verifyWechatQuerySign(data: Record<string, string>, apiKey: string): boolean {
+  const signature = data.sign?.trim().toUpperCase();
+  if (!signature) return false;
+  const expected = signWechatV2(data, apiKey);
+  const actualBuffer = Buffer.from(signature, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  return actualBuffer.length === expectedBuffer.length &&
+    crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+export type WechatTradeQueryResult = {
+  paid: boolean;
+  transactionId?: string;
+  totalFee?: number;
+  tradeState?: string;
+  raw: string;
+  message?: string;
+};
+
+/** WeChat Pay v2 active order query used when the asynchronous callback is delayed. */
+export async function queryWechatTrade(input: {
+  config: WechatGatewayConfig;
+  orderNo: string;
+}): Promise<WechatTradeQueryResult> {
+  const params: Record<string, string> = {
+    appid: input.config.appId,
+    mch_id: input.config.mchId,
+    nonce_str: crypto.randomBytes(16).toString("hex"),
+    out_trade_no: input.orderNo,
+  };
+  params.sign = signWechatV2(params, input.config.apiKey);
+
+  const response = await fetch("https://api.mch.weixin.qq.com/pay/orderquery", {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=utf-8" },
+    body: buildWechatXml(params),
+    signal: paymentProviderSignal(),
+  });
+  const raw = await response.text();
+  const data = parseWechatXml(raw);
+
+  if (data.return_code !== "SUCCESS" || data.result_code !== "SUCCESS") {
+    return {
+      paid: false,
+      raw,
+      tradeState: data.trade_state,
+      message: data.err_code_des || data.return_msg || "微信查单失败",
+    };
+  }
+  if (!verifyWechatQuerySign(data, input.config.apiKey)) {
+    return { paid: false, raw, message: "微信查单响应签名无效" };
+  }
+  if (!data.nonce_str) {
+    return { paid: false, raw, message: "微信查单响应缺少随机串" };
+  }
+  if (
+    data.appid !== input.config.appId ||
+    data.mch_id !== input.config.mchId ||
+    data.out_trade_no !== input.orderNo
+  ) {
+    return { paid: false, raw, message: "微信查单响应订单或商户不匹配" };
+  }
+
+  const totalFee = Number.parseInt(data.total_fee || "", 10);
+  return {
+    paid: data.trade_state === "SUCCESS",
+    transactionId: data.transaction_id || undefined,
+    totalFee: Number.isFinite(totalFee) ? totalFee : undefined,
+    tradeState: data.trade_state,
+    raw,
+  };
 }
 
 export async function createWechatPayment(input: {
@@ -232,6 +400,7 @@ export async function createWechatPayment(input: {
     method: "POST",
     headers: { "Content-Type": "text/xml; charset=utf-8" },
     body: buildWechatXml(params),
+    signal: paymentProviderSignal(),
   });
 
   const text = await response.text();
@@ -240,6 +409,15 @@ export async function createWechatPayment(input: {
   if (data.return_code !== "SUCCESS" || data.result_code !== "SUCCESS") {
     const message = data.err_code_des || data.return_msg || "微信下单失败";
     throw new Error(message);
+  }
+  if (!verifyWechatQuerySign(data, input.config.apiKey)) {
+    throw new Error("微信下单响应签名无效");
+  }
+  if (!data.nonce_str) {
+    throw new Error("微信下单响应缺少随机串");
+  }
+  if (data.appid !== input.config.appId || data.mch_id !== input.config.mchId) {
+    throw new Error("微信下单响应商户不匹配");
   }
 
   if (input.mode === "native") {

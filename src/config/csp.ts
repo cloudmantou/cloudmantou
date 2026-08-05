@@ -8,15 +8,24 @@ export const ALIPAY_FORM_ACTION_ORIGINS = [
 
 export const ALIPAY_FORM_ACTION_CSP = ALIPAY_FORM_ACTION_ORIGINS.join(" ");
 
-export const ALIPAY_LAUNCH_CSP = [
-  "default-src 'none'",
-  "script-src 'unsafe-inline'",
-  `form-action ${ALIPAY_FORM_ACTION_CSP}`,
-  "base-uri 'none'",
-].join("; ");
+export function buildAlipayLaunchContentSecurityPolicy(nonce: string): string {
+  return [
+    "default-src 'none'",
+    `script-src 'nonce-${nonce}'`,
+    `form-action ${ALIPAY_FORM_ACTION_CSP}`,
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+  ].join("; ");
+}
 
 export function generateCspNonce(): string {
   return btoa(crypto.randomUUID());
+}
+
+/** Only middleware-generated base64/base64url tokens may reach a CSP header. */
+export function resolveCspNonce(value: string | null): string {
+  const nonce = value?.trim() || "";
+  return /^[A-Za-z0-9+/_=-]{12,256}$/.test(nonce) ? nonce : generateCspNonce();
 }
 
 export function usesScriptNonce(dev = process.env.NODE_ENV === "development"): boolean {

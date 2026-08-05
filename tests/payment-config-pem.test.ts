@@ -35,6 +35,7 @@ describe("Alipay PKCS#8 private key", () => {
       amount: 0.01,
       notifyUrl: "http://localhost:3000/api/payment/notify/alipay",
       returnUrl: "http://localhost:3000/payment/result",
+      scriptNonce: "pem-test-nonce",
     });
 
     expect(result.type).toBe("form");

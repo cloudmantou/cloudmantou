@@ -186,9 +186,6 @@ export default auth(async (req) => {
         nonce
       );
     }
-    if (isAdmin) {
-      return withCsp(req, NextResponse.redirect(new URL("/admin", req.url)), nonce);
-    }
   }
 
   if (

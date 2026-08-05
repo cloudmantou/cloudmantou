@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import crypto from "crypto";
-import { decryptCardSecret } from "@/lib/card-secret-storage";
+import { buildOrderFulfillment } from "@/lib/order-fulfillment";
 import {
   isMembershipProductAvailable,
   type MembershipProductType,
@@ -22,52 +22,6 @@ const createOrderSchema = z.object({
   productType: z.enum(["VIP_MONTH", "VIP_QUARTER", "VIP_YEAR", "PAID_POST", "CARD_PACKAGE"]),
   productId: z.string().optional(),
 });
-
-function buildFulfillment(order: {
-  productType: string;
-  status: string;
-  delivery: { cardNo: string; cardSecretEnc: string; status: string } | null;
-}) {
-  if (order.status !== "PAID") {
-    return { kind: "none" as const, message: null, card: null };
-  }
-
-  if (order.productType === "CARD_PACKAGE") {
-    if (order.delivery) {
-      return {
-        kind: "card" as const,
-        message: "卡密已发放，请妥善保存",
-        card: {
-          cardNo: order.delivery.cardNo,
-          cardSecret: decryptCardSecret(order.delivery.cardSecretEnc),
-        },
-      };
-    }
-    return { kind: "card" as const, message: "卡密发放中，请稍后刷新", card: null };
-  }
-
-  if (
-    order.productType === "VIP_MONTH" ||
-    order.productType === "VIP_QUARTER" ||
-    order.productType === "VIP_YEAR"
-  ) {
-    return {
-      kind: "membership" as const,
-      message: "会员已自动开通，无需卡密",
-      card: null,
-    };
-  }
-
-  if (order.productType === "PAID_POST") {
-    return {
-      kind: "article" as const,
-      message: "付费文章已解锁",
-      card: null,
-    };
-  }
-
-  return { kind: "none" as const, message: null, card: null };
-}
 
 function generateOrderNo(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -106,9 +60,9 @@ export async function GET(req: NextRequest) {
       prisma.order.count({ where }),
     ]);
 
-    return ok(
+    const response = ok(
       orders.map((o) => {
-        const fulfillment = buildFulfillment(o);
+        const fulfillment = buildOrderFulfillment(o);
         return {
           id: o.id,
           orderNo: o.orderNo,
@@ -125,6 +79,8 @@ export async function GET(req: NextRequest) {
       }),
       { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     );
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
   } catch (error) {
     console.error("[Orders List Error]", error);
     return fail("获取订单列表失败", 50000, 500);

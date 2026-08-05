@@ -644,6 +644,12 @@
 .editorial-checkout .payment-channel-btn small { color: #59656e; }
 .editorial-checkout .payment-checkout-qr img { border: 3px solid #101820; border-radius: 0; box-shadow: 6px 6px 0 #ffd23f; }
 .editorial-checkout .payment-checkout-error { color: #c52e22; font-weight: 800; }
+.editorial-checkout .payment-checkout-card-delivery,
+.editorial-checkout .payment-checkout-receipt dl { border: 2px solid #101820; border-radius: 0; background: #f6f3ea; padding: 14px; }
+.editorial-checkout .payment-checkout-card-delivery button,
+.editorial-checkout .payment-checkout-receipt-actions a,
+.editorial-checkout .payment-checkout-receipt-actions button { border: 2px solid #101820; border-radius: 0; background: #fffdf6; box-shadow: 2px 2px 0 #101820; }
+.editorial-checkout .payment-checkout-receipt-actions a:first-child { color: #fff; background: #145ee8; }
 .editorial-product-detail .product-detail-modal { border: 3px solid #101820; border-radius: 0; background: #fffdf6; box-shadow: 12px 12px 0 #145ee8; }
 .editorial-product-detail .product-detail-cover { border-bottom: 3px solid #101820; }
 .editorial-product-detail .product-badge { border: 2px solid #101820; border-radius: 0; color: #101820; background: #ffd23f; box-shadow: 3px 3px 0 #101820; font-weight: 900; }

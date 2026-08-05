@@ -157,6 +157,35 @@ describe("WeChat payment notifications", () => {
     });
   });
 
+  it("returns a failure and records an audit when payment identity finalization is rejected", async () => {
+    mocks.decryptWechatV3Resource.mockReturnValue({
+      appid: "wx-expected",
+      mchid: "mch-expected",
+      out_trade_no: "ORDER-PENDING-1",
+      transaction_id: "TX-PENDING-1",
+      trade_state: "SUCCESS",
+      amount: { total: 100 },
+    });
+    mocks.orderFindUnique.mockResolvedValue({
+      id: "order-pending",
+      orderNo: "ORDER-PENDING-1",
+      status: "PENDING",
+      productType: "VIP_MONTH",
+      amount: { toString: () => "1.00" },
+      payment: { id: "payment-id", channel: "ALIPAY" },
+    });
+    mocks.finalizePaidOrder.mockResolvedValue(false);
+
+    const response = await POST(v3Request({ resource: { ciphertext: "encrypted" } }));
+
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(mocks.recordPaymentNotifyAudit).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "WECHAT",
+      orderNo: "ORDER-PENDING-1",
+      status: "FINALIZE_REJECTED",
+    }));
+  });
+
   it("returns a non-2xx V3 response when the signed body is invalid", async () => {
     const request = new NextRequest("https://example.com/api/payment/notify/wechat", {
       method: "POST",

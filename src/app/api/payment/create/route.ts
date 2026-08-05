@@ -7,6 +7,7 @@ import { getPaymentRuntimeConfig } from "@/lib/payment-config";
 import { createWechatPayment } from "@/lib/payment-providers";
 import { ensureOrderPayable, expireStalePendingOrders } from "@/lib/order-lifecycle";
 import { getClientIP } from "@/lib/rate-limit";
+import { claimPaymentChannel } from "@/lib/payment-channel";
 import {
   detectPaymentScene,
   resolveAlipayMode,
@@ -78,20 +79,14 @@ export async function POST(req: NextRequest) {
 
     // 测试模式：无论真实网关是否配置，一律走模拟支付
     if (config.testMode) {
-      await prisma.payment.upsert({
-        where: { orderId: order.id },
-        create: {
-          orderId: order.id,
-          channel,
-          amount: order.amount,
-          status: "WAITING",
-        },
-        update: {
-          channel,
-          amount: order.amount,
-          status: "WAITING",
-        },
+      const channelClaimed = await claimPaymentChannel({
+        orderId: order.id,
+        channel,
+        amount: order.amount,
       });
+      if (!channelClaimed) {
+        return fail("该订单已绑定其他支付渠道，请使用原渠道完成支付或重新下单", 40900, 409);
+      }
       return ok({
         type: "test",
         mode: channel === "ALIPAY" ? "alipay_test" : "wechat_test",
@@ -109,20 +104,14 @@ export async function POST(req: NextRequest) {
         return fail("支付宝未配置或未启用", 40000, 400);
       }
       const mode = resolveAlipayMode(scene);
-      await prisma.payment.upsert({
-        where: { orderId: order.id },
-        create: {
-          orderId: order.id,
-          channel,
-          amount: order.amount,
-          status: "WAITING",
-        },
-        update: {
-          channel,
-          amount: order.amount,
-          status: "WAITING",
-        },
+      const channelClaimed = await claimPaymentChannel({
+        orderId: order.id,
+        channel,
+        amount: order.amount,
       });
+      if (!channelClaimed) {
+        return fail("该订单已绑定其他支付渠道，请使用原渠道完成支付或重新下单", 40900, 409);
+      }
 
       return ok({
         type: "navigate",
@@ -141,6 +130,14 @@ export async function POST(req: NextRequest) {
       if (!mode) {
         return fail("微信内支付需 JSAPI（openid），当前请使用支付宝或在外部浏览器打开", 40000, 400);
       }
+      const channelClaimed = await claimPaymentChannel({
+        orderId: order.id,
+        channel,
+        amount: order.amount,
+      });
+      if (!channelClaimed) {
+        return fail("该订单已绑定其他支付渠道，请使用原渠道完成支付或重新下单", 40900, 409);
+      }
       launch = await createWechatPayment({
         config: config.wechat,
         mode,
@@ -152,21 +149,6 @@ export async function POST(req: NextRequest) {
         returnUrl: mode === "mweb" ? returnUrl : undefined,
       });
     }
-
-    await prisma.payment.upsert({
-      where: { orderId: order.id },
-      create: {
-        orderId: order.id,
-        channel,
-        amount: order.amount,
-        status: "WAITING",
-      },
-      update: {
-        channel,
-        amount: order.amount,
-        status: "WAITING",
-      },
-    });
 
     return ok({
       ...launch,

@@ -67,8 +67,7 @@ const nextConfig = {
         ],
       },
       {
-        // 支付跳转页不叠加全站 CSP，由 route handler 返回独立策略
-        source: "/((?!payment/alipay-launch).*)",
+        source: "/:path*",
         headers: securityHeaders,
       },
     ];

@@ -158,11 +158,22 @@ export async function POST(req: NextRequest) {
       return new Response("success", { status: 200 });
     }
 
-    await finalizeAlipayOrder({
+    const finalized = await finalizeAlipayOrder({
       order,
       tradeNo: trade_no,
       rawCallback: rawBody,
     });
+    if (!finalized) {
+      console.warn("[Alipay] Payment identity rejected during finalization:", out_trade_no);
+      await recordPaymentNotifyAudit({
+        channel: "ALIPAY",
+        orderNo: out_trade_no,
+        status: "FINALIZE_REJECTED",
+        reason: trade_no,
+        rawBody,
+      });
+      return new Response("failure", { status: 200 });
+    }
 
     return new Response("success", { status: 200 });
   } catch (error) {

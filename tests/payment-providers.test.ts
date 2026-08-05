@@ -18,6 +18,7 @@ describe("payment providers", () => {
       amount: 29,
       notifyUrl: "https://example.com/api/payment/notify/alipay",
       returnUrl: "https://example.com/payment/result?orderNo=ORD202601010001",
+      scriptNonce: "test-launch-nonce",
     });
 
     expect(result.type).toBe("form");
@@ -25,6 +26,8 @@ describe("payment providers", () => {
       expect(result.html).toContain("alipay.trade.page.pay");
       expect(result.html).toContain('name="sign"');
       expect(result.html).toContain("FAST_INSTANT_TRADE_PAY");
+      expect(result.html).toContain('<script nonce="test-launch-nonce">');
+      expect(result.html).not.toContain("<script>");
       expect(result.mode).toBe("alipay_pc");
     }
   });
@@ -45,6 +48,7 @@ describe("payment providers", () => {
       amount: 69,
       notifyUrl: "https://example.com/api/payment/notify/alipay",
       returnUrl: "https://example.com/payment/result?orderNo=ORD202601010002",
+      scriptNonce: "test-wap-nonce",
     });
 
     expect(result.type).toBe("form");

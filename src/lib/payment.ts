@@ -20,6 +20,13 @@ export function isValidAlipayTradeNo(tradeNo: string): boolean {
   return ALIPAY_TRADE_NO_RE.test(tradeNo.trim());
 }
 
+/** WeChat transaction IDs are provider-issued alphanumeric identifiers. */
+export const WECHAT_TRADE_NO_RE = /^[0-9A-Za-z]{16,64}$/;
+
+export function isValidWechatTradeNo(tradeNo: string): boolean {
+  return WECHAT_TRADE_NO_RE.test(tradeNo.trim());
+}
+
 // ===== 支付宝签名验证 =====
 
 export function verifyAlipaySign(
@@ -232,14 +239,23 @@ export async function finalizePaidOrderInTransaction(
     where: { id: order.id },
     select: {
       status: true,
-      payment: { select: { id: true, status: true } },
+      payment: { select: { id: true, status: true, channel: true, tradeNo: true } },
     },
   });
 
   if (!current) {
     return false;
   }
-  if (current.status === "PAID") return true;
+  if (current.status === "PAID") {
+    return current.payment?.channel === channel && current.payment.tradeNo === tradeNo;
+  }
+  if (
+    current.payment &&
+    (current.payment.channel !== channel ||
+      (current.payment.tradeNo != null && current.payment.tradeNo !== tradeNo))
+  ) {
+    return false;
+  }
 
   assertOrderTransition(current.status, orderStatus);
 
@@ -282,11 +298,9 @@ export async function finalizePaidOrder(input: FinalizePaidOrderInput): Promise<
     return false;
   }
 
-  const finalized = alreadyPaid
-    ? false
-    : await prisma.$transaction((tx) => finalizePaidOrderInTransaction(tx, input));
+  const finalized = await prisma.$transaction((tx) => finalizePaidOrderInTransaction(tx, input));
 
-  if (input.order.productType === "CARD_PACKAGE") {
+  if (finalized && input.order.productType === "CARD_PACKAGE") {
     try {
       await ensureCardDeliveryForPaidOrder({ ...input.order, status: "PAID" });
     } catch (error) {
@@ -298,7 +312,7 @@ export async function finalizePaidOrder(input: FinalizePaidOrderInput): Promise<
     }
   }
 
-  return alreadyPaid || finalized;
+  return finalized;
 }
 
 /** @deprecated 新代码应直接调用 finalizePaidOrder。 */
