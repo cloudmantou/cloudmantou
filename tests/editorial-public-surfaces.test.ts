@@ -15,6 +15,24 @@ function source(path: string) {
 }
 
 describe("editorial public-surface closure", () => {
+  it("uses the black-hole icon for browser metadata and public brand marks", () => {
+    const editorialHeader = source("src/components/editorial/EditorialHeader.tsx");
+    const editorialFooter = source("src/components/editorial/EditorialFooter.tsx");
+    const officialNavbar = source("src/components/official/OfficialNavbar.tsx");
+    const officialFooter = source("src/components/official/OfficialFooter.tsx");
+
+    for (const component of [editorialHeader, editorialFooter, officialNavbar, officialFooter]) {
+      expect(component).toContain("/brand/mantou-black-hole-icon.png");
+    }
+    for (const asset of [
+      "public/brand/mantou-black-hole-icon.png",
+      "src/app/icon.png",
+      "src/app/apple-icon.png",
+    ]) {
+      expect(existsSync(join(root, asset)), `expected ${asset} to exist`).toBe(true);
+    }
+  });
+
   it("uses semantic article elements for archive and home cards", () => {
     const card = source("src/components/editorial/EditorialArticleCard.tsx");
     expect(card).toMatch(/<article className="editorial-article-item">/);

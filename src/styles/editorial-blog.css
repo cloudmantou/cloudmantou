@@ -41,9 +41,11 @@
   color: #fff;
   background: var(--ed-ink);
   box-shadow: 5px 5px 0 var(--ed-blue);
+  overflow: hidden;
   font-size: 1.05rem;
   font-weight: 900;
 }
+.editorial-brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .editorial-brand > span:nth-child(2) { display: flex; align-items: baseline; gap: 7px; }
 .editorial-brand strong { font-size: 1.25rem; font-weight: 950; letter-spacing: -.04em; }
 .editorial-brand small { font-size: .86rem; font-weight: 800; }

@@ -18,7 +18,7 @@ export function OfficialFooter() {
         <div>
           <Link href={href("/")} className="official-brand" style={{ marginBottom: 12 }}>
             <span className="official-brand-mark" aria-hidden="true">
-              <Image src="/brand/mantou-assistant-icon.png" alt="" width={34} height={34} />
+              <Image src="/brand/mantou-black-hole-icon.png" alt="" width={34} height={34} />
             </span>
             <span>
               <div>{messages.site.name}</div>

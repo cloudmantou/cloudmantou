@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -140,7 +141,15 @@ export function EditorialHeader({ locale }: { locale: OfficialLocale }) {
     <header className="editorial-header">
       <div className="editorial-container editorial-header-inner">
         <Link className="editorial-brand" href={localizeOfficialPath("/", locale)} onClick={() => closeMenu(false)}>
-          <span className="editorial-brand-mark" aria-hidden="true">馒</span>
+          <span className="editorial-brand-mark" aria-hidden="true">
+            <Image
+              src="/brand/mantou-black-hole-icon.png"
+              alt=""
+              width={48}
+              height={48}
+              priority
+            />
+          </span>
           <span><strong>{copy.brand.name}</strong><small>/ {copy.brand.alternateName}</small></span>
           <em>{copy.brand.subtitle}</em>
         </Link>

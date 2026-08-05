@@ -28,7 +28,7 @@ export function OfficialNavbar() {
       <div className="official-nav-inner">
         <Link href={localizeOfficialPath("/", locale)} className="official-brand" onClick={() => setOpen(false)}>
           <span className="official-brand-mark" aria-hidden="true">
-            <Image src="/brand/mantou-assistant-icon.png" alt="" width={34} height={34} priority />
+            <Image src="/brand/mantou-black-hole-icon.png" alt="" width={34} height={34} priority />
           </span>
           <span>
             <div>{messages.site.name}</div>

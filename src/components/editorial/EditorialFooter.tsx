@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { OfficialLocale } from "@/i18n/official";
 import { localizeOfficialPath } from "@/i18n/official";
@@ -13,7 +14,14 @@ export function EditorialFooter({ locale }: { locale: OfficialLocale }) {
     <footer className="editorial-footer">
       <div className="editorial-container editorial-footer-inner">
         <div className="editorial-footer-brand">
-          <span className="editorial-brand-mark" aria-hidden="true">馒</span>
+          <span className="editorial-brand-mark" aria-hidden="true">
+            <Image
+              src="/brand/mantou-black-hole-icon.png"
+              alt=""
+              width={48}
+              height={48}
+            />
+          </span>
           <span><strong>{copy.brand.name}</strong><small>{copy.brand.subtitle}</small></span>
         </div>
         <nav aria-label={locale === "en" ? "Editorial navigation" : "编辑站点导航"}>
