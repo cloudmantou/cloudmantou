@@ -3,12 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   generateText: vi.fn(),
   outputObject: vi.fn((options: unknown) => ({ kind: "object", options })),
+  isNoObjectGeneratedError: vi.fn((error: unknown) => (
+    error instanceof Error && error.name === "AI_NoObjectGeneratedError"
+  )),
+  isApiCallError: vi.fn((error: unknown) => (
+    error instanceof Error && error.name === "AI_APICallError"
+  )),
+  isUnsupportedFunctionalityError: vi.fn((error: unknown) => (
+    error instanceof Error && error.name === "AI_UnsupportedFunctionalityError"
+  )),
   getAiTextModel: vi.fn(),
 }));
 
 vi.mock("ai", () => ({
   generateText: mocks.generateText,
   Output: { object: mocks.outputObject },
+  NoObjectGeneratedError: { isInstance: mocks.isNoObjectGeneratedError },
+  APICallError: { isInstance: mocks.isApiCallError },
+  UnsupportedFunctionalityError: { isInstance: mocks.isUnsupportedFunctionalityError },
 }));
 
 vi.mock("@/lib/ai/provider", () => ({
@@ -18,16 +30,19 @@ vi.mock("@/lib/ai/provider", () => ({
 import {
   buildEditorialPrompt,
   generateEditorialSuggestion,
+  parseAiJsonObject,
 } from "@/lib/ai/editor-service";
 
 describe("editorial AI service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.generateText.mockReset();
     mocks.getAiTextModel.mockReturnValue({
       model: "model-fixture",
       config: {
         providerName: "fixture-provider",
         textModel: "fixture-model",
+        supportsStructuredOutputs: true,
         requestTimeoutMs: 120_000,
       },
     });
@@ -226,5 +241,217 @@ describe("editorial AI service", () => {
         locale: "auto",
       }),
     ).rejects.toMatchObject({ code: "AI_INVALID_OUTPUT" });
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
+  });
+
+  it("extracts JSON objects from fenced model text", () => {
+    expect(parseAiJsonObject('```json\n{"language":"zh-CN"}\n```'))
+      .toEqual({ language: "zh-CN" });
+    expect(parseAiJsonObject('结果如下：\n{"language":"en-US"}\n完成'))
+      .toEqual({ language: "en-US" });
+  });
+
+  it("falls back to plain JSON when native structured output cannot be parsed", async () => {
+    const nativeError = new Error("native output was not valid JSON");
+    nativeError.name = "AI_NoObjectGeneratedError";
+    mocks.generateText
+      .mockRejectedValueOnce(nativeError)
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          language: "zh-CN",
+          titles: Array.from({ length: 5 }, (_, index) => ({
+            title: `降级标题 ${index + 1}`,
+            reason: `理由 ${index + 1}`,
+          })),
+        }),
+        usage: { totalTokens: 240 },
+      });
+
+    const result = await generateEditorialSuggestion({
+      task: "title",
+      title: "应用降级",
+      excerpt: "",
+      content: "这是一段用于验证结构化输出降级路径的文章正文。",
+      locale: "zh-CN",
+    });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
+    expect(mocks.generateText.mock.calls[0]?.[0]).toHaveProperty("output");
+    expect(mocks.generateText.mock.calls[1]?.[0]).not.toHaveProperty("output");
+    expect(mocks.generateText.mock.calls[1]?.[0].prompt).toContain("只输出一个 JSON 对象");
+    expect(result).toMatchObject({
+      task: "title",
+      result: { titles: expect.arrayContaining([expect.objectContaining({ title: "降级标题 1" })]) },
+    });
+  });
+
+  it("falls back when the provider disables the structured-output feature", async () => {
+    const unsupportedError = Object.assign(new Error("structured output feature is disabled"), {
+      name: "AI_APICallError",
+      statusCode: 400,
+      responseBody: '{"error":{"message":"Feature is disabled for tools"}}',
+    });
+    mocks.generateText
+      .mockRejectedValueOnce(unsupportedError)
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          language: "zh-CN",
+          titles: Array.from({ length: 5 }, (_, index) => ({
+            title: `兼容标题 ${index + 1}`,
+            reason: `理由 ${index + 1}`,
+          })),
+        }),
+        usage: { totalTokens: 260 },
+      });
+
+    const result = await generateEditorialSuggestion({
+      task: "title",
+      title: "结构化兼容",
+      excerpt: "",
+      content: "这是一段用于验证上游禁用结构化输出时兼容模式的文章正文。",
+      locale: "zh-CN",
+    });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
+    expect(mocks.generateText.mock.calls[1]?.[0]).not.toHaveProperty("output");
+    expect(result).toMatchObject({
+      task: "title",
+      result: { titles: expect.arrayContaining([expect.objectContaining({ title: "兼容标题 1" })]) },
+    });
+  });
+
+  it("does not hide authentication failures behind JSON compatibility mode", async () => {
+    const authenticationError = Object.assign(new Error("invalid api key"), {
+      name: "AI_APICallError",
+      statusCode: 401,
+      responseBody: '{"error":{"message":"Unauthorized"}}',
+    });
+    mocks.generateText.mockRejectedValue(authenticationError);
+
+    await expect(generateEditorialSuggestion({
+      task: "title",
+      title: "认证失败",
+      excerpt: "",
+      content: "这是一段用于验证认证失败不会触发兼容重试的文章正文。",
+      locale: "zh-CN",
+    })).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry unrelated unsupported functionality errors", async () => {
+    const unsupportedTemperature = Object.assign(new Error("temperature is not supported"), {
+      name: "AI_UnsupportedFunctionalityError",
+      functionality: "temperature",
+    });
+    mocks.generateText.mockRejectedValue(unsupportedTemperature);
+
+    await expect(generateEditorialSuggestion({
+      task: "title",
+      title: "能力错误",
+      excerpt: "",
+      content: "这是一段用于验证非结构化能力错误不会触发兼容重试的文章正文。",
+      locale: "zh-CN",
+    })).rejects.toMatchObject({ code: "AI_GENERATION_FAILED" });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses plain JSON directly when native structured outputs are disabled", async () => {
+    mocks.getAiTextModel.mockReturnValue({
+      model: "model-fixture",
+      config: {
+        providerName: "fixture-provider",
+        textModel: "fixture-model",
+        supportsStructuredOutputs: false,
+        requestTimeoutMs: 120_000,
+      },
+    });
+    mocks.generateText.mockResolvedValue({
+      text: JSON.stringify({
+        language: "en-US",
+        excerpt: "A concise summary.",
+        keyPoints: ["One point"],
+        keywords: ["testing"],
+      }),
+      usage: { totalTokens: 120 },
+    });
+
+    const result = await generateEditorialSuggestion({
+      task: "summary",
+      title: "Fallback",
+      excerpt: "",
+      content: "This article body is long enough to test the plain JSON generation path.",
+      locale: "en-US",
+    });
+
+    expect(mocks.outputObject).not.toHaveBeenCalled();
+    expect(mocks.generateText.mock.calls[0]?.[0]).not.toHaveProperty("output");
+    expect(result).toMatchObject({ task: "summary", result: { excerpt: "A concise summary." } });
+  });
+
+  it("does not retry valid JSON that fails the result schema", async () => {
+    mocks.getAiTextModel.mockReturnValue({
+      model: "model-fixture",
+      config: {
+        providerName: "fixture-provider",
+        textModel: "fixture-model",
+        supportsStructuredOutputs: false,
+        requestTimeoutMs: 120_000,
+      },
+    });
+    mocks.generateText.mockResolvedValue({
+      text: JSON.stringify({
+        language: "en-US",
+        excerpt: "A concise summary.",
+        keyPoints: [],
+        keywords: ["testing"],
+      }),
+      usage: { totalTokens: 120 },
+    });
+
+    await expect(generateEditorialSuggestion({
+      task: "summary",
+      title: "Schema failure",
+      excerpt: "",
+      content: "This article body validates that schema failures are not retried.",
+      locale: "en-US",
+    })).rejects.toMatchObject({ code: "AI_INVALID_OUTPUT" });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries malformed JSON once when structured outputs are disabled", async () => {
+    mocks.getAiTextModel.mockReturnValue({
+      model: "model-fixture",
+      config: {
+        providerName: "fixture-provider",
+        textModel: "fixture-model",
+        supportsStructuredOutputs: false,
+        requestTimeoutMs: 120_000,
+      },
+    });
+    mocks.generateText
+      .mockResolvedValueOnce({ text: "not-json", usage: {} })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          language: "en-US",
+          excerpt: "Recovered summary.",
+          keyPoints: ["One point"],
+          keywords: ["testing"],
+        }),
+        usage: { totalTokens: 180 },
+      });
+
+    const result = await generateEditorialSuggestion({
+      task: "summary",
+      title: "Malformed JSON retry",
+      excerpt: "",
+      content: "This article body validates a single retry for malformed JSON.",
+      locale: "en-US",
+    });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ task: "summary", result: { excerpt: "Recovered summary." } });
   });
 });

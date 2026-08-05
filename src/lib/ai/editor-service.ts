@@ -1,4 +1,11 @@
-import { generateText, Output } from "ai";
+import {
+  APICallError,
+  generateText,
+  NoObjectGeneratedError,
+  Output,
+  UnsupportedFunctionalityError,
+} from "ai";
+import type { ZodType } from "zod";
 import { AiConfigurationError } from "@/lib/ai/config";
 import {
   type EditorialAiInput,
@@ -23,6 +30,60 @@ export class AiGenerationError extends Error {
     super(message);
     this.name = "AiGenerationError";
   }
+}
+
+const EDITORIAL_JSON_FORMATS: Record<EditorialAiInput["task"], string> = {
+  title: '{"language":"zh-CN 或 en-US","titles":[{"title":"标题","reason":"简短理由"}]}，titles 必须正好 5 项',
+  summary: '{"language":"zh-CN 或 en-US","excerpt":"摘要","keyPoints":["要点"],"keywords":["关键词"]}',
+  metadata: '{"language":"zh-CN 或 en-US","seoTitle":"SEO 标题","seoDescription":"SEO 描述","keywords":["关键词"],"focusKeyphrase":"核心短语","socialTitle":"社交标题","socialDescription":"社交描述","searchIntent":"搜索意图"}',
+  optimize: '{"language":"zh-CN 或 en-US","optimizedContent":"完整 Markdown 正文，换行必须使用 JSON 转义","focusKeyphrase":"核心短语","supportingKeywords":["相关词"],"changes":["修改说明"]}',
+};
+
+const STRUCTURED_OUTPUT_COMPATIBILITY_ERROR =
+  /feature is disabled|unsupported|structured|schema|response[_ -]?format|tool[_ -]?choice|tool use|tools/i;
+const STRUCTURED_OUTPUT_FUNCTIONALITY =
+  /structured output|json schema|json mode|response[_ -]?format|object (?:generation|output|mode)|tool (?:use|choice)|tools/i;
+
+export function shouldFallbackFromStructuredError(error: unknown): boolean {
+  if (NoObjectGeneratedError.isInstance(error)) return true;
+  if (UnsupportedFunctionalityError.isInstance(error)) {
+    return STRUCTURED_OUTPUT_FUNCTIONALITY.test(error.functionality);
+  }
+  if (!APICallError.isInstance(error)) return false;
+  if (error.statusCode !== 400 && error.statusCode !== 422) return false;
+
+  const detail = [error.message, error.responseBody]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return STRUCTURED_OUTPUT_COMPATIBILITY_ERROR.test(detail);
+}
+
+export function parseAiJsonObject(text: string): unknown {
+  const withoutFence = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    return JSON.parse(withoutFence);
+  } catch {
+    const firstBrace = withoutFence.indexOf("{");
+    const lastBrace = withoutFence.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) throw new Error("AI_JSON_OBJECT_NOT_FOUND");
+    return JSON.parse(withoutFence.slice(firstBrace, lastBrace + 1));
+  }
+}
+
+function buildPlainJsonPrompt(
+  prompt: string,
+  task: EditorialAiInput["task"],
+): string {
+  return [
+    prompt,
+    "结构化输出兼容模式：只输出一个 JSON 对象，不要 Markdown 代码围栏、解释、思考过程或任何前后缀。",
+    `JSON 格式：${EDITORIAL_JSON_FORMATS[task]}。`,
+    "所有字符串必须是有效 JSON 字符串，正文中的换行、引号和反斜杠必须正确转义。",
+  ].join("\n");
 }
 
 function boundArticleSource(source: string): string {
@@ -107,93 +168,120 @@ export async function generateEditorialSuggestion(
       abortSignal: options.signal,
     } as const;
 
+    const generateValidated = async <Result>(
+      schema: ZodType<Result>,
+      outputOptions: { name: string; description: string },
+      generationOptions: { temperature: number; maxOutputTokens: number },
+    ) => {
+      if (config.supportsStructuredOutputs) {
+        try {
+          const generated = await generateText({
+            ...commonOptions,
+            ...generationOptions,
+            output: Output.object({ schema, ...outputOptions }),
+          });
+          const parsed = schema.safeParse(generated.output);
+          if (parsed.success) return { value: parsed.data, usage: generated.usage };
+        } catch (error) {
+          if (!shouldFallbackFromStructuredError(error)) throw error;
+          if (NoObjectGeneratedError.isInstance(error) && typeof error.text === "string") {
+            try {
+              const repaired = schema.safeParse(parseAiJsonObject(error.text));
+              if (repaired.success) {
+                return { value: repaired.data, usage: error.usage ?? {} };
+              }
+            } catch {
+              // The model output is not locally repairable; retry in plain JSON mode.
+            }
+          }
+          console.warn("[Editorial AI] structured output failed; retrying in JSON compatibility mode", {
+            provider: config.providerName,
+            model: config.textModel,
+          });
+        }
+      }
+
+      const compatibilityAttempts = config.supportsStructuredOutputs ? 1 : 2;
+      for (let attempt = 0; attempt < compatibilityAttempts; attempt += 1) {
+        const generated = await generateText({
+          ...commonOptions,
+          ...generationOptions,
+          prompt: buildPlainJsonPrompt(commonOptions.prompt, input.task),
+        });
+        let parsedJson: unknown;
+        try {
+          parsedJson = parseAiJsonObject(generated.text);
+        } catch {
+          if (attempt + 1 < compatibilityAttempts) continue;
+          throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
+        }
+
+        const parsed = schema.safeParse(parsedJson);
+        if (parsed.success) return { value: parsed.data, usage: generated.usage };
+        throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
+      }
+      throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
+    };
+
     if (input.task === "title") {
-      const generated = await generateText({
-        ...commonOptions,
-        output: Output.object({
-          schema: titleSuggestionSchema,
-          name: "editorial_titles",
-          description: "Five editorial title candidates",
-        }),
+      const generated = await generateValidated(titleSuggestionSchema, {
+        name: "editorial_titles",
+        description: "Five editorial title candidates",
+      }, {
         temperature: 0.65,
         maxOutputTokens: 1_200,
       });
-      const parsed = titleSuggestionSchema.safeParse(generated.output);
-      if (!parsed.success) {
-        throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
-      }
       return {
         task: "title",
         ...base,
-        result: parsed.data,
+        result: generated.value,
         usage: compactUsage(generated.usage),
       };
     }
 
     if (input.task === "metadata") {
-      const generated = await generateText({
-        ...commonOptions,
-        output: Output.object({
-          schema: metadataSuggestionSchema,
-          name: "editorial_metadata",
-          description: "Search and social metadata grounded in the public article",
-        }),
+      const generated = await generateValidated(metadataSuggestionSchema, {
+        name: "editorial_metadata",
+        description: "Search and social metadata grounded in the public article",
+      }, {
         temperature: 0.15,
         maxOutputTokens: 1_800,
       });
-      const parsed = metadataSuggestionSchema.safeParse(generated.output);
-      if (!parsed.success) {
-        throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
-      }
       return {
         task: "metadata",
         ...base,
-        result: parsed.data,
+        result: generated.value,
         usage: compactUsage(generated.usage),
       };
     }
 
     if (input.task === "optimize") {
-      const generated = await generateText({
-        ...commonOptions,
-        output: Output.object({
-          schema: optimizationSuggestionSchema,
-          name: "editorial_optimization",
-          description: "A grounded full-markdown rewrite for search and answer engines",
-        }),
+      const generated = await generateValidated(optimizationSuggestionSchema, {
+        name: "editorial_optimization",
+        description: "A grounded full-markdown rewrite for search and answer engines",
+      }, {
         temperature: 0.1,
         maxOutputTokens: 12_000,
       });
-      const parsed = optimizationSuggestionSchema.safeParse(generated.output);
-      if (!parsed.success) {
-        throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
-      }
       return {
         task: "optimize",
         ...base,
-        result: parsed.data,
+        result: generated.value,
         usage: compactUsage(generated.usage),
       };
     }
 
-    const generated = await generateText({
-      ...commonOptions,
-      output: Output.object({
-        schema: summarySuggestionSchema,
-        name: "editorial_summary",
-        description: "A concise editorial summary with key points and keywords",
-      }),
+    const generated = await generateValidated(summarySuggestionSchema, {
+      name: "editorial_summary",
+      description: "A concise editorial summary with key points and keywords",
+    }, {
       temperature: 0.2,
       maxOutputTokens: 1_600,
     });
-    const parsed = summarySuggestionSchema.safeParse(generated.output);
-    if (!parsed.success) {
-      throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
-    }
     return {
       task: "summary",
       ...base,
-      result: parsed.data,
+      result: generated.value,
       usage: compactUsage(generated.usage),
     };
   } catch (error) {
