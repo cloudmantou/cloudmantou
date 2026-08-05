@@ -20,6 +20,31 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp).not.toContain("unsafe-inline");
   });
 
+  it("支付宝 form-action 同时允许官方电脑、H5 与沙箱收银台重定向", () => {
+    const csp = buildAlipayLaunchContentSecurityPolicy("launch123");
+    const formAction =
+      csp.split(";").find((part) => part.trim().startsWith("form-action")) ?? "";
+    const globalFormAction =
+      buildContentSecurityPolicy("global123", false)
+        .split(";")
+        .find((part) => part.trim().startsWith("form-action")) ?? "";
+
+    expect(formAction.trim().split(/\s+/)).toEqual([
+      "form-action",
+      "'self'",
+      "https://openapi.alipay.com",
+      "https://unitradeprod.alipay.com",
+      "https://excashier.alipay.com",
+      "https://mclient.alipay.com",
+      "https://openapi.alipaydev.com",
+      "https://openapi-sandbox.dl.alipaydev.com",
+      "https://unitradeprod-sandbox.dl.alipaydev.com",
+      "https://excashier-sandbox.dl.alipaydev.com",
+      "https://mobileclientgw-sandbox.dl.alipaydev.com",
+    ]);
+    expect(globalFormAction.trim()).toBe(formAction.trim());
+  });
+
   it("生产环境 script 使用 nonce 且不含 unsafe-inline", () => {
     const csp = buildContentSecurityPolicy("abc123", false);
     const scriptSrc = csp.split(";").find((part) => part.trim().startsWith("script-src")) ?? "";

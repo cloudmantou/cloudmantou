@@ -1,9 +1,19 @@
-/** 支付宝网关 form-action 白名单（与 next.config.mjs 保持同步） */
+/**
+ * 支付宝页面支付 form-action 白名单。
+ * Chrome 会继续检查 POST 后的 302 收银台跳转，因此网关和最终收银台
+ * 必须同时列出；保留精确官方域名，避免放宽为任意 HTTPS 或通配子域。
+ */
 export const ALIPAY_FORM_ACTION_ORIGINS = [
   "'self'",
   "https://openapi.alipay.com",
+  "https://unitradeprod.alipay.com",
+  "https://excashier.alipay.com",
+  "https://mclient.alipay.com",
   "https://openapi.alipaydev.com",
   "https://openapi-sandbox.dl.alipaydev.com",
+  "https://unitradeprod-sandbox.dl.alipaydev.com",
+  "https://excashier-sandbox.dl.alipaydev.com",
+  "https://mobileclientgw-sandbox.dl.alipaydev.com",
 ] as const;
 
 export const ALIPAY_FORM_ACTION_CSP = ALIPAY_FORM_ACTION_ORIGINS.join(" ");
