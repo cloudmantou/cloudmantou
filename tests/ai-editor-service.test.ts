@@ -454,4 +454,44 @@ describe("editorial AI service", () => {
     expect(mocks.generateText).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ task: "summary", result: { excerpt: "Recovered summary." } });
   });
+
+  it("bounds metadata keyword arrays returned by JSON compatibility mode", async () => {
+    mocks.getAiTextModel.mockReturnValue({
+      model: "model-fixture",
+      config: {
+        providerName: "fixture-provider",
+        textModel: "fixture-model",
+        supportsStructuredOutputs: false,
+        requestTimeoutMs: 120_000,
+      },
+    });
+    const keywords = Array.from({ length: 14 }, (_, index) => `关键词 ${index + 1}`);
+    mocks.generateText.mockResolvedValue({
+      text: JSON.stringify({
+        language: "zh-CN",
+        seoTitle: "文章 SEO 标题",
+        seoDescription: "一段准确描述文章内容、适合搜索结果展示的 SEO 摘要。",
+        keywords,
+        focusKeyphrase: "核心短语",
+        socialTitle: "文章社交标题",
+        socialDescription: "一段忠于原文的社交平台分享说明。",
+        searchIntent: "用户希望了解文章主题、适用条件与具体步骤。",
+      }),
+      usage: { totalTokens: 220 },
+    });
+
+    const result = await generateEditorialSuggestion({
+      task: "metadata",
+      title: "SEO 元数据",
+      excerpt: "",
+      content: "这是一段用于验证模型返回过多关键词时仍能生成有效元数据的文章正文。",
+      locale: "zh-CN",
+    });
+
+    expect(mocks.generateText).toHaveBeenCalledTimes(1);
+    expect(result.task).toBe("metadata");
+    if (result.task !== "metadata") throw new Error("unexpected task");
+    expect(result.result.keywords).toEqual(keywords.slice(0, 12));
+    expect(keywords).toHaveLength(14);
+  });
 });

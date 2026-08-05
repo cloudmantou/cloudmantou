@@ -34,9 +34,9 @@ export class AiGenerationError extends Error {
 
 const EDITORIAL_JSON_FORMATS: Record<EditorialAiInput["task"], string> = {
   title: '{"language":"zh-CN 或 en-US","titles":[{"title":"标题","reason":"简短理由"}]}，titles 必须正好 5 项',
-  summary: '{"language":"zh-CN 或 en-US","excerpt":"摘要","keyPoints":["要点"],"keywords":["关键词"]}',
-  metadata: '{"language":"zh-CN 或 en-US","seoTitle":"SEO 标题","seoDescription":"SEO 描述","keywords":["关键词"],"focusKeyphrase":"核心短语","socialTitle":"社交标题","socialDescription":"社交描述","searchIntent":"搜索意图"}',
-  optimize: '{"language":"zh-CN 或 en-US","optimizedContent":"完整 Markdown 正文，换行必须使用 JSON 转义","focusKeyphrase":"核心短语","supportingKeywords":["相关词"],"changes":["修改说明"]}',
+  summary: '{"language":"zh-CN 或 en-US","excerpt":"摘要","keyPoints":["要点"],"keywords":["关键词"]}，keyPoints 1 至 6 项，keywords 1 至 10 项',
+  metadata: '{"language":"zh-CN 或 en-US","seoTitle":"SEO 标题","seoDescription":"SEO 描述","keywords":["关键词"],"focusKeyphrase":"核心短语","socialTitle":"社交标题","socialDescription":"社交描述","searchIntent":"搜索意图"}，keywords 3 至 12 项',
+  optimize: '{"language":"zh-CN 或 en-US","optimizedContent":"完整 Markdown 正文，换行必须使用 JSON 转义","focusKeyphrase":"核心短语","supportingKeywords":["相关词"],"changes":["修改说明"]}，supportingKeywords 1 至 12 项，changes 1 至 8 项',
 };
 
 const STRUCTURED_OUTPUT_COMPATIBILITY_ERROR =
@@ -72,6 +72,32 @@ export function parseAiJsonObject(text: string): unknown {
     if (firstBrace < 0 || lastBrace <= firstBrace) throw new Error("AI_JSON_OBJECT_NOT_FOUND");
     return JSON.parse(withoutFence.slice(firstBrace, lastBrace + 1));
   }
+}
+
+export function normalizeEditorialJsonResult(
+  task: EditorialAiInput["task"],
+  value: unknown,
+): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const normalized = { ...(value as Record<string, unknown>) };
+  const boundArray = (key: string, maximum: number) => {
+    const items = normalized[key];
+    if (Array.isArray(items) && items.length > maximum) {
+      normalized[key] = items.slice(0, maximum);
+    }
+  };
+
+  if (task === "title") boundArray("titles", 5);
+  if (task === "summary") {
+    boundArray("keyPoints", 6);
+    boundArray("keywords", 10);
+  }
+  if (task === "metadata") boundArray("keywords", 12);
+  if (task === "optimize") {
+    boundArray("supportingKeywords", 12);
+    boundArray("changes", 8);
+  }
+  return normalized;
 }
 
 function buildPlainJsonPrompt(
@@ -180,13 +206,17 @@ export async function generateEditorialSuggestion(
             ...generationOptions,
             output: Output.object({ schema, ...outputOptions }),
           });
-          const parsed = schema.safeParse(generated.output);
+          const parsed = schema.safeParse(
+            normalizeEditorialJsonResult(input.task, generated.output),
+          );
           if (parsed.success) return { value: parsed.data, usage: generated.usage };
         } catch (error) {
           if (!shouldFallbackFromStructuredError(error)) throw error;
           if (NoObjectGeneratedError.isInstance(error) && typeof error.text === "string") {
             try {
-              const repaired = schema.safeParse(parseAiJsonObject(error.text));
+              const repaired = schema.safeParse(
+                normalizeEditorialJsonResult(input.task, parseAiJsonObject(error.text)),
+              );
               if (repaired.success) {
                 return { value: repaired.data, usage: error.usage ?? {} };
               }
@@ -216,7 +246,9 @@ export async function generateEditorialSuggestion(
           throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
         }
 
-        const parsed = schema.safeParse(parsedJson);
+        const parsed = schema.safeParse(
+          normalizeEditorialJsonResult(input.task, parsedJson),
+        );
         if (parsed.success) return { value: parsed.data, usage: generated.usage };
         throw new AiGenerationError("AI_INVALID_OUTPUT", "AI 返回内容格式错误");
       }
