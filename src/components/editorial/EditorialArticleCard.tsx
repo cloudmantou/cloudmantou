@@ -48,7 +48,7 @@ export function EditorialArticleCard({
       })
     : locale === "en" ? "Draft note" : "持续更新";
   const author = post.author?.nickname || post.author?.username || (locale === "en" ? "Mantou" : "馒头");
-  const coverImage = variant === "card" ? null : safeCoverSource(post.coverImage);
+  const coverImage = safeCoverSource(post.coverImage);
 
   return (
     <article className="editorial-article-item">

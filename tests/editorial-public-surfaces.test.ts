@@ -42,6 +42,31 @@ describe("editorial public-surface closure", () => {
     expect(card).not.toMatch(/backgroundImage:/);
   });
 
+  it("keeps available covers visible on compact recent-article cards", () => {
+    const card = source("src/components/editorial/EditorialArticleCard.tsx");
+    const css = source("src/styles/editorial-blog.css");
+
+    expect(card).toMatch(/const coverImage = safeCoverSource\(post\.coverImage\);/);
+    expect(card).not.toMatch(/variant === ["']card["'] \? null : safeCoverSource/);
+    expect(css).not.toMatch(
+      /\.editorial-article-card \.editorial-article-media\s*\{[^}]*display:\s*none/,
+    );
+  });
+
+  it("uses an explicit high-contrast foreground for inline and fenced code", () => {
+    const globalCss = source("src/app/globals.css");
+    const editorialCss = source("src/styles/editorial-blog.css");
+
+    expect(globalCss).toMatch(/--article-code-text:\s*#[0-9a-f]{6}/i);
+    expect(globalCss).toMatch(
+      /\.article-prose code:not\(pre code\)\s*\{[^}]*color:\s*var\(--article-code-text\)/,
+    );
+    expect(globalCss).toMatch(
+      /\.article-prose pre code\s*\{[^}]*color:\s*var\(--article-code-text\)/,
+    );
+    expect(editorialCss).toMatch(/--article-code-text:\s*#[0-9a-f]{6}/i);
+  });
+
   it("renders the article hero cover as a prioritized image instead of a CSS background", () => {
     const chrome = source("src/components/editorial/EditorialArticleChrome.tsx");
     expect(chrome).toMatch(/import Image from ["']next\/image["']/);

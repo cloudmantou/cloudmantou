@@ -34,6 +34,7 @@
   --article-text-secondary: #9a9698;
   --article-border: #252640;
   --article-code-bg: #12131f;
+  --article-code-text: #e6edf3;
   --article-link: #e8b964;
   --article-heading: #f0ece2;
   --article-blockquote-border: #4dd9b6;
@@ -3275,8 +3276,10 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   padding: 0.15em 0.4em;
   border-radius: 4px;
   background: var(--article-code-bg);
+  color: var(--article-code-text);
   font-family: "JetBrains Mono", monospace;
   font-size: 0.88em;
+  font-weight: 500;
 }
 
 /* Code blocks */
@@ -3285,16 +3288,20 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   padding: 1em 1.2em;
   border-radius: var(--radius);
   background: var(--article-code-bg);
+  color: var(--article-code-text);
   overflow-x: auto;
   border: 1px solid var(--article-border);
+  color-scheme: dark;
 }
 
 .article-prose pre code {
   padding: 0;
   background: transparent;
+  color: var(--article-code-text);
   font-family: "JetBrains Mono", monospace;
   font-size: 0.88em;
   line-height: 1.65;
+  tab-size: 2;
 }
 
 /* Task lists (GFM) */

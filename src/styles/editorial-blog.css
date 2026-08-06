@@ -189,8 +189,8 @@
 .editorial-article-lead .editorial-article-excerpt { margin-top: 18px; font-size: .94rem; }
 .editorial-article-lead .editorial-article-arrow { position: absolute; right: 18px; bottom: 18px; width: 48px; height: 48px; border: var(--ed-line); }
 .editorial-compact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.editorial-article-card { min-height: 190px; grid-template-columns: 1fr; }
-.editorial-article-card .editorial-article-media { display: none; }
+.editorial-article-card { min-height: 400px; grid-template-columns: 1fr; grid-template-rows: minmax(138px, .78fr) minmax(230px, 1.22fr); }
+.editorial-article-card .editorial-article-media { min-height: 0; border-bottom: var(--ed-line); background-color: var(--ed-blue); }
 .editorial-article-card .editorial-article-copy { padding: 20px; }
 .editorial-article-card .editorial-article-copy > strong { margin-top: 13px; font-size: 1.2rem; }
 .editorial-article-card .editorial-article-excerpt { margin-top: 10px; font-size: .76rem; -webkit-line-clamp: 2; }
@@ -249,6 +249,7 @@
   --article-text-secondary: #59656e;
   --article-border: var(--ed-ink);
   --article-code-bg: var(--ed-ink);
+  --article-code-text: #f7f4ea;
   --article-link: var(--ed-blue);
   --article-heading: var(--ed-ink);
   --article-blockquote-border: var(--ed-red);
@@ -256,6 +257,7 @@
   --article-table-border: var(--ed-ink);
   --article-table-stripe: rgba(20, 94, 232, .06);
   --article-hr: var(--ed-ink);
+  --hl-comment: #b8c0c8;
   border-top: 0;
 }
 .editorial-post-page > div { border-inline: var(--ed-line); background: var(--ed-paper-strong); box-shadow: 9px 9px 0 var(--ed-ink); }
@@ -371,7 +373,7 @@
   .editorial-article-lead .editorial-article-copy { min-height: 260px; padding: 24px; }
   .editorial-article-lead .editorial-article-copy > strong { margin-top: 14px; font-size: 1.65rem; }
   .editorial-compact-grid { grid-template-columns: 1fr; }
-  .editorial-article-card { min-height: 210px; }
+  .editorial-article-card { min-height: 340px; grid-template-rows: 150px minmax(190px, auto); }
   .editorial-project-card { min-height: 128px; padding: 17px; }
   .editorial-project-icon { width: 55px; height: 55px; }
   .editorial-support-panel,
