@@ -14,6 +14,11 @@ html.official-site-root body.official-site-body {
   background-image: none;
 }
 
+/* Fixed SVG turbulence repaints aggressively while mobile Safari scrolls. */
+html.official-site-root body.official-site-body::after {
+  display: none;
+}
+
 .official-nav {
   position: sticky;
   top: 0;
@@ -2095,6 +2100,16 @@ html.official-site-root body.official-site-body {
   .official-downgrade-app em { display: none; }
   .official-version-row { grid-template-columns: 1fr auto; }
   .official-version-row small { display: none; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .official-nav {
+    background: #fff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .official-app-card { transition: none; }
 }
 
 .official-download-platforms {

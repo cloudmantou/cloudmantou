@@ -13,10 +13,14 @@ import {
   EDITORIAL_PUBLIC_POST_STATUSES,
   buildEditorialSearchWhere,
   clampEditorialArchivePage,
-  getEnglishEditorialTaxonomyArchive,
   parseEditorialArchiveParams,
   type EditorialArchiveSearchParams,
 } from "@/lib/editorial-archive";
+import { loadEnglishTaxonomyArchive } from "@/lib/editorial-translation-archive";
+import {
+  ENGLISH_POST_TRANSLATION_LOCALE,
+  ENGLISH_POST_TRANSLATION_STATUS,
+} from "@/lib/editorial-translations";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -30,12 +34,34 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const baseCtx = await getSeoContext(locale);
   const ctx = withEditorialSeoContext(baseCtx);
   if (locale === "en") {
-    const archive = getEnglishEditorialTaxonomyArchive("tag", slug, null);
-    if (!archive) return { title: "Tag not found" };
-    const localizedTag = archive.tags.find((tag) => tag.slug === slug);
+    const tag = await prisma.tag.findUnique({
+      where: { slug },
+      select: {
+        name: true,
+        _count: {
+          select: {
+            posts: {
+              where: {
+                post: {
+                  status: "PUBLISHED",
+                  translations: {
+                    some: {
+                      locale: ENGLISH_POST_TRANSLATION_LOCALE,
+                      status: ENGLISH_POST_TRANSLATION_STATUS,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!tag || tag._count.posts === 0) return { title: "Tag not found" };
+    const localizedTag = localizeEditorialTaxonomy("tag", { slug, name: tag.name }, locale);
     return buildPageMetadata(ctx, {
-      title: `Posts tagged ${localizedTag?.name || slug}`,
-      description: `Articles tagged ${localizedTag?.name || slug}.`,
+      title: `Posts tagged ${localizedTag.name}`,
+      description: `Articles tagged ${localizedTag.name}.`,
       path: `/tag/${slug}`,
     });
   }
@@ -55,30 +81,30 @@ export default async function TagPage({ params, searchParams }: PageProps) {
   const archiveParams = parseEditorialArchiveParams(rawSearchParams);
 
   if (locale === "en") {
-    const archive = getEnglishEditorialTaxonomyArchive(
-      "tag",
+    const archive = await loadEnglishTaxonomyArchive({
+      type: "tag",
       slug,
-      archiveParams.query,
-      archiveParams.page,
-      EDITORIAL_ARCHIVE_PAGE_SIZE
-    );
+      query: archiveParams.query,
+      queryError: Boolean(archiveParams.queryError),
+      page: archiveParams.page,
+      pageSize: EDITORIAL_ARCHIVE_PAGE_SIZE,
+    });
     if (!archive) notFound();
-    const localizedTag = archive.tags.find((item) => item.slug === slug);
     return (
       <EditorialShell locale={locale}>
         <EditorialArchivePage
           locale={locale}
-          title={`Posts tagged ${localizedTag?.name || slug}`}
-          description={`Field notes connected by the ${localizedTag?.name || slug} topic.`}
-          posts={archiveParams.queryError ? [] : archive.posts}
+          title={`Posts tagged ${archive.taxonomy.name}`}
+          description={`Field notes connected by the ${archive.taxonomy.name} topic.`}
+          posts={archive.posts}
           categories={archive.categories}
           tags={archive.tags}
           totalPosts={archive.totalPosts}
-          resultCount={archiveParams.queryError ? 0 : archive.total}
+          resultCount={archive.resultCount}
           basePath={`/tag/${slug}`}
           query={archiveParams.query}
           queryError={archiveParams.queryError}
-          currentPage={archive.page}
+          currentPage={archive.currentPage}
           totalPages={archive.totalPages}
           activeTag={slug}
         />

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
-import { auditAdminAction } from "@/lib/admin-audit-log";
+import { auditAdminAction, auditAdminActionStrict } from "@/lib/admin-audit-log";
 import { isVaultTotpConfigured } from "@/lib/vault-totp";
 import { verifyVaultUnlockToken, VAULT_UNLOCK_COOKIE } from "@/lib/vault-session";
 
@@ -74,5 +74,19 @@ export async function requireAdminAndAudit(
 ) {
   const session = await requireAdmin();
   await auditAdminAction(req, session.user.id, action, options);
+  return session;
+}
+
+export async function requireAdminAndStrictAudit(
+  req: NextRequest,
+  action: string,
+  options?: {
+    targetType?: string;
+    targetId?: string;
+    detail?: string;
+  }
+) {
+  const session = await requireAdmin();
+  await auditAdminActionStrict(req, session.user.id, action, options);
   return session;
 }

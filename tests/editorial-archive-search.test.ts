@@ -5,6 +5,7 @@ const prismaMock = vi.hoisted(() => ({
   post: {
     findMany: vi.fn(),
     count: vi.fn(),
+    findUnique: vi.fn(),
   },
 }));
 
@@ -96,6 +97,8 @@ describe("GET /api/posts public search contract", () => {
   beforeEach(() => {
     prismaMock.post.findMany.mockReset();
     prismaMock.post.count.mockReset();
+    prismaMock.post.findUnique.mockReset();
+    prismaMock.post.findUnique.mockResolvedValue(null);
     prismaMock.post.findMany.mockResolvedValue([
       {
         id: "post-1",
@@ -191,9 +194,23 @@ describe("GET /api/posts public search contract", () => {
     });
   });
 
-  it("serves the English static article search without querying the Chinese database", async () => {
-    prismaMock.post.findMany.mockClear();
-    prismaMock.post.count.mockClear();
+  it("searches only reviewed English database translations", async () => {
+    prismaMock.post.findMany.mockResolvedValue([{
+      id: "post-en-1",
+      slug: "translated-guide",
+      coverImage: null,
+      publishedAt: new Date("2026-08-08T00:00:00Z"),
+      viewCount: 8,
+      isTop: false,
+      author: { username: "mantou", nickname: "Mantou" },
+      category: { name: "产品实践", slug: "product-notes" },
+      tags: [{ tag: { id: "tag-ios", name: "iOS", slug: "ios", color: null } }],
+      translations: [{
+        title: "Virtual Location Guide",
+        excerpt: "A reviewed guide to virtual location.",
+      }],
+    }]);
+    prismaMock.post.count.mockResolvedValue(1);
     const response = await GET(
       new NextRequest("http://localhost/api/posts?q=virtual%20location&locale=en&pageSize=6")
     );
@@ -201,9 +218,36 @@ describe("GET /api/posts public search contract", () => {
 
     expect(response.status).toBe(200);
     expect(body.data).toEqual([
-      expect.objectContaining({ id: "static:mantou-assistant", slug: "mantou-assistant" }),
+      expect.objectContaining({
+        id: "post-en-1",
+        slug: "translated-guide",
+        title: "Virtual Location Guide",
+      }),
     ]);
-    expect(prismaMock.post.findMany).not.toHaveBeenCalled();
-    expect(prismaMock.post.count).not.toHaveBeenCalled();
+    expect(prismaMock.post.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        status: "PUBLISHED",
+        translations: { some: expect.objectContaining({ locale: "en-US", status: "PUBLISHED" }) },
+      }),
+    }));
+  });
+
+  it("keeps the bundled English article searchable before managed migration", async () => {
+    prismaMock.post.findMany.mockResolvedValue([]);
+    prismaMock.post.count.mockResolvedValue(0);
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/posts?q=virtual%20location&locale=en&pageSize=6"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toEqual([
+      expect.objectContaining({
+        id: "static-mantou-assistant",
+        slug: "mantou-assistant",
+      }),
+    ]);
+    expect(body.pagination).toMatchObject({ total: 1, totalPages: 1 });
   });
 });

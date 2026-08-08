@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   postTagDeleteMany: vi.fn(),
   paidContentCreate: vi.fn(),
   paidContentDeleteMany: vi.fn(),
+  postTranslationUpdateMany: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -90,6 +91,7 @@ beforeEach(() => {
       create: mocks.paidContentCreate,
       deleteMany: mocks.paidContentDeleteMany,
     },
+    postTranslation: { updateMany: mocks.postTranslationUpdateMany },
   }));
 });
 

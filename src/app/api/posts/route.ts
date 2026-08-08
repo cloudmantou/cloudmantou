@@ -13,6 +13,13 @@ import {
   normalizeEditorialQuery,
   parseEditorialArchiveParams,
 } from "@/lib/editorial-archive";
+import {
+  ENGLISH_POST_TRANSLATION_LOCALE,
+  ENGLISH_POST_TRANSLATION_STATUS,
+} from "@/lib/editorial-translations";
+import { localizeEditorialTaxonomy } from "@/lib/editorial-article";
+import { MANTOU_ASSISTANT_ARTICLE_EN } from "@/config/editorial-blog";
+import { canUseStaticEnglishMantouFallback } from "@/lib/editorial-static-fallback";
 
 /** Extract a snippet around the first match of `q` in `text` */
 function extractSnippet(text: string, q: string, radius = 80): string | null {
@@ -51,27 +58,136 @@ export async function GET(req: NextRequest) {
     }
 
     if (searchParams.get("locale") === "en") {
-      const archive = getEnglishEditorialArchive(parsed.query, parsed.page, pageSize);
-      const formatted = archive.posts.map((post) => ({
-        id: `static:${post.slug}`,
-        title: post.title,
-        slug: post.slug,
-        excerpt: post.excerpt,
-        coverImage: post.coverImage,
-        publishedAt: post.publishedAt,
-        viewCount: 0,
-        isTop: false,
-        author: post.author,
-        category: post.category,
-        tags: [],
-        premium: post.status === "PAID_ONLY",
-        matchedContent: parsed.query ? post.excerpt : null,
-      }));
+      const translationWhere = {
+        locale: ENGLISH_POST_TRANSLATION_LOCALE,
+        status: ENGLISH_POST_TRANSLATION_STATUS,
+        ...(parsed.query ? {
+          OR: [
+            { title: { contains: parsed.query } },
+            { excerpt: { contains: parsed.query } },
+            { content: { contains: parsed.query } },
+          ],
+        } : {}),
+      };
+      const where = {
+        status: "PUBLISHED" as const,
+        ...(categoryId && { categoryId }),
+        ...(tag && { tags: { some: { tag: { slug: tag } } } }),
+        translations: { some: translationWhere },
+      };
+      const select = {
+        id: true,
+        slug: true,
+        coverImage: true,
+        publishedAt: true,
+        viewCount: true,
+        isTop: true,
+        author: { select: { username: true, nickname: true } },
+        category: { select: { name: true, slug: true } },
+        tags: { select: { tag: { select: { id: true, name: true, slug: true, color: true } } } },
+        translations: {
+          where: translationWhere,
+          select: { title: true, excerpt: true },
+          take: 1,
+        },
+      } as const;
+      const [initialPosts, total] = await Promise.all([
+        prisma.post.findMany({
+          where,
+          select,
+          orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
+          skip: (parsed.page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prisma.post.count({ where }),
+      ]);
+      const currentPage = clampEditorialArchivePage(parsed.page, total, pageSize);
+      const posts = currentPage === parsed.page ? initialPosts : await prisma.post.findMany({
+        where,
+        select,
+        orderBy: EDITORIAL_ARCHIVE_ORDER_BY,
+        skip: (currentPage - 1) * pageSize,
+        take: pageSize,
+      });
+      if (total === 0 && !categoryId && !tag) {
+        const fallbackSource = await prisma.post.findUnique({
+          where: { slug: MANTOU_ASSISTANT_ARTICLE_EN.slug },
+          select: {
+            title: true,
+            excerpt: true,
+            content: true,
+            status: true,
+            translations: {
+              where: { locale: ENGLISH_POST_TRANSLATION_LOCALE },
+              select: { status: true },
+            },
+          },
+        });
+        if (canUseStaticEnglishMantouFallback(fallbackSource)) {
+          const fallback = getEnglishEditorialArchive(parsed.query, parsed.page, pageSize);
+          const formattedFallback = fallback.posts.map((post) => ({
+            id: `static-${post.slug}`,
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            coverImage: post.coverImage,
+            publishedAt: post.publishedAt,
+            viewCount: 0,
+            isTop: post.isTop,
+            author: post.author,
+            category: fallback.categories[0]
+              ? { name: fallback.categories[0].name, slug: fallback.categories[0].slug }
+              : null,
+            tags: fallback.tags.map((fallbackTag) => ({
+              id: `static-${fallbackTag.slug}`,
+              name: fallbackTag.name,
+              slug: fallbackTag.slug,
+              color: null,
+            })),
+            premium: false,
+            matchedContent: parsed.query
+              ? extractSnippet(post.excerpt || "", parsed.query)
+              : null,
+          }));
+          return ok(formattedFallback, {
+            page: fallback.page,
+            pageSize,
+            total: fallback.total,
+            totalPages: fallback.totalPages,
+          });
+        }
+      }
+      const formatted = posts.flatMap((post) => {
+        const translation = post.translations[0];
+        if (!translation) return [];
+        return [{
+          id: post.id,
+          title: translation.title,
+          slug: post.slug,
+          excerpt: translation.excerpt,
+          coverImage: post.coverImage,
+          publishedAt: post.publishedAt,
+          viewCount: post.viewCount,
+          isTop: post.isTop,
+          author: post.author,
+          category: post.category
+            ? localizeEditorialTaxonomy("category", post.category, "en")
+            : null,
+          tags: post.tags.map(({ tag: postTag }) => ({
+            ...postTag,
+            ...localizeEditorialTaxonomy("tag", postTag, "en"),
+          })),
+          premium: false,
+          matchedContent: parsed.query
+            ? extractSnippet(translation.excerpt || "", parsed.query)
+            : null,
+        }];
+      });
       return ok(formatted, {
-        page: archive.page,
+        page: currentPage,
         pageSize,
-        total: archive.total,
-        totalPages: archive.totalPages,
+        total,
+        totalPages: Math.ceil(total / pageSize),
       });
     }
 

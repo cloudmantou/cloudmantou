@@ -13,10 +13,14 @@ import {
   EDITORIAL_PUBLIC_POST_STATUSES,
   buildEditorialSearchWhere,
   clampEditorialArchivePage,
-  getEnglishEditorialTaxonomyArchive,
   parseEditorialArchiveParams,
   type EditorialArchiveSearchParams,
 } from "@/lib/editorial-archive";
+import { loadEnglishTaxonomyArchive } from "@/lib/editorial-translation-archive";
+import {
+  ENGLISH_POST_TRANSLATION_LOCALE,
+  ENGLISH_POST_TRANSLATION_STATUS,
+} from "@/lib/editorial-translations";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -30,12 +34,35 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const baseCtx = await getSeoContext(locale);
   const ctx = withEditorialSeoContext(baseCtx);
   if (locale === "en") {
-    if (!getEnglishEditorialTaxonomyArchive("category", slug, null)) {
+    const category = await prisma.category.findUnique({
+      where: { slug },
+      select: {
+        name: true,
+        description: true,
+        _count: {
+          select: {
+            posts: {
+              where: {
+                status: "PUBLISHED",
+                translations: {
+                  some: {
+                    locale: ENGLISH_POST_TRANSLATION_LOCALE,
+                    status: ENGLISH_POST_TRANSLATION_STATUS,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!category || category._count.posts === 0) {
       return { title: "Category not found" };
     }
+    const localized = localizeEditorialTaxonomy("category", { slug, name: category.name }, locale);
     return buildPageMetadata(ctx, {
-      title: "Product practice — category",
-      description: "Articles filed under Product practice.",
+      title: `${localized.name} — category`,
+      description: category.description || `Articles filed under ${localized.name}.`,
       path: `/category/${slug}`,
     });
   }
@@ -55,29 +82,30 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   const archiveParams = parseEditorialArchiveParams(rawSearchParams);
 
   if (locale === "en") {
-    const archive = getEnglishEditorialTaxonomyArchive(
-      "category",
+    const archive = await loadEnglishTaxonomyArchive({
+      type: "category",
       slug,
-      archiveParams.query,
-      archiveParams.page,
-      EDITORIAL_ARCHIVE_PAGE_SIZE
-    );
+      query: archiveParams.query,
+      queryError: Boolean(archiveParams.queryError),
+      page: archiveParams.page,
+      pageSize: EDITORIAL_ARCHIVE_PAGE_SIZE,
+    });
     if (!archive) notFound();
     return (
       <EditorialShell locale={locale}>
         <EditorialArchivePage
           locale={locale}
-          title="Product practice"
-          description="Posts filed in Product practice."
-          posts={archiveParams.queryError ? [] : archive.posts}
+          title={archive.taxonomy.name}
+          description={archive.taxonomy.description || `Posts filed in ${archive.taxonomy.name}.`}
+          posts={archive.posts}
           categories={archive.categories}
           tags={archive.tags}
           totalPosts={archive.totalPosts}
-          resultCount={archiveParams.queryError ? 0 : archive.total}
+          resultCount={archive.resultCount}
           basePath={`/category/${slug}`}
           query={archiveParams.query}
           queryError={archiveParams.queryError}
-          currentPage={archive.page}
+          currentPage={archive.currentPage}
           totalPages={archive.totalPages}
           activeCategory={slug}
         />

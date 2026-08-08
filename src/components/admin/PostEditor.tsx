@@ -10,6 +10,7 @@ import { importRemoteImagesInMarkdown } from "@/lib/remote-image-client";
 import { replaceImportedImageUrls } from "@/lib/markdown-remote-images";
 import { readApiEnvelope } from "@/lib/client-api-response";
 import { EditorialAiAssistant } from "@/components/admin/EditorialAiAssistant";
+import { PostTranslationPanel } from "@/components/admin/PostTranslationPanel";
 import {
   MAX_PAID_POST_CONTENT_LENGTH,
   MAX_PAID_POST_PRICE,
@@ -398,7 +399,80 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
           }),
         });
 
-        await readApiEnvelope(res, "保存失败");
+        const envelope = await readApiEnvelope(res, "保存失败");
+        const saved = envelope.data as {
+          id?: string;
+          translationSourceChanged?: boolean;
+        };
+        const savedPostId = saved.id || initialData?.id;
+        const shouldGenerateEnglishDraft = submission.status === "PUBLISHED"
+          && Boolean(savedPostId)
+          && (mode === "create" || saved.translationSourceChanged === true);
+
+        if (shouldGenerateEnglishDraft && savedPostId) {
+          try {
+            const translationResponse = await fetch(
+              `/api/admin/posts/${savedPostId}/translations/en`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: "{}",
+              },
+            );
+            const generatedEnvelope = await readApiEnvelope(
+              translationResponse,
+              "英文草稿生成失败",
+            );
+            const generated = (generatedEnvelope.data as {
+              translation: {
+                title: string;
+                excerpt: string | null;
+                content: string;
+                seoTitle: string | null;
+                seoDescription: string | null;
+                seoKeywords: unknown;
+                socialTitle: string | null;
+                socialDescription: string | null;
+                updatedAt: string;
+              };
+            }).translation;
+            const publishTranslationResponse = await fetch(
+              `/api/admin/posts/${savedPostId}/translations/en`,
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title: generated.title,
+                  excerpt: generated.excerpt,
+                  content: generated.content,
+                  seoTitle: generated.seoTitle,
+                  seoDescription: generated.seoDescription,
+                  seoKeywords: Array.isArray(generated.seoKeywords) ? generated.seoKeywords : [],
+                  socialTitle: generated.socialTitle,
+                  socialDescription: generated.socialDescription,
+                  status: "PUBLISHED",
+                  updatedAt: generated.updatedAt,
+                }),
+              },
+            );
+            await readApiEnvelope(publishTranslationResponse, "英文版自动发布失败");
+          } catch (translationError) {
+            setError(
+              `中文文章已发布，但英文版自动生成或发布失败：${translationError instanceof Error ? translationError.message : "请稍后重试"}`,
+            );
+            setSaveState("saved");
+            if (mode === "create") {
+              router.push(`/admin/posts/${savedPostId}/edit?translation=failed`);
+              router.refresh();
+            }
+            return;
+          }
+
+          setSaveState("saved");
+          router.push(`/admin/posts/${savedPostId}/edit?translation=published`);
+          router.refresh();
+          return;
+        }
 
         setSaveState("saved");
         router.push("/admin/posts");
@@ -652,6 +726,15 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             }}
             onApplyContent={setContent}
           />
+
+          {mode === "edit" && initialData?.id ? (
+            <PostTranslationPanel
+              postId={initialData.id}
+              slug={slug}
+              paid={isPaid || initialData.status === "PAID_ONLY"}
+              sourcePublished={initialData.status === "PUBLISHED"}
+            />
+          ) : null}
 
           <div className="publish-box">
             <h4>封面图</h4>

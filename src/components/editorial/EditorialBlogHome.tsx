@@ -27,10 +27,22 @@ function getMantouAssistantPost(posts: EditorialPostCardData[], locale: Official
 
 const PROJECT_ICONS = [Code2, Layers3, Rocket] as const;
 
-export function EditorialBlogHome({ posts, locale }: { posts: EditorialPostCardData[]; locale: OfficialLocale }) {
+export function EditorialBlogHome({
+  posts,
+  locale,
+  allowStaticFallback = true,
+}: {
+  posts: EditorialPostCardData[];
+  locale: OfficialLocale;
+  allowStaticFallback?: boolean;
+}) {
   const copy = getEditorialBlogCopy(locale);
   const projects = getEditorialProjects(locale);
-  const homepagePosts = posts.length > 0 ? posts : [getMantouAssistantPost(posts, locale)];
+  const homepagePosts = posts.length > 0
+    ? posts
+    : allowStaticFallback
+      ? [getMantouAssistantPost(posts, locale)]
+      : [];
   const { featuredPosts, recentPosts } = selectEditorialHomepagePosts(homepagePosts);
   const primaryRecent = recentPosts[0];
   const compactRecent = recentPosts.slice(1);

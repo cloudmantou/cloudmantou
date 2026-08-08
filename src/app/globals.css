@@ -3362,7 +3362,9 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   height: 3px;
   background: linear-gradient(90deg, var(--accent), var(--teal));
   z-index: 1000;
-  transition: width 100ms ease;
+  width: 100%;
+  transform-origin: left center;
+  will-change: transform;
 }
 
 /* ==================== Paid Content Overlay ==================== */
@@ -5804,6 +5806,21 @@ select.form-input {
 
 .article-prose .md-figure {
   margin: 1.4em 0;
+}
+
+.article-prose .md-image-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--article-code-bg, var(--card));
+}
+
+.article-prose .md-image-frame img {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: contain;
 }
 
 .article-prose .md-figure figcaption {

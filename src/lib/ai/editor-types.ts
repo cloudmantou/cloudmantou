@@ -4,7 +4,7 @@ const languageSchema = z.enum(["zh-CN", "en-US"]);
 
 export const editorAiInputSchema = z
   .object({
-    task: z.enum(["title", "summary", "metadata", "optimize"]),
+    task: z.enum(["title", "summary", "metadata", "optimize", "translate"]),
     title: z.string().trim().max(200).default(""),
     excerpt: z.string().trim().max(500).default(""),
     content: z.string().trim().min(10, "文章正文至少需要 10 个字符").max(100_000),
@@ -61,6 +61,20 @@ export const optimizationSuggestionSchema = z
   })
   .strict();
 
+export const translationSuggestionSchema = z
+  .object({
+    language: z.literal("en-US"),
+    title: z.string().trim().min(1).max(200),
+    excerpt: z.string().trim().max(500),
+    content: z.string().trim().min(10).max(100_000),
+    seoTitle: z.string().trim().min(1).max(120),
+    seoDescription: z.string().trim().min(1).max(320),
+    seoKeywords: z.array(z.string().trim().min(1).max(60)).min(3).max(12),
+    socialTitle: z.string().trim().min(1).max(140),
+    socialDescription: z.string().trim().min(1).max(400),
+  })
+  .strict();
+
 const usageSchema = z
   .object({
     inputTokens: z.number().nonnegative().optional(),
@@ -103,6 +117,15 @@ export const editorAiResponseSchema = z.discriminatedUnion("task", [
       provider: z.string().min(1),
       model: z.string().min(1),
       result: optimizationSuggestionSchema,
+      usage: usageSchema,
+    })
+    .strict(),
+  z
+    .object({
+      task: z.literal("translate"),
+      provider: z.string().min(1),
+      model: z.string().min(1),
+      result: translationSuggestionSchema,
       usage: usageSchema,
     })
     .strict(),

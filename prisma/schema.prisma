@@ -65,11 +65,40 @@ model Post {
   likes        Like[]
   paidContent  PaidContent?
   entitlements Entitlement[]
+  translations PostTranslation[]
 
   @@index([status, publishedAt])
   @@index([authorId])
   @@index([categoryId])
   @@map("posts")
+}
+
+model PostTranslation {
+  id                String                @id @default(cuid())
+  postId            String
+  locale            String                @db.VarChar(10)
+  title             String                @db.VarChar(200)
+  excerpt           String?               @db.Text
+  content           String                @db.LongText
+  seoTitle          String?               @db.VarChar(120)
+  seoDescription    String?               @db.VarChar(320)
+  seoKeywords       Json?
+  socialTitle       String?               @db.VarChar(140)
+  socialDescription String?               @db.VarChar(400)
+  status            PostTranslationStatus @default(DRAFT)
+  sourceHash        String                @db.Char(64)
+  sourceUpdatedAt   DateTime
+  provider          String?               @db.VarChar(100)
+  model             String?               @db.VarChar(191)
+  publishedAt       DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, locale])
+  @@index([locale, status, publishedAt])
+  @@map("post_translations")
 }
 
 model PaidContent {
@@ -391,6 +420,12 @@ enum PostStatus {
   DRAFT
   PUBLISHED
   PAID_ONLY
+}
+
+enum PostTranslationStatus {
+  DRAFT
+  PUBLISHED
+  STALE
 }
 
 enum CommentStatus {

@@ -16,7 +16,7 @@ const updatePostSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   slug: postSlugSchema.optional(),
   excerpt: z.string().max(500).optional().nullable(),
-  content: z.string().min(1).optional(),
+  content: z.string().min(1).max(100_000, "公开正文最多 100000 个字符").optional(),
   coverImage: coverImageSchema,
   categoryId: z.string().optional().nullable(),
   tagIds: z.array(z.string()).optional(),
@@ -95,6 +95,18 @@ export async function PUT(
 
     const data = parsed.data;
     const effectiveStatus = data.status ?? post.status;
+    const translationSourceChanged = [
+      data.title !== undefined && data.title !== post.title,
+      data.excerpt !== undefined && data.excerpt !== post.excerpt,
+      data.content !== undefined && data.content !== post.content,
+      data.seoTitle !== undefined && data.seoTitle !== post.seoTitle,
+      data.seoDescription !== undefined && data.seoDescription !== post.seoDescription,
+      data.seoKeywords !== undefined
+        && JSON.stringify(data.seoKeywords || []) !== JSON.stringify(post.seoKeywords || []),
+      data.socialTitle !== undefined && data.socialTitle !== post.socialTitle,
+      data.socialDescription !== undefined && data.socialDescription !== post.socialDescription,
+      data.status !== undefined && data.status !== post.status,
+    ].some(Boolean);
     const paidPostError = validatePaidPostMutation({
       status: effectiveStatus,
       paidContent: data.paidContent,
@@ -146,6 +158,13 @@ export async function PUT(
         throw new ApiError("文章已被其他操作更新，请刷新后重试", 40901, 409);
       }
 
+      if (translationSourceChanged) {
+        await tx.postTranslation.updateMany({
+          where: { postId: id },
+          data: { status: "STALE" },
+        });
+      }
+
       // Update tags if provided
       if (data.tagIds !== undefined) {
         await tx.postTag.deleteMany({ where: { postId: id } });
@@ -173,7 +192,7 @@ export async function PUT(
       }
     });
 
-    return ok({ id: id });
+    return ok({ id, translationSourceChanged });
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);

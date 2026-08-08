@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
+  loadEnglishTaxonomyArchive: vi.fn(),
   prisma: {
     post: { findMany: vi.fn(), count: vi.fn() },
     category: { findMany: vi.fn(), findUnique: vi.fn() },
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("@/i18n/server", () => ({ getRequestLocale: mocks.locale }));
+vi.mock("@/lib/editorial-translation-archive", () => ({
+  loadEnglishTaxonomyArchive: mocks.loadEnglishTaxonomyArchive,
+}));
 vi.mock("next/navigation", async (importOriginal) => ({
   ...(await importOriginal<typeof import("next/navigation")>()),
   notFound: mocks.notFound,
@@ -126,8 +130,33 @@ describe("editorial archive SSR pages", () => {
     expect(props).toMatchObject({ queryError: "empty", posts: [], resultCount: 0 });
   });
 
-  it("serves English category and tag routes from static content without Prisma", async () => {
+  it("serves English category and tag routes from reviewed database translations", async () => {
     mocks.locale.mockResolvedValue("en");
+    mocks.loadEnglishTaxonomyArchive.mockImplementation(async ({ type, query }) => ({
+      taxonomy: {
+        id: `${type}-1`,
+        slug: type === "category" ? "product-notes" : "ios",
+        name: type === "category" ? "Product practice" : "iOS",
+        description: null,
+      },
+      posts: [{
+        slug: "translated-post",
+        title: "Translated post",
+        excerpt: "Reviewed English copy",
+        coverImage: null,
+        publishedAt: new Date("2026-08-08T00:00:00Z"),
+        status: "PUBLISHED",
+        isTop: false,
+        category: { name: "Product practice" },
+      }],
+      categories: [],
+      tags: [],
+      totalPosts: 1,
+      resultCount: 1,
+      currentPage: 1,
+      totalPages: 1,
+      query,
+    }));
 
     const categoryResult = await CategoryPage({
       params: Promise.resolve({ slug: "product-notes" }),
@@ -140,10 +169,14 @@ describe("editorial archive SSR pages", () => {
     const categoryProps = (categoryResult as any).props.children.props;
     const tagProps = (tagResult as any).props.children.props;
 
-    expect(mocks.prisma.category.findUnique).not.toHaveBeenCalled();
-    expect(mocks.prisma.tag.findUnique).not.toHaveBeenCalled();
-    expect(categoryProps.posts[0].slug).toBe("mantou-assistant");
-    expect(tagProps.posts[0].slug).toBe("mantou-assistant");
+    expect(mocks.loadEnglishTaxonomyArchive).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "category", slug: "product-notes" }),
+    );
+    expect(mocks.loadEnglishTaxonomyArchive).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "tag", slug: "ios", query: "virtual location" }),
+    );
+    expect(categoryProps.posts[0].slug).toBe("translated-post");
+    expect(tagProps.posts[0].slug).toBe("translated-post");
     expect(tagProps.query).toBe("virtual location");
   });
 });

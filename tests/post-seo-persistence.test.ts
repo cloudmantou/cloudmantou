@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   postUpdateMany: vi.fn(),
   postTagDeleteMany: vi.fn(),
   paidContentDeleteMany: vi.fn(),
+  postTranslationUpdateMany: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -59,6 +60,7 @@ describe("article SEO persistence", () => {
       post: { create: mocks.postCreate, updateMany: mocks.postUpdateMany },
       postTag: { createMany: vi.fn(), deleteMany: mocks.postTagDeleteMany },
       paidContent: { create: vi.fn(), deleteMany: mocks.paidContentDeleteMany },
+      postTranslation: { updateMany: mocks.postTranslationUpdateMany },
     }));
   });
 

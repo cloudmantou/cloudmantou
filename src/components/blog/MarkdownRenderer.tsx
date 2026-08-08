@@ -58,8 +58,17 @@ export function MarkdownRenderer({
             if (!src?.trim() || !isSafeMarkdownImageSrc(src)) return null;
             return (
               <figure className="md-figure">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={alt || ""} loading="lazy" decoding="async" />
+                <span className="md-image-frame">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt={alt || ""}
+                    width={1200}
+                    height={675}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
                 {alt && alt !== "image" && alt !== "paste" ? (
                   <figcaption>{alt}</figcaption>
                 ) : null}

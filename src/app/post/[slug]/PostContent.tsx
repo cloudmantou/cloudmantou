@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Crown, Ticket } from "lucide-react";
 import type { PostAccessReason } from "@/lib/post-access";
@@ -77,7 +77,7 @@ export function PostContent({
   nextPost,
 }: PostContentProps) {
   const router = useRouter();
-  const [progress, setProgress] = useState(0);
+  const progressRef = useRef<HTMLDivElement | null>(null);
   const [unlocking, setUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const isPaidOnly = post.status === "PAID_ONLY";
@@ -105,21 +105,33 @@ export function PostContent({
 
   // Reading progress bar
   useEffect(() => {
+    let frame = 0;
     const handler = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      setProgress(docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0);
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const progress = docHeight > 0 ? Math.min(1, window.scrollY / docHeight) : 0;
+        if (progressRef.current) {
+          progressRef.current.style.transform = `scaleX(${progress})`;
+        }
+      });
     };
+    handler();
     window.addEventListener("scroll", handler, { passive: true });
-    return () => window.removeEventListener("scroll", handler);
+    return () => {
+      window.removeEventListener("scroll", handler);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (
     <>
       {/* Reading progress */}
       <div
+        ref={progressRef}
         className="reading-progress"
-        style={{ width: `${progress}%` }}
+        style={{ transform: "scaleX(0)" }}
         aria-hidden="true"
       />
 
