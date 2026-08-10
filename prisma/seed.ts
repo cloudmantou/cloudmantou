@@ -74,10 +74,10 @@ async function main() {
   }
   const adminPassword = await bcrypt.hash(seedAdminPassword, 12);
   await prisma.user.upsert({
-    where: { email: "admin@cloudmantou.com" },
+    where: { email: "modianwuhen@gmail.com" },
     update: { password: adminPassword },
     create: {
-      email: "admin@cloudmantou.com",
+      email: "modianwuhen@gmail.com",
       username: "admin",
       password: adminPassword,
       nickname: "管理员",
@@ -125,7 +125,7 @@ async function main() {
 
   // 示例文章
   const admin = await prisma.user.findUnique({
-    where: { email: "admin@cloudmantou.com" },
+    where: { email: "modianwuhen@gmail.com" },
   });
   const category = await prisma.category.findUnique({
     where: { slug: "engineering" },
