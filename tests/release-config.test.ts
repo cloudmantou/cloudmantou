@@ -134,9 +134,10 @@ describe("release configuration", () => {
       sharp: "0.35.5",
       esbuild: "0.25.12",
       vite: "6.4.3",
-      "brace-expansion@<1.1.18": "1.1.18",
-      "brace-expansion@>=2.0.0 <2.1.4": "2.1.4",
-      "brace-expansion@>=4.0.0 <5.0.9": "5.0.9",
+      "js-yaml": "4.3.2",
+      "brace-expansion@<1.1.21": "1.1.21",
+      "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",
+      "brace-expansion@>=4.0.0 <5.0.12": "5.0.12",
     };
 
     for (const [dependency, version] of Object.entries(expectedOverrides)) {
