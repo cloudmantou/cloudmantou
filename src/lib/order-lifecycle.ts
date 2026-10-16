@@ -5,6 +5,7 @@ import {
   assertPaymentTransition,
   pairedStatusesForExpired,
 } from "@/lib/payment-state";
+import { releaseCardReservations } from "@/lib/card-delivery";
 
 /** 待支付订单默认 30 分钟过期 */
 export const ORDER_PENDING_TTL_MS = 30 * 60 * 1000;
@@ -29,6 +30,8 @@ const STALE_ORDER_BATCH_SIZE = 100;
 
 export async function expireStalePendingOrders(options?: {
   userId?: string;
+  /** 仅处理某个卡密套餐的订单，用于下单前及时归还超时预占的库存 */
+  cardPackageId?: string;
   now?: Date;
 }): Promise<number> {
   const now = options?.now ?? new Date();
@@ -42,6 +45,9 @@ export async function expireStalePendingOrders(options?: {
         status: "PENDING",
         createdAt: { lt: cutoff },
         ...(options?.userId ? { userId: options.userId } : {}),
+        ...(options?.cardPackageId
+          ? { productType: "CARD_PACKAGE" as const, productId: options.cardPackageId }
+          : {}),
       },
       select: { id: true, status: true, payment: { select: { id: true, status: true } } },
       take: STALE_ORDER_BATCH_SIZE,
@@ -65,6 +71,7 @@ export async function expireStalePendingOrders(options?: {
           });
         }
       }
+      await releaseCardReservations(tx, stale.map((order) => order.id));
     });
 
     totalExpired += stale.length;
@@ -112,6 +119,7 @@ export async function ensureOrderPayable(order: {
         data: { status: paymentStatus },
       });
     }
+    await releaseCardReservations(tx, [order.id]);
   });
 
   return { expired: true };

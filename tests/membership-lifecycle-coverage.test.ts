@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   orderFindUnique: vi.fn(),
   orderUpdate: vi.fn(),
   paymentUpdate: vi.fn(),
+  cardUpdateMany: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/lib/prisma", () => {
       update: mocks.orderUpdate,
     },
     payment: { update: mocks.paymentUpdate },
+    card: { updateMany: mocks.cardUpdateMany },
   };
 
   return {
@@ -49,12 +51,14 @@ beforeEach(() => {
       update: mocks.orderUpdate,
     },
     payment: { update: mocks.paymentUpdate },
+    card: { updateMany: mocks.cardUpdateMany },
   };
   mocks.transaction.mockImplementation(
     async (callback: (client: typeof tx) => unknown) => callback(tx)
   );
   mocks.orderUpdate.mockResolvedValue({});
   mocks.paymentUpdate.mockResolvedValue({});
+  mocks.cardUpdateMany.mockResolvedValue({ count: 0 });
 });
 
 afterEach(() => {
@@ -81,6 +85,21 @@ describe("order age and payable guards", () => {
 });
 
 describe("batch expiry", () => {
+  it("can scope expiry to one card package to free its reserved stock", async () => {
+    mocks.orderFindMany.mockResolvedValue([]);
+
+    await expireStalePendingOrders({ now: NOW, cardPackageId: "package-1" });
+    expect(mocks.orderFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "PENDING",
+          productType: "CARD_PACKAGE",
+          productId: "package-1",
+        }),
+      })
+    );
+  });
+
   it("returns zero without opening a transaction when no stale order exists", async () => {
     mocks.orderFindMany.mockResolvedValue([]);
 
@@ -149,6 +168,8 @@ describe("batch expiry", () => {
       data: { status: "EXPIRED" },
     });
     expect(mocks.paymentUpdate).toHaveBeenCalledTimes(51);
+    // 每个批次在同一事务内归还预占的卡密
+    expect(mocks.cardUpdateMany).toHaveBeenCalledTimes(2);
     expect(mocks.paymentUpdate).toHaveBeenCalledWith({
       where: { id: "payment-100" },
       data: { status: "CLOSED" },
@@ -201,6 +222,11 @@ describe("single-order payable reconciliation", () => {
       data: { status: "EXPIRED" },
     });
     expect(mocks.paymentUpdate).not.toHaveBeenCalled();
+    // 过期订单预占的卡密归还库存
+    expect(mocks.cardUpdateMany).toHaveBeenCalledWith({
+      where: { orderId: { in: ["order-1"] }, delivery: { is: null } },
+      data: { orderId: null },
+    });
   });
 
   it("atomically expires a stale order and closes its waiting payment", async () => {

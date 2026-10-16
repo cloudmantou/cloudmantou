@@ -77,4 +77,5 @@ export const RATE_LIMITS = {
   LIKE: { limit: 30, windowMs: 60 * 1000 },
   COMMENT: { limit: 10, windowMs: 10 * 60 * 1000 },
   CARD_VERIFY: { limit: 10, windowMs: 15 * 60 * 1000 },
+  ORDER_CREATE: { limit: 10, windowMs: 10 * 60 * 1000 },
 } as const;

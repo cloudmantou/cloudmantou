@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
 import { getSiteSettings } from "@/lib/site-settings";
+import { hasJsonContentType, isAllowedMutationOrigin } from "@/lib/csrf-origin";
 
 const registerSchema = z.object({
   email: z.string().email("邮箱格式不正确"),
@@ -17,7 +18,14 @@ const registerSchema = z.object({
   nickname: z.string().max(30, "昵称过长").optional(),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (!isAllowedMutationOrigin(req)) {
+    return fail("跨站请求被拒绝", 40300, 403);
+  }
+  if (!hasJsonContentType(req)) {
+    return fail("请求格式不正确", 41500, 415);
+  }
+
   try {
     // 速率限制：每 IP 每小时最多 5 次注册
     const limited = await checkRateLimit(req, {

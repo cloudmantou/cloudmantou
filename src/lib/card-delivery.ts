@@ -48,16 +48,77 @@ export async function deliverCardPackageOrder(
   }
 
   const deliveryTime = new Date();
-  const availableCardWhere: Prisma.CardWhereInput = {
-    packageId: pkg.id,
+  const reserved = await tx.card.findUnique({ where: { orderId: order.id } });
+  const card = reserved && isDeliverableCard(reserved, pkg.id, deliveryTime)
+    ? reserved
+    : await (async () => {
+        // 预占卡已被后台禁用/删除或过期：先释放旧占用（orderId 唯一），再从库存池补领。
+        if (reserved) {
+          await tx.card.updateMany({
+            where: { id: reserved.id, orderId: order.id },
+            data: { orderId: null },
+          });
+        }
+        return claimPooledCard(tx, pkg.id, order.id, deliveryTime);
+      })();
+
+  const cardSecret = decryptCardSecret(card.cardSecretEnc!);
+  await tx.orderDelivery.create({
+    data: {
+      orderId: order.id,
+      cardId: card.id,
+      cardNo: card.cardNo,
+      cardSecretEnc: card.cardSecretEnc!.startsWith(POINT_CARD_PREFIX) ? encryptPointCardSecret(cardSecret) : encryptCardSecret(cardSecret),
+      status: "DELIVERED",
+    },
+  });
+
+  return {
+    cardNo: card.cardNo,
+    cardSecret,
+    status: "DELIVERED",
+  };
+}
+
+type ClaimableCard = {
+  id: string;
+  cardNo: string;
+  cardSecretEnc: string | null;
+  packageId: string | null;
+  status: string;
+  expireAt?: Date | null;
+};
+
+function deliverableCardWhere(packageId: string, now: Date): Prisma.CardWhereInput {
+  return {
+    packageId,
     status: "ACTIVE",
     orderId: null,
     cardSecretEnc: { not: null },
-    OR: [{ expireAt: null }, { expireAt: { gt: deliveryTime } }],
+    OR: [{ expireAt: null }, { expireAt: { gt: now } }],
   };
+}
+
+function isDeliverableCard(card: ClaimableCard, packageId: string, now: Date): boolean {
+  return (
+    card.packageId === packageId &&
+    card.status === "ACTIVE" &&
+    Boolean(card.cardSecretEnc) &&
+    (!card.expireAt || card.expireAt > now)
+  );
+}
+
+/** 从库存池原子领取一张卡并写入 orderId；库存不足时抛错。 */
+async function claimPooledCard(
+  tx: Tx,
+  packageId: string,
+  orderId: string,
+  now: Date
+): Promise<ClaimableCard & { cardSecretEnc: string }> {
+  const availableCardWhere = deliverableCardWhere(packageId, now);
   const availableAtStart = await tx.card.count({ where: availableCardWhere });
   if (availableAtStart === 0) {
-    throw new Error("该商品卡密库存不足，请先在后台导入或生成卡密");
+    throw new CardStockError();
   }
 
   // Repeatable-read transactions may keep seeing a candidate another order
@@ -76,7 +137,7 @@ export async function deliverCardPackageOrder(
     });
 
     if (!pooled?.cardSecretEnc) {
-      throw new Error("该商品卡密库存不足，请先在后台导入或生成卡密");
+      throw new CardStockError();
     }
 
     const claimed = await tx.card.updateMany({
@@ -84,33 +145,45 @@ export async function deliverCardPackageOrder(
         ...availableCardWhere,
         id: pooled.id,
       },
-      data: { orderId: order.id },
+      data: { orderId },
     });
 
-    if (claimed.count === 0) {
-      skippedCardIds = [...skippedCardIds, pooled.id];
-      continue;
+    if (claimed.count === 1) {
+      return { ...pooled, cardSecretEnc: pooled.cardSecretEnc };
     }
-
-    const cardSecret = decryptCardSecret(pooled.cardSecretEnc);
-    await tx.orderDelivery.create({
-      data: {
-        orderId: order.id,
-        cardId: pooled.id,
-        cardNo: pooled.cardNo,
-        cardSecretEnc: pooled.cardSecretEnc.startsWith(POINT_CARD_PREFIX) ? encryptPointCardSecret(cardSecret) : encryptCardSecret(cardSecret),
-        status: "DELIVERED",
-      },
-    });
-
-    return {
-      cardNo: pooled.cardNo,
-      cardSecret,
-      status: "DELIVERED",
-    };
+    skippedCardIds = [...skippedCardIds, pooled.id];
   }
 
   throw new Error("卡密库存领取冲突，请稍后重试");
+}
+
+export class CardStockError extends Error {
+  constructor() {
+    super("该商品卡密库存不足，请先在后台导入或生成卡密");
+    this.name = "CardStockError";
+  }
+}
+
+/**
+ * 下单时为卡密订单预占一张卡（写入 Card.orderId），防止并发支付超卖。
+ * 预占卡不计入可售库存；订单过期时由 releaseCardReservations 归还。
+ */
+export async function reserveCardForOrder(
+  tx: Tx,
+  order: { id: string; productId: string },
+  now = new Date()
+): Promise<void> {
+  await claimPooledCard(tx, order.productId, order.id, now);
+}
+
+/** 归还未支付订单预占的卡（仅在订单进入 EXPIRED/CANCELLED 时调用）。 */
+export async function releaseCardReservations(tx: Tx, orderIds: string[]): Promise<number> {
+  if (orderIds.length === 0) return 0;
+  const released = await tx.card.updateMany({
+    where: { orderId: { in: orderIds }, delivery: { is: null } },
+    data: { orderId: null },
+  });
+  return released.count;
 }
 
 /** 已支付卡密订单若尚未发卡，补发（幂等） */

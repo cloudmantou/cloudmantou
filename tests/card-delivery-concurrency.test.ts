@@ -96,6 +96,10 @@ function createConcurrentStockTx() {
       findUnique: async () => ({ id: PACKAGE_ID }),
     },
     card: {
+      findUnique: async ({ where }: { where: { orderId: string } }) => {
+        const reserved = cards.find((card) => card.orderId === where.orderId);
+        return reserved ? { ...reserved } : null;
+      },
       count: async () => cards.filter((card) => card.orderId === null).length,
       findFirst: async () => {
         const candidate = findAvailableCard();
@@ -190,7 +194,7 @@ describe("deliverCardPackageOrder concurrency", () => {
     const baseTx = {
       orderDelivery: { findUnique: async () => null },
       cardPackage: { findUnique: async () => null },
-      card: { count: async () => 0, findFirst: async () => null },
+      card: { findUnique: async () => null, count: async () => 0, findFirst: async () => null },
     };
 
     await expect(
@@ -309,6 +313,7 @@ describe("deliverCardPackageOrder concurrency", () => {
       },
       cardPackage: { findUnique: async () => ({ id: PACKAGE_ID }) },
       card: {
+        findUnique: async () => null,
         count: async () => cards.length,
         // Simulates a repeatable-read snapshot: availability stays stale, while
         // an explicit id exclusion can advance to another candidate.
@@ -359,6 +364,7 @@ describe("deliverCardPackageOrder concurrency", () => {
       },
       cardPackage: { findUnique: async () => ({ id: PACKAGE_ID }) },
       card: {
+        findUnique: async () => null,
         count: async () => candidates.length,
         findFirst: async (args: { where: { id?: { notIn: string[] } } }) => {
           const excluded = args.where.id?.notIn ?? [];
@@ -391,6 +397,7 @@ describe("deliverCardPackageOrder concurrency", () => {
       },
       cardPackage: { findUnique: async () => ({ id: PACKAGE_ID }) },
       card: {
+        findUnique: async () => null,
         count: async () => candidates.length,
         findFirst: async (args: { where: { id?: { notIn: string[] } } }) => {
           const excluded = args.where.id?.notIn ?? [];
