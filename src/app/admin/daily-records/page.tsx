@@ -42,6 +42,7 @@ export default function AdminDailyRecordsPage() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async (p: number, f: string) => {
@@ -69,20 +70,33 @@ export default function AdminDailyRecordsPage() {
   const handleDelete = (id: string, preview: string) => {
     const label = preview.length > 30 ? `${preview.slice(0, 30)}…` : preview;
     if (!confirm(`确定删除「${label}」？此操作不可撤销。`)) return;
+    setActionError("");
     startTransition(async () => {
       const res = await fetch(`/api/admin/daily-records/${id}`, { method: "DELETE" });
-      if (res.ok) load(page, filter);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.message || "删除失败，请稍后重试");
+        return;
+      }
+      if (records.length <= 1 && page > 1) setPage(page - 1);
+      else await load(page, filter);
     });
   };
 
   const handleToggleTop = (id: string, isTop: boolean) => {
+    setActionError("");
     startTransition(async () => {
       const res = await fetch(`/api/admin/daily-records/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isTop: !isTop }),
       });
-      if (res.ok) load(page, filter);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setActionError(data?.message || (isTop ? "取消置顶失败" : "置顶失败"));
+        return;
+      }
+      await load(page, filter);
     });
   };
 
@@ -124,8 +138,11 @@ export default function AdminDailyRecordsPage() {
         ))}
       </div>
 
+      {actionError ? (
+        <p className="text-xs mb-4" style={{ color: "var(--rose)" }} role="alert">{actionError}</p>
+      ) : null}
       {loadError ? (
-        <p className="text-xs mb-4" style={{ color: "var(--rose)" }}>{loadError}</p>
+        <p className="text-xs mb-4" style={{ color: "var(--rose)" }} role="alert">{loadError}</p>
       ) : null}
 
       <div className="overflow-x-auto rounded-lg" style={{ border: "1px solid var(--border)" }}>

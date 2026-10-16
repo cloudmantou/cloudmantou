@@ -124,7 +124,9 @@ export default function PaymentGatewayPage() {
   const [gateways, setGateways] = useState<Record<string, GatewayData>>({});
   const [testMode, setTestMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [switching, setSwitching] = useState<string | null>(null);
   const [openConfig, setOpenConfig] = useState<GatewayId | "webhook" | null>("alipay");
   const [toast, setToast] = useState("");
 
@@ -135,15 +137,17 @@ export default function PaymentGatewayPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
-      const res = await fetch("/api/admin/payment-gateway");
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
+      const res = await fetch("/api/admin/payment-gateway", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data) throw new Error(json?.message || "加载支付配置失败");
       setData(json.data);
       setGateways(json.data.gateways);
       setTestMode(json.data.testMode);
-    } catch {
+    } catch (e) {
       setData(null);
+      setLoadError(e instanceof Error ? e.message : "加载支付配置失败");
     }
     setLoading(false);
   }, []);
@@ -156,8 +160,46 @@ export default function PaymentGatewayPage() {
     setGateways((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
   };
 
-  const toggleGateway = (id: GatewayId) => {
-    updateGateway(id, { enabled: !gateways[id]?.enabled });
+  const putGatewayConfig = async (payload: Record<string, unknown>) => {
+    const res = await fetch("/api/admin/payment-gateway", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(json?.message || "保存失败");
+  };
+
+  // 卡片上的开关直接持久化启用状态（只提交 enabled，不夹带未保存的凭证草稿），失败则回滚。
+  const toggleGateway = async (id: GatewayId) => {
+    if (switching) return;
+    const next = !gateways[id]?.enabled;
+    setSwitching(id);
+    updateGateway(id, { enabled: next });
+    try {
+      await putGatewayConfig({ gateways: { [id]: { enabled: next } } });
+      flash(next ? "通道已启用" : "通道已停用");
+    } catch (e) {
+      updateGateway(id, { enabled: !next });
+      flash(e instanceof Error ? e.message : "切换失败");
+    } finally {
+      setSwitching(null);
+    }
+  };
+
+  // 测试模式影响真实扣款，必须以服务端结果为准（生产环境未放开时服务端会拒绝）。
+  const setTestModeRemote = async (next: boolean) => {
+    if (switching) return;
+    setSwitching("testMode");
+    try {
+      await putGatewayConfig({ testMode: next });
+      setTestMode(next);
+      flash(next ? "测试模式已开启" : "测试模式已关闭");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "切换测试模式失败");
+    } finally {
+      setSwitching(null);
+    }
   };
 
   const saveGateway = async (id?: GatewayId) => {
@@ -229,6 +271,20 @@ export default function PaymentGatewayPage() {
     );
   }
 
+  if (loadError || !data) {
+    return (
+      <div className="admin-panel" role="alert" style={{ padding: 32, textAlign: "center" }}>
+        <p style={{ color: "var(--rose)", fontSize: 13, marginBottom: 6 }}>{loadError || "加载支付配置失败"}</p>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 14 }}>
+          加载成功前不允许修改支付配置，以免空表单覆盖现有凭证。
+        </p>
+        <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => void load()}>
+          重新加载
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="admin-page-header">
@@ -244,15 +300,8 @@ export default function PaymentGatewayPage() {
           <button
             type="button"
             className="admin-btn admin-btn-ghost admin-btn-sm"
-            onClick={() => {
-              const next = !testMode;
-              setTestMode(next);
-              fetch("/api/admin/payment-gateway", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ testMode: next }),
-              }).then(() => flash(next ? "测试模式已开启" : "测试模式已关闭"));
-            }}
+            disabled={switching !== null || !data}
+            onClick={() => void setTestModeRemote(!testMode)}
           >
             🧪 {testMode ? "关闭测试模式" : "切换测试模式"}
           </button>
@@ -268,14 +317,8 @@ export default function PaymentGatewayPage() {
             type="button"
             className="admin-btn admin-btn-sm"
             style={{ background: "var(--orange)", color: "#000" }}
-            onClick={() => {
-              setTestMode(false);
-              fetch("/api/admin/payment-gateway", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ testMode: false }),
-              });
-            }}
+            disabled={switching !== null}
+            onClick={() => void setTestModeRemote(false)}
           >
             关闭测试模式
           </button>
@@ -330,8 +373,10 @@ export default function PaymentGatewayPage() {
                 <button
                   type="button"
                   className={`admin-toggle${enabled ? " on" : ""}`}
-                  onClick={() => toggleGateway(gw.id)}
-                  aria-label={`切换 ${gw.name}`}
+                  onClick={() => void toggleGateway(gw.id)}
+                  disabled={switching !== null || !data}
+                  aria-pressed={enabled}
+                  aria-label={`${enabled ? "停用" : "启用"} ${gw.name}`}
                 />
               </div>
               <div className="admin-gateway-body">

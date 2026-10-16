@@ -3,7 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
+import { BRAND_NAME } from "@/config/site";
 import {
   ArrowLeft,
   CreditCard,
@@ -22,6 +23,9 @@ import {
   Wallet,
   Lock,
   AppWindow,
+  Bug,
+  Gift,
+  LogOut,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -51,8 +55,8 @@ const navGroups: NavGroup[] = [
       { href: "/admin/daily-records/new", label: "发布日常", icon: PenLine },
       { href: "/admin/daily-records", label: "日常记录", icon: CalendarDays },
       { href: "/admin/comments", label: "评论管理", icon: MessageSquare },
-      { href: "/admin/feedback", label: "需求与 Bug", icon: MessageSquare },
-      { href: "/admin/categories", label: "分类标签", icon: FolderOpen },
+      { href: "/admin/feedback", label: "需求与 Bug", icon: Bug },
+      { href: "/admin/categories", label: "分类", icon: FolderOpen },
       { href: "/admin/tags", label: "标签", icon: Hash },
     ],
   },
@@ -68,7 +72,7 @@ const navGroups: NavGroup[] = [
       { href: "/admin/store-apps", label: "应用商店", icon: AppWindow },
       { href: "/admin/orders", label: "订单管理", icon: ShoppingCart },
       { href: "/admin/cards", label: "卡密管理", icon: KeyRound },
-      { href: "/admin/points", label: "积分兑换", icon: KeyRound },
+      { href: "/admin/points", label: "积分兑换", icon: Gift },
       { href: "/admin/payment-gateway", label: "支付对接", icon: Wallet },
       { href: "/admin/payments", label: "支付记录", icon: CreditCard },
     ],
@@ -89,7 +93,7 @@ const pageTitles: Record<string, string> = {
   "/admin/comments": "评论管理",
   "/admin/feedback": "需求与 Bug",
   "/admin/points": "积分兑换",
-  "/admin/categories": "分类标签",
+  "/admin/categories": "分类管理",
   "/admin/tags": "标签管理",
   "/admin/users": "用户管理",
   "/admin/store-apps": "应用商店",
@@ -149,7 +153,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="admin-brand">
           <div className="admin-brand-icon">CM</div>
           <div className="admin-brand-text">
-            <h2>馒头的博客</h2>
+            <h2>{BRAND_NAME}</h2>
             <span>Admin Panel</span>
           </div>
         </div>
@@ -197,10 +201,25 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
         <div className="admin-sidebar-footer">
           <div className="admin-avatar-sm">{initial}</div>
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h4>{displayName}</h4>
-            <span>{session?.user?.email || "admin@cloudmantou.dev"}</span>
+            {session?.user?.email ? (
+              <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session.user.email}
+              </span>
+            ) : null}
           </div>
+          <button
+            type="button"
+            className="admin-topbar-btn"
+            onClick={() => {
+              if (window.confirm("确定退出登录？")) void signOut({ callbackUrl: "/login" });
+            }}
+            title="退出登录"
+            aria-label="退出登录"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </aside>
 
@@ -211,7 +230,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               type="button"
               className="admin-mobile-toggle"
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label="打开菜单"
+              aria-label={mobileOpen ? "关闭菜单" : "打开菜单"}
+              aria-expanded={mobileOpen}
             >
               <Menu size={18} />
             </button>

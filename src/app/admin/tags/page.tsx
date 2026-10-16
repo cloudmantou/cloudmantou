@@ -28,13 +28,18 @@ export default function AdminTagsPage() {
   const [form, setForm] = useState<FormData>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
 
   const load = async () => {
     try {
-      const res = await fetch("/api/admin/tags");
-      const data = await res.json();
-      setTags(data.data || []);
-    } catch { /* ignore */ }
+      const res = await fetch("/api/admin/tags", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || "加载标签失败");
+      setTags(data?.data || []);
+      setPageError("");
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : "加载标签失败");
+    }
     setLoading(false);
   };
 
@@ -84,7 +89,13 @@ export default function AdminTagsPage() {
     if (!confirm(`确定删除标签「${name}」？已关联的文章会失去此标签。`)) return;
     startTransition(async () => {
       const res = await fetch(`/api/admin/tags/${id}`, { method: "DELETE" });
-      if (res.ok) load();
+      if (res.ok) {
+        setPageError("");
+        await load();
+      } else {
+        const data = await res.json().catch(() => null);
+        setPageError(data?.message || "删除标签失败");
+      }
     });
   };
 
@@ -104,6 +115,15 @@ export default function AdminTagsPage() {
           新建标签
         </button>
       </div>
+
+      {pageError ? (
+        <div className="mb-4 flex items-center gap-3 text-xs" style={{ color: "var(--rose)" }} role="alert">
+          <span>{pageError}</span>
+          <button type="button" onClick={() => { setLoading(true); void load(); }} className="underline">
+            重试
+          </button>
+        </div>
+      ) : null}
 
       {/* Inline form */}
       {showForm && (
@@ -179,7 +199,7 @@ export default function AdminTagsPage() {
       {/* Tag grid */}
       {loading ? (
         <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</div>
-      ) : tags.length === 0 ? (
+      ) : tags.length === 0 && pageError ? null : tags.length === 0 ? (
         <EmptyState title="暂无标签" description="还没有任何标签。" />
       ) : (
         <div className="flex flex-wrap gap-2">

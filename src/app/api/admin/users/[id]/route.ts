@@ -41,8 +41,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return fail("不能修改其他管理员", 40900, 409);
     }
 
+    // 调整等级时不缩短已付费的会员期：在“现有到期时间”和“今天起 30 天”中取较晚者。
+    const now = Date.now();
+    const grantUntil = now + 30 * 24 * 60 * 60 * 1000;
+    const currentExpiry = user.vipExpireAt && user.vipExpireAt.getTime() > now
+      ? user.vipExpireAt.getTime()
+      : 0;
     const vipExpireAt = parsed.data.vipLevel && parsed.data.vipLevel > 0
-      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      ? new Date(Math.max(currentExpiry, grantUntil))
       : null;
     const updated = await prisma.$transaction(async (tx) => {
       if (parsed.data.role !== undefined) {

@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
       }),
     };
 
-    const [items, total] = await Promise.all([
+    const now = new Date();
+    const [items, total, roleCounts, activeVip] = await Promise.all([
       prisma.user.findMany({
         where,
         select: {
@@ -43,9 +44,24 @@ export async function GET(req: NextRequest) {
         take: pageSize,
       }),
       prisma.user.count({ where }),
+      prisma.user.groupBy({ by: ["role"], _count: true }),
+      prisma.user.count({ where: { vipExpireAt: { gt: now } } }),
     ]);
 
-    return ok(items, { page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
+    // 汇总基于全站而不是当前页，避免“管理员 / VIP”数字随翻页变化。
+    const countOf = (r: string) => roleCounts.find((c) => c.role === r)?._count ?? 0;
+    return ok(
+      {
+        items,
+        summary: {
+          total: roleCounts.reduce((sum, c) => sum + c._count, 0),
+          admins: countOf("ADMIN"),
+          editors: countOf("EDITOR"),
+          activeVip,
+        },
+      },
+      { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    );
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);

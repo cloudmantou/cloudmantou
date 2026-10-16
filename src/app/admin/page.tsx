@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { readApiEnvelope } from "@/lib/client-api-response";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
 import {
   FileText,
   MessageSquare,
@@ -58,7 +58,7 @@ type Stats = {
     user: { username: string; nickname: string | null };
     post: { title: string };
   }>;
-  visitTrend: Array<{ label: string; value: number; height: number }>;
+  publishTrend: Array<{ label: string; value: number; height: number }>;
   revenueBreakdown: Array<{ type: string; amount: number; percent: number }>;
   activity: Array<{ type: string; color: string; text: string; time: string }>;
   updatedAt: string;
@@ -103,37 +103,41 @@ function formatRelativeTime(iso: string) {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${Math.max(1, mins)} 分钟前`;
+  if (mins < 1) return "刚刚";
+  if (mins < 60) return `${mins} 分钟前`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours} 小时前`;
   const days = Math.floor(hours / 24);
   return `${days} 天前`;
 }
 
+function formatRevenue(value: number) {
+  return value >= 1000 ? `¥${(value / 1000).toFixed(1)}K` : `¥${value.toFixed(2)}`;
+}
+
 export default function AdminDashboard() {
-  const { data: session } = useSession();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
 
-  const load = () => {
+  // 刷新时保留旧数据，只在按钮上显示加载状态，避免整个面板闪烁消失。
+  const load = useCallback(async () => {
     setLoading(true);
-    fetch("/api/admin/stats")
-      .then((r) => {
-        if (!r.ok) throw new Error("fetch failed");
-        return r.json();
-      })
-      .then((d) => {
-        setStats(d.data);
-        setError(false);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  };
+    try {
+      const res = await fetch("/api/admin/stats", { cache: "no-store" });
+      const body = await readApiEnvelope(res, "获取数据失败");
+      setStats(body.data as Stats);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "获取数据失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   const donutGradient =
     stats?.revenueBreakdown && stats.revenueBreakdown.length > 0
@@ -161,9 +165,9 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={load}>
-            <RefreshCw size={13} />
-            刷新
+          <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => void load()} disabled={loading}>
+            <RefreshCw size={13} className={loading ? "animate-spin" : undefined} />
+            {loading ? "刷新中" : "刷新"}
           </button>
           <Link href="/admin/posts/new" className="admin-btn admin-btn-accent admin-btn-sm" style={{ textDecoration: "none" }}>
             <Plus size={13} />
@@ -172,7 +176,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {loading && (
+      {loading && !stats && (
         <div className="admin-panel" style={{ padding: 48, textAlign: "center", color: "var(--text-muted)" }}>
           <Loader2 size={16} className="animate-spin" style={{ margin: "0 auto 8px" }} />
           <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12 }}>加载中...</span>
@@ -180,42 +184,43 @@ export default function AdminDashboard() {
       )}
 
       {error && (
-        <div className="admin-panel" style={{ padding: 32, textAlign: "center", color: "var(--text-muted)" }}>
-          <p style={{ fontSize: 12, marginBottom: 8 }}>获取数据失败</p>
-          <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={load}>
+        <div className="admin-panel" role="alert" style={{ padding: 24, marginBottom: 16, textAlign: "center", color: "var(--rose)" }}>
+          <p style={{ fontSize: 12, marginBottom: 8 }}>
+            {error}
+            {stats ? "（当前显示的是上次成功加载的数据）" : ""}
+          </p>
+          <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => void load()}>
             重试
           </button>
         </div>
       )}
 
-      {!loading && !error && stats && (
+      {stats && (
         <>
           <div className="admin-stats-grid">
-            <div className="admin-stat-card">
+            <Link href="/admin/posts" className="admin-stat-card" style={{ textDecoration: "none" }}>
               <div className="admin-stat-header">
                 <div className="admin-stat-icon purple">✎</div>
               </div>
               <div className="admin-stat-value">{stats.metrics.posts}</div>
               <div className="admin-stat-label">总文章数</div>
-            </div>
-            <div className="admin-stat-card">
+            </Link>
+            <Link href="/admin/users" className="admin-stat-card" style={{ textDecoration: "none" }}>
               <div className="admin-stat-header">
                 <div className="admin-stat-icon green">◉</div>
               </div>
               <div className="admin-stat-value">{stats.metrics.users}</div>
               <div className="admin-stat-label">注册用户</div>
-            </div>
-            <div className="admin-stat-card">
+            </Link>
+            <Link href="/admin/orders" className="admin-stat-card" style={{ textDecoration: "none" }}>
               <div className="admin-stat-header">
                 <div className="admin-stat-icon yellow">◆</div>
               </div>
-              <div className="admin-stat-value">
-                {stats.metrics.revenue >= 1000
-                  ? `¥${(stats.metrics.revenue / 1000).toFixed(1)}K`
-                  : `¥${stats.metrics.revenue.toFixed(0)}`}
+              <div className="admin-stat-value" title={`¥${stats.metrics.revenue.toFixed(2)}`}>
+                {formatRevenue(stats.metrics.revenue)}
               </div>
-              <div className="admin-stat-label">总收入</div>
-            </div>
+              <div className="admin-stat-label">总收入 · {stats.metrics.orders} 笔已支付</div>
+            </Link>
             <div className="admin-stat-card">
               <div className="admin-stat-header">
                 <div className="admin-stat-icon blue">★</div>
@@ -261,19 +266,16 @@ export default function AdminDashboard() {
             <div className="admin-panel">
               <div className="admin-panel-header">
                 <div>
-                  <div className="admin-panel-title">访问趋势</div>
-                  <div className="admin-panel-subtitle">近 7 天博客访问量</div>
-                </div>
-                <div className="admin-filter-chips">
-                  <button type="button" className="admin-chip active">
-                    周
-                  </button>
+                  <div className="admin-panel-title">发布趋势</div>
+                  <div className="admin-panel-subtitle">
+                    近 7 天发布 {stats.publishTrend.reduce((sum, d) => sum + d.value, 0)} 篇文章
+                  </div>
                 </div>
               </div>
               <div className="admin-panel-body">
                 <div className="admin-chart-bars">
-                  {stats.visitTrend.map((d) => (
-                    <div className="admin-chart-bar-group" key={d.label}>
+                  {stats.publishTrend.map((d, i) => (
+                    <div className="admin-chart-bar-group" key={`${d.label}-${i}`} title={`${d.label}：${d.value} 篇`}>
                       <div className="admin-chart-bar-wrap">
                         <div className="admin-chart-bar" style={{ height: `${d.height}%` }} />
                       </div>
@@ -288,18 +290,14 @@ export default function AdminDashboard() {
               <div className="admin-panel-header">
                 <div>
                   <div className="admin-panel-title">收入构成</div>
-                  <div className="admin-panel-subtitle">各渠道占比</div>
+                  <div className="admin-panel-subtitle">各商品类型占比</div>
                 </div>
               </div>
               <div className="admin-panel-body">
                 <div className="admin-donut-wrap">
                   <div className="admin-donut" style={{ background: `conic-gradient(${donutGradient})` }}>
                     <div className="admin-donut-center">
-                      <strong>
-                        {stats.metrics.revenue >= 1000
-                          ? `¥${(stats.metrics.revenue / 1000).toFixed(1)}K`
-                          : `¥${stats.metrics.revenue.toFixed(0)}`}
-                      </strong>
+                      <strong>{formatRevenue(stats.metrics.revenue)}</strong>
                       <span>总收入</span>
                     </div>
                   </div>
@@ -328,7 +326,7 @@ export default function AdminDashboard() {
               <div className="admin-panel-header">
                 <div>
                   <div className="admin-panel-title">最新文章</div>
-                  <div className="admin-panel-subtitle">最近发布的博客</div>
+                  <div className="admin-panel-subtitle">最近创建的文章</div>
                 </div>
                 <Link href="/admin/posts" className="admin-btn admin-btn-ghost admin-btn-sm" style={{ textDecoration: "none" }}>
                   查看全部
@@ -371,7 +369,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="mono">{p.viewCount}</td>
                           <td style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                            {formatRelativeTime(p.publishedAt || "")}
+                            {p.publishedAt ? formatRelativeTime(p.publishedAt) : "未发布"}
                           </td>
                         </tr>
                       ))
@@ -385,7 +383,7 @@ export default function AdminDashboard() {
               <div className="admin-panel-header">
                 <div>
                   <div className="admin-panel-title">最近动态</div>
-                  <div className="admin-panel-subtitle">系统操作日志</div>
+                  <div className="admin-panel-subtitle">支付、待审评论与发布</div>
                 </div>
               </div>
               <div className="admin-panel-body">
@@ -413,7 +411,7 @@ export default function AdminDashboard() {
       <h2 className="section-title" style={{ marginTop: 8, marginBottom: 12, fontSize: 14, fontWeight: 600 }}>
         管理模块
       </h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
         {modules.map((mod) => {
           const Icon = mod.icon;
           return (
@@ -430,7 +428,7 @@ export default function AdminDashboard() {
                 transition: "border-color 0.2s",
               }}
             >
-              <div style={{ padding: 8, borderRadius: 8, background: `${mod.color}15` }}>
+              <div style={{ padding: 8, borderRadius: 8, background: `color-mix(in srgb, ${mod.color} 12%, transparent)` }}>
                 <Icon size={20} style={{ color: mod.color }} />
               </div>
               <div style={{ flex: 1 }}>

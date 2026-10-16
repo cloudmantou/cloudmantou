@@ -30,13 +30,18 @@ export default function AdminCategoriesPage() {
   const [form, setForm] = useState<FormData>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
 
   const load = async () => {
     try {
-      const res = await fetch("/api/admin/categories");
-      const data = await res.json();
-      setCategories(data.data || []);
-    } catch { /* ignore */ }
+      const res = await fetch("/api/admin/categories", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || "加载分类失败");
+      setCategories(data?.data || []);
+      setPageError("");
+    } catch (e) {
+      setPageError(e instanceof Error ? e.message : "加载分类失败");
+    }
     setLoading(false);
   };
 
@@ -90,13 +95,19 @@ export default function AdminCategoriesPage() {
 
   const handleDelete = (id: string, name: string, postCount: number) => {
     if (postCount > 0) {
-      alert(`该分类下有 ${postCount} 篇文章，请先移除`);
+      setPageError(`「${name}」下还有 ${postCount} 篇文章，请先把这些文章移到其他分类再删除。`);
       return;
     }
     if (!confirm(`确定删除「${name}」？`)) return;
     startTransition(async () => {
       const res = await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
-      if (res.ok) load();
+      if (res.ok) {
+        setPageError("");
+        await load();
+      } else {
+        const data = await res.json().catch(() => null);
+        setPageError(data?.message || "删除分类失败");
+      }
     });
   };
 
@@ -116,6 +127,15 @@ export default function AdminCategoriesPage() {
           新建分类
         </button>
       </div>
+
+      {pageError ? (
+        <div className="mb-4 flex items-center gap-3 text-xs" style={{ color: "var(--rose)" }} role="alert">
+          <span>{pageError}</span>
+          <button type="button" onClick={() => { setLoading(true); void load(); }} className="underline">
+            重试
+          </button>
+        </div>
+      ) : null}
 
       {/* Inline form */}
       {showForm && (
@@ -194,7 +214,7 @@ export default function AdminCategoriesPage() {
       <div className="flex flex-col gap-2">
         {loading ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--text-muted)" }}>加载中...</div>
-        ) : categories.length === 0 ? (
+        ) : categories.length === 0 && pageError ? null : categories.length === 0 ? (
           <EmptyState title="暂无分类" description="还没有任何分类。" />
         ) : (
           categories.map((cat) => (

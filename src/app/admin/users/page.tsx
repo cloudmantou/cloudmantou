@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, ShieldCheck, Shield, UserX, Crown } from "lucide-react";
+import { Search, ShieldCheck, UserX, Crown } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { readApiEnvelope } from "@/lib/client-api-response";
 
 type UserItem = {
   id: string;
@@ -28,6 +30,12 @@ const ROLE_TAG: Record<string, string> = {
   USER: "tag-muted",
 };
 
+type UserSummary = { total: number; admins: number; editors: number; activeVip: number };
+
+function isVipActive(u: UserItem) {
+  return u.vipLevel > 0 && Boolean(u.vipExpireAt) && new Date(u.vipExpireAt as string).getTime() > Date.now();
+}
+
 const ROLE_FILTERS = [
   { id: "", label: "全部" },
   { id: "ADMIN", label: "管理员" },
@@ -44,23 +52,30 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [summary, setSummary] = useState<UserSummary | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const load = useCallback(
     async (p: number) => {
       setLoading(true);
+      setLoadError("");
       try {
         const params = new URLSearchParams({ page: String(p), pageSize: "20" });
         if (roleFilter) params.set("role", roleFilter);
         if (search) params.set("q", search);
-        const res = await fetch(`/api/admin/users?${params}`);
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        setUsers(data.data || []);
-        setTotal(data.pagination?.total || 0);
-        setTotalPages(data.pagination?.totalPages || 1);
-      } catch {
+        const res = await fetch(`/api/admin/users?${params}`, { cache: "no-store" });
+        const body = await readApiEnvelope(res, "获取用户列表失败");
+        const data = body.data as { items: UserItem[]; summary: UserSummary };
+        const pagination = body.pagination as { total?: number; totalPages?: number } | undefined;
+        setUsers(data.items || []);
+        setSummary(data.summary || null);
+        setTotal(pagination?.total || 0);
+        setTotalPages(pagination?.totalPages || 1);
+      } catch (e) {
         setUsers([]);
+        setLoadError(e instanceof Error ? e.message : "获取用户列表失败");
       }
       setLoading(false);
     },
@@ -76,14 +91,18 @@ export default function AdminUsersPage() {
     setTimeout(() => setToast(null), 2400);
   };
 
-  const handleRoleChange = async (id: string, currentRole: string) => {
+  const handleRoleChange = async (u: UserItem) => {
+    const { id, role: currentRole } = u;
     const next = currentRole === "EDITOR" ? "USER" : "EDITOR";
+    if (!window.confirm(`确定将「${u.nickname || u.username}」设为${ROLE_LABELS[next]}？`)) return;
+    setBusyId(id);
     const res = await fetch(`/api/admin/users/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: next }),
     });
     const data = await res.json().catch(() => null);
+    setBusyId(null);
     if (!res.ok) {
       flash(data?.message || "更新失败", "err");
       return;
@@ -92,14 +111,23 @@ export default function AdminUsersPage() {
     load(page);
   };
 
-  const handleVipBump = async (id: string, currentLevel: number) => {
+  // 会员等级会直接影响付费权益：每次调整都明确告知结果，并防止连续误点。
+  const handleVipBump = async (u: UserItem) => {
+    const { id, vipLevel: currentLevel } = u;
     const next = currentLevel >= 3 ? 0 : currentLevel + 1;
+    const name = u.nickname || u.username;
+    const message = next === 0
+      ? `确定取消「${name}」的会员？会员权益将立即失效。`
+      : `确定将「${name}」的会员等级调整为 Lv.${next}？\n到期时间取“现有到期时间”和“今天起 30 天”中较晚者。`;
+    if (!window.confirm(message)) return;
+    setBusyId(id);
     const res = await fetch(`/api/admin/users/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vipLevel: next }),
     });
     const data = await res.json().catch(() => null);
+    setBusyId(null);
     if (!res.ok) {
       flash(data?.message || "更新失败", "err");
       return;
@@ -119,26 +147,19 @@ export default function AdminUsersPage() {
       {/* Summary */}
       <div className="metrics-grid mb-6">
         <div className="metric-card">
-          <div className="metric-value">{total}</div>
+          <div className="metric-value">{summary?.total ?? "—"}</div>
           <div className="metric-label">用户总数</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">
-            {users.filter((u) => u.vipLevel > 0).length}
-            <span className="metric-delta muted">/ {users.length}</span>
-          </div>
-          <div className="metric-label">VIP / 列表内</div>
+          <div className="metric-value">{summary?.activeVip ?? "—"}</div>
+          <div className="metric-label">有效会员</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">
-            {users.filter((u) => u.role === "ADMIN").length}
-          </div>
+          <div className="metric-value">{summary?.admins ?? "—"}</div>
           <div className="metric-label">管理员</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">
-            {users.filter((u) => u.role === "EDITOR").length}
-          </div>
+          <div className="metric-value">{summary?.editors ?? "—"}</div>
           <div className="metric-label">编辑</div>
         </div>
       </div>
@@ -192,8 +213,18 @@ export default function AdminUsersPage() {
         </div>
         {loading ? (
           <div className="data-panel-loading">加载中…</div>
+        ) : loadError ? (
+          <div className="data-panel-loading" role="alert" style={{ color: "var(--rose)" }}>
+            {loadError}
+            <button type="button" className="filter-button" style={{ marginLeft: 10 }} onClick={() => load(page)}>
+              重试
+            </button>
+          </div>
         ) : users.length === 0 ? (
-          <EmptyState title="暂无用户" description="还没有注册用户。" />
+          <EmptyState
+            title={search || roleFilter ? "没有匹配的用户" : "暂无用户"}
+            description={search || roleFilter ? "换个关键词或筛选条件试试。" : "还没有注册用户。"}
+          />
         ) : (
           <div className="data-table-wrap">
             <table className="data-table">
@@ -229,11 +260,18 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
                     <td>
-                      {u.vipLevel > 0 ? (
-                        <span className="vip-badge">
-                          <Crown size={11} aria-hidden="true" />
-                          Lv.{u.vipLevel}
+                      {isVipActive(u) ? (
+                        <span title={`到期：${new Date(u.vipExpireAt as string).toLocaleString("zh-CN")}`}>
+                          <span className="vip-badge">
+                            <Crown size={11} aria-hidden="true" />
+                            Lv.{u.vipLevel}
+                          </span>
+                          <span className="muted" style={{ display: "block", fontSize: 11, marginTop: 2 }}>
+                            至 {new Date(u.vipExpireAt as string).toLocaleDateString("zh-CN")}
+                          </span>
                         </span>
+                      ) : u.vipLevel > 0 ? (
+                        <span className="muted">已过期</span>
                       ) : (
                         <span className="muted">免费</span>
                       )}
@@ -249,7 +287,8 @@ export default function AdminUsersPage() {
                         {u.role !== "ADMIN" && (
                           <button
                             type="button"
-                            onClick={() => handleRoleChange(u.id, u.role)}
+                            onClick={() => void handleRoleChange(u)}
+                            disabled={busyId !== null}
                             className="icon-action"
                             title={u.role === "EDITOR" ? "降级为用户" : "升级为编辑"}
                             aria-label={u.role === "EDITOR" ? "降级为用户" : "升级为编辑"}
@@ -261,15 +300,18 @@ export default function AdminUsersPage() {
                             )}
                           </button>
                         )}
+                        {u.role !== "ADMIN" && (
                         <button
                           type="button"
-                          onClick={() => handleVipBump(u.id, u.vipLevel)}
+                          onClick={() => void handleVipBump(u)}
+                          disabled={busyId !== null}
                           className="icon-action"
                           title={u.vipLevel >= 3 ? "重置 VIP" : "提升 VIP"}
                           aria-label={u.vipLevel >= 3 ? "重置 VIP" : "提升 VIP"}
                         >
                           <Crown size={14} aria-hidden="true" />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -280,21 +322,7 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPage(p)}
-              className={`pagination-item${p === page ? " active" : ""}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} disabled={loading} onChange={setPage} />
 
       {toast && <div className={`toast ${toast.type === "err" ? "toast-err" : ""}`}>{toast.text}</div>}
     </div>

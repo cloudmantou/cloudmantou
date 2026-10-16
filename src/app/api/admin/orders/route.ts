@@ -4,14 +4,17 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 
+const ORDER_STATUSES = new Set(["PENDING", "PAID", "CANCELLED", "REFUNDED", "EXPIRED"]);
+
 export async function GET(req: NextRequest) {
   try {
     await requireAdmin();
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const pageSize = Math.min(50, parseInt(searchParams.get("pageSize") || "20"));
-    const status = searchParams.get("status") || undefined;
-    const q = searchParams.get("q") || undefined;
+    const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") || "20") || 20));
+    const rawStatus = searchParams.get("status") || undefined;
+    const status = rawStatus && ORDER_STATUSES.has(rawStatus) ? rawStatus : undefined;
+    const q = searchParams.get("q")?.trim() || undefined;
 
     const where: any = {
       ...(status && { status }),
@@ -19,6 +22,8 @@ export async function GET(req: NextRequest) {
         OR: [
           { orderNo: { contains: q } },
           { title: { contains: q } },
+          { user: { email: { contains: q } } },
+          { user: { username: { contains: q } } },
         ],
       }),
     };

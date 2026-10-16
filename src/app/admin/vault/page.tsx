@@ -77,6 +77,7 @@ function copyText(text: string) {
 export default function AdminVaultPage() {
   const [items, setItems] = useState<VaultListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -96,19 +97,24 @@ export default function AdminVaultPage() {
       const params = new URLSearchParams();
       if (type !== "all") params.set("type", type);
       if (q) params.set("q", q);
-      const res = await fetch(`/api/admin/vault?${params}`);
-      const data = await res.json();
-      if (res.status === 403 && data.code === 40301) {
+      const res = await fetch(`/api/admin/vault?${params}`, { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (res.status === 403 && data?.code === 40301) {
         setNeedsUnlock(true);
         setItems([]);
         return;
       }
+      if (!res.ok) throw new Error(data?.message || "加载私密笔记失败");
       setNeedsUnlock(false);
-      setItems(data.data || []);
-    } catch {
+      setListError("");
+      setItems(data?.data || []);
+    } catch (e) {
       setItems([]);
+      setListError(e instanceof Error ? e.message : "加载私密笔记失败");
+    } finally {
+      // 需要二次验证时也必须结束加载态，否则列表会一直停在“加载中”。
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const handleUnlock = async () => {
@@ -210,8 +216,13 @@ export default function AdminVaultPage() {
   const handleDelete = (id: string, title: string) => {
     if (!confirm(`确定删除「${title}」？`)) return;
     startTransition(async () => {
-      await fetch(`/api/admin/vault/${id}`, { method: "DELETE" });
-      loadItems(typeFilter, search);
+      const res = await fetch(`/api/admin/vault/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setListError(data?.message || "删除失败，请稍后重试");
+        return;
+      }
+      await loadItems(typeFilter, search);
     });
   };
 
@@ -221,6 +232,9 @@ export default function AdminVaultPage() {
 
   return (
     <div className="admin-page">
+      {listError ? (
+        <p role="alert" style={{ color: "var(--rose)", fontSize: 12, marginBottom: 12 }}>{listError}</p>
+      ) : null}
       {totpConfigured && needsUnlock && (
         <div className="admin-card" style={{ marginBottom: 16, padding: 16 }}>
           <p style={{ margin: "0 0 12px", color: "var(--text-secondary)" }}>

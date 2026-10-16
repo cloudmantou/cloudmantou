@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
-    const status = searchParams.get("status") || undefined;
+    const rawStatus = searchParams.get("status") || undefined;
+    const status = rawStatus && ["PENDING", "APPROVED", "REJECTED"].includes(rawStatus) ? rawStatus : undefined;
 
     const where: any = {
       ...(status && { status }),

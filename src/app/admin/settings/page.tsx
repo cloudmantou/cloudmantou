@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
-import { Save, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { readApiEnvelope } from "@/lib/client-api-response";
+import { Save, Loader2, RefreshCw } from "lucide-react";
 import { ContactLinksEditor } from "@/components/admin/ContactLinksEditor";
 import { AiSettingsEditor } from "@/components/admin/AiSettingsEditor";
 import type { ContactLink } from "@/lib/contact-links";
@@ -41,24 +42,52 @@ export default function AdminSettingsPage() {
     macosDownloadUrl: "",
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
   const [toast, setToast] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
-  useEffect(() => {
-    fetch("/api/admin/settings")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.data) {
-          setSettings((prev) => ({
-            ...prev,
-            ...d.data,
-            contactLinks: Array.isArray(d.data.contactLinks) ? d.data.contactLinks : [],
-          }));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  // 加载失败时绝不能展示默认值表单：否则点“保存”会用空值覆盖线上配置。
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const res = await fetch("/api/admin/settings", { cache: "no-store" });
+      const body = await readApiEnvelope(res, "加载系统设置失败");
+      const data = (body.data || {}) as Partial<typeof settings>;
+      setSettings((prev) => {
+        const next = {
+          ...prev,
+          ...data,
+          contactLinks: Array.isArray(data.contactLinks) ? data.contactLinks : [],
+        };
+        setSavedSnapshot(JSON.stringify(next));
+        return next;
+      });
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "加载系统设置失败");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const dirty = useMemo(
+    () => savedSnapshot !== "" && JSON.stringify(settings) !== savedSnapshot,
+    [settings, savedSnapshot]
+  );
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const flash = useCallback((text: string, type: "ok" | "err" = "ok") => {
     setToast({ text, type });
@@ -66,6 +95,15 @@ export default function AdminSettingsPage() {
   }, []);
 
   const handleSave = async () => {
+    if (!dirty || loadError) return;
+    const previous = savedSnapshot ? (JSON.parse(savedSnapshot) as typeof settings) : null;
+    if (
+      settings.maintenanceMode &&
+      !previous?.maintenanceMode &&
+      !window.confirm("开启维护模式后，前台访客将只能看到维护页面。确定保存吗？")
+    ) {
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/admin/settings", {
@@ -75,6 +113,7 @@ export default function AdminSettingsPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || "保存失败");
+      setSavedSnapshot(JSON.stringify(settings));
       flash("已保存");
     } catch (e: any) {
       flash(e?.message || "保存失败", "err");
@@ -96,22 +135,38 @@ export default function AdminSettingsPage() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="data-panel" role="alert" style={{ padding: 32, textAlign: "center" }}>
+        <p style={{ color: "var(--rose)", fontSize: 13, marginBottom: 6 }}>{loadError}</p>
+        <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 14 }}>
+          为避免用默认值覆盖现有配置，加载成功前不允许编辑和保存。
+        </p>
+        <button type="button" className="primary-button" onClick={() => void load()}>
+          <RefreshCw size={13} />
+          重新加载
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <p className="home-greeting">Settings</p>
           <h1 className="page-title">系统设置</h1>
-          <p className="page-desc">配置站点基本信息和系统参数。</p>
+          <p className="page-desc">配置站点基本信息和系统参数。右上角按钮保存除 AI 模型外的全部设置，AI 模型在其卡片内单独保存。</p>
         </div>
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !dirty}
           className="primary-button"
+          title={dirty ? "保存基本设置与开关" : "没有未保存的更改"}
         >
           {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-          {saving ? "保存中…" : "保存更改"}
+          {saving ? "保存中…" : dirty ? "保存更改" : "已保存"}
         </button>
       </div>
 

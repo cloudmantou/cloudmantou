@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, ExternalLink } from "lucide-react";
+import { Search } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AdminPagination } from "@/components/admin/AdminPagination";
 
 type Order = {
   id: string;
@@ -33,6 +34,12 @@ const STATUS_COLORS: Record<string, string> = {
   EXPIRED: "var(--blue)",
 };
 
+const CHANNEL_LABELS: Record<string, string> = {
+  ALIPAY: "支付宝",
+  WECHAT: "微信支付",
+  CARD_KEY: "卡密兑换",
+};
+
 const PRODUCT_LABELS: Record<string, string> = {
   VIP_MONTH: "月度会员",
   VIP_QUARTER: "季度会员",
@@ -47,6 +54,7 @@ export default function AdminOrdersPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -86,22 +94,27 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex items-center gap-1.5 flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-1.5 flex-1" style={{ minWidth: 220, maxWidth: 320 }}>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load(1)}
-            placeholder="搜索订单号/标题..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setPage(1);
+                setSearch(searchInput.trim());
+              }
+            }}
+            placeholder="订单号 / 标题 / 用户名 / 邮箱"
             className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
             style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)", fontFamily: '"JetBrains Mono", monospace' }}
           />
-          <button type="button" onClick={() => { setPage(1); load(1); }} className="p-1.5 rounded-md border transition-colors hover:border-[var(--accent)]" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
+          <button type="button" onClick={() => { setPage(1); setSearch(searchInput.trim()); }} aria-label="搜索订单" className="p-1.5 rounded-md border transition-colors hover:border-[var(--accent)]" style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}>
             <Search size={14} aria-hidden="true" />
           </button>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {[{ id: "", label: "全部" }, { id: "PENDING", label: "待支付" }, { id: "PAID", label: "已支付" }, { id: "CANCELLED", label: "已取消" }, { id: "REFUNDED", label: "已退款" }, { id: "EXPIRED", label: "已过期" }].map((f) => (
             <button key={f.id} type="button" onClick={() => { setStatusFilter(f.id); setPage(1); }} className="px-2.5 py-1 rounded-md text-[10px] border transition-colors" style={{ borderColor: statusFilter === f.id ? "var(--accent)" : "var(--border)", background: statusFilter === f.id ? "var(--accent-dim)" : "transparent", color: statusFilter === f.id ? "var(--accent)" : "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
               {f.label}
@@ -126,24 +139,33 @@ export default function AdminOrdersPage() {
             ) : loadError ? (
               <tr><td colSpan={7} className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={7}><div style={{ padding: "32px 16px" }}><EmptyState title="暂无订单" description="还没有任何订单记录。" /></div></td></tr>
+              <tr><td colSpan={7}><div style={{ padding: "32px 16px" }}><EmptyState title={search || statusFilter ? "没有匹配的订单" : "暂无订单"} description={search || statusFilter ? "换个关键词或状态筛选试试。" : "还没有任何订单记录。"} /></div></td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} style={{ borderTop: "1px solid var(--border)" }}>
                 <td className="px-3 py-2 text-xs" style={{ fontFamily: '"JetBrains Mono", monospace', color: "var(--text)" }}>{o.orderNo}</td>
-                <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>{o.user.nickname || o.user.username}</td>
+                <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <div>{o.user.nickname || o.user.username}</div>
+                  <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{o.user.email}</div>
+                </td>
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>
                   <div>{o.title}</div>
                   <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{PRODUCT_LABELS[o.productType]}</div>
                 </td>
                 <td className="px-3 py-2 text-xs font-medium" style={{ color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>¥{o.amount.toFixed(2)}</td>
                 <td className="px-3 py-2">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `${STATUS_COLORS[o.status]}15`, color: STATUS_COLORS[o.status], fontFamily: '"JetBrains Mono", monospace' }}>
-                    {STATUS_LABELS[o.status]}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: `color-mix(in srgb, ${STATUS_COLORS[o.status]} 12%, transparent)`, color: STATUS_COLORS[o.status], fontFamily: '"JetBrains Mono", monospace' }}>
+                    {STATUS_LABELS[o.status] || o.status}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>{o.payment?.channel || "—"}</td>
+                <td className="px-3 py-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                  {o.payment ? CHANNEL_LABELS[o.payment.channel] || o.payment.channel : "—"}
+                  {o.payment?.tradeNo ? (
+                    <div className="text-[10px]" style={{ fontFamily: '"JetBrains Mono", monospace' }} title="第三方交易号">{o.payment.tradeNo}</div>
+                  ) : null}
+                </td>
                 <td className="px-3 py-2 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
-                  {new Date(o.createdAt).toLocaleDateString("zh-CN")}
+                  <div title="下单时间">{new Date(o.createdAt).toLocaleString("zh-CN")}</div>
+                  {o.paidAt ? <div title="支付时间" style={{ color: "var(--teal)" }}>付 {new Date(o.paidAt).toLocaleString("zh-CN")}</div> : null}
                 </td>
               </tr>
             ))}
@@ -151,16 +173,7 @@ export default function AdminOrdersPage() {
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
-            <button key={p} type="button" onClick={() => setPage(p)} className="w-7 h-7 rounded-md text-xs transition-colors" style={{ background: p === page ? "var(--accent)" : "transparent", color: p === page ? "var(--bg)" : "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} disabled={loading} onChange={setPage} />
     </div>
   );
 }

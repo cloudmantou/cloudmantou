@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { readApiEnvelope } from "@/lib/client-api-response";
 
 type PaymentItem = {
   id: string;
@@ -62,38 +64,26 @@ export default function AdminPaymentsPage() {
   const [stats, setStats] = useState<PaymentStats | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(
     async (p: number) => {
       setLoading(true);
+      setLoadError("");
       try {
         const params = new URLSearchParams({ page: String(p), pageSize: "20" });
         if (statusFilter) params.set("status", statusFilter);
-        const res = await fetch(`/api/admin/payments?${params}`);
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        const list: PaymentItem[] = data.data || [];
-        setPayments(list);
-        setTotal(data.pagination?.total || 0);
-        setTotalPages(data.pagination?.totalPages || 1);
-
-        // 在客户端做一次轻量统计（不依赖后端额外接口）
-        const acc: PaymentStats = { total: 0, success: 0, successAmount: 0, failed: 0, waiting: 0 };
-        for (const item of list) {
-          acc.total += 1;
-          if (item.status === "SUCCESS") {
-            acc.success += 1;
-            acc.successAmount += Number(item.amount) || 0;
-          } else if (item.status === "FAILED") {
-            acc.failed += 1;
-          } else if (item.status === "WAITING") {
-            acc.waiting += 1;
-          }
-        }
-        setStats(acc);
-      } catch {
+        const res = await fetch(`/api/admin/payments?${params}`, { cache: "no-store" });
+        const body = await readApiEnvelope(res, "获取支付记录失败");
+        const data = body.data as { items: PaymentItem[]; summary: PaymentStats };
+        const pagination = body.pagination as { total?: number; totalPages?: number } | undefined;
+        setPayments(data.items || []);
+        setStats(data.summary || null);
+        setTotal(pagination?.total || 0);
+        setTotalPages(pagination?.totalPages || 1);
+      } catch (e) {
         setPayments([]);
-        setStats(null);
+        setLoadError(e instanceof Error ? e.message : "获取支付记录失败");
       }
       setLoading(false);
     },
@@ -116,11 +106,11 @@ export default function AdminPaymentsPage() {
       <div className="metrics-grid mb-6">
         <div className="metric-card">
           <div className="metric-value">{stats?.total ?? "—"}</div>
-          <div className="metric-label">本次列表</div>
+          <div className="metric-label">流水总数</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">¥{(stats?.successAmount ?? 0).toFixed(2)}</div>
-          <div className="metric-label">成功金额</div>
+          <div className="metric-value">{stats ? `¥${stats.successAmount.toFixed(2)}` : "—"}</div>
+          <div className="metric-label">累计成功金额</div>
         </div>
         <div className="metric-card">
           <div className="metric-value">{stats?.success ?? 0}</div>
@@ -131,7 +121,7 @@ export default function AdminPaymentsPage() {
             {stats?.waiting ?? 0}
             <span className="metric-delta" style={{ color: "var(--rose)" }}>/{stats?.failed ?? 0}</span>
           </div>
-          <div className="metric-label">待支付 / 失败</div>
+          <div className="metric-label">等待中 / 失败</div>
         </div>
       </div>
 
@@ -160,6 +150,13 @@ export default function AdminPaymentsPage() {
         </div>
         {loading ? (
           <div className="data-panel-loading">加载中…</div>
+        ) : loadError ? (
+          <div className="data-panel-loading" role="alert" style={{ color: "var(--rose)" }}>
+            {loadError}
+            <button type="button" className="filter-button" style={{ marginLeft: 10 }} onClick={() => load(page)}>
+              重试
+            </button>
+          </div>
         ) : payments.length === 0 ? (
           <EmptyState title="暂无支付记录" description="还没有任何支付流水。" />
         ) : (
@@ -182,8 +179,8 @@ export default function AdminPaymentsPage() {
                     <td className="mono">{p.tradeNo || p.id.slice(0, 12)}</td>
                     <td className="mono muted">{p.order.orderNo}</td>
                     <td>{p.order.user.nickname || p.order.user.username}</td>
-                    <td className={`num mono ${p.status === "FAILED" ? "muted" : "amount"}`}>
-                      {p.status === "FAILED" ? "−" : "+"}¥{Number(p.amount).toFixed(2)}
+                    <td className={`num mono ${p.status === "SUCCESS" ? "amount" : "muted"}`}>
+                      ¥{Number(p.amount).toFixed(2)}
                     </td>
                     <td>{CHANNEL_LABELS[p.channel] || p.channel}</td>
                     <td>
@@ -200,21 +197,7 @@ export default function AdminPaymentsPage() {
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPage(p)}
-              className={`pagination-item${p === page ? " active" : ""}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} disabled={loading} onChange={setPage} />
     </div>
   );
 }

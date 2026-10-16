@@ -4,6 +4,8 @@ import { useState, useEffect, useTransition, useCallback } from "react";
 import { Check, X, Trash2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { clampPageAfterRemoval } from "@/lib/admin-pagination";
 
 type Comment = {
   id: string;
@@ -34,6 +36,7 @@ export default function AdminCommentsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const load = useCallback(async (p: number, status?: string) => {
@@ -58,23 +61,45 @@ export default function AdminCommentsPage() {
     load(page, statusFilter);
   }, [page, statusFilter, load]);
 
-  const handleStatus = (id: string, newStatus: string) => {
+  // 操作后若当前筛选下这一条会消失（如“待审核”里通过一条），需要处理空页回退。
+  const refreshAfterChange = async (removedFromView: boolean) => {
+    const nextPage = removedFromView ? clampPageAfterRemoval(page, comments.length - 1) : page;
+    if (nextPage !== page) setPage(nextPage);
+    else await load(page, statusFilter);
+  };
+
+  const runAction = (request: () => Promise<Response>, fallback: string, removedFromView: boolean) => {
+    setActionError("");
     startTransition(async () => {
-      const res = await fetch(`/api/admin/comments/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (res.ok) load(page, statusFilter);
+      try {
+        const res = await request();
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.message || fallback);
+        }
+        await refreshAfterChange(removedFromView);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : fallback);
+      }
     });
   };
 
+  const handleStatus = (id: string, newStatus: string) => {
+    runAction(
+      () =>
+        fetch(`/api/admin/comments/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }),
+      newStatus === "APPROVED" ? "通过评论失败" : "拒绝评论失败",
+      statusFilter !== "" && statusFilter !== newStatus
+    );
+  };
+
   const handleDelete = (id: string) => {
-    if (!confirm("确定删除此评论？")) return;
-    startTransition(async () => {
-      const res = await fetch(`/api/admin/comments/${id}`, { method: "DELETE" });
-      if (res.ok) load(page, statusFilter);
-    });
+    if (!confirm("确定删除此评论？此操作不可撤销。")) return;
+    runAction(() => fetch(`/api/admin/comments/${id}`, { method: "DELETE" }), "删除评论失败", true);
   };
 
   return (
@@ -115,6 +140,12 @@ export default function AdminCommentsPage() {
         ))}
       </div>
 
+      {actionError ? (
+        <p className="mb-3 text-xs" style={{ color: "var(--rose)" }} role="alert">
+          {actionError}
+        </p>
+      ) : null}
+
       {/* Comment list */}
       <div className="flex flex-col gap-2">
         {loading ? (
@@ -122,7 +153,10 @@ export default function AdminCommentsPage() {
         ) : loadError ? (
           <div className="text-center py-8 text-xs" style={{ color: "var(--rose)" }}>{loadError}</div>
         ) : comments.length === 0 ? (
-          <EmptyState title="暂无评论" description="还没有用户发表评论。" />
+          <EmptyState
+            title={statusFilter ? "该状态下没有评论" : "暂无评论"}
+            description={statusFilter ? "切换其他状态查看。" : "还没有用户发表评论。"}
+          />
         ) : (
           comments.map((c) => (
             <div key={c.id} className="comment-box">
@@ -134,7 +168,7 @@ export default function AdminCommentsPage() {
                     </span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded-full"
-                      style={{ background: `${STATUS_COLORS[c.status]}15`, color: STATUS_COLORS[c.status], fontFamily: '"JetBrains Mono", monospace' }}
+                      style={{ background: `color-mix(in srgb, ${STATUS_COLORS[c.status]} 12%, transparent)`, color: STATUS_COLORS[c.status], fontFamily: '"JetBrains Mono", monospace' }}
                     >
                       {STATUS_LABELS[c.status]}
                     </span>
@@ -142,7 +176,7 @@ export default function AdminCommentsPage() {
                       {new Date(c.createdAt).toLocaleString("zh-CN")}
                     </span>
                   </div>
-                  <p className="text-sm m-0 mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                  <p className="text-sm m-0 mb-1.5" style={{ color: "var(--text-secondary)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                     {c.content}
                   </p>
                   <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted)", fontFamily: '"JetBrains Mono", monospace' }}>
@@ -162,6 +196,7 @@ export default function AdminCommentsPage() {
                       className="p-1.5 rounded-md transition-colors hover:bg-[var(--teal-dim)]"
                       style={{ color: "var(--teal)" }}
                       title="通过"
+                      aria-label="通过评论"
                     >
                       <Check size={14} aria-hidden="true" />
                     </button>
@@ -174,6 +209,7 @@ export default function AdminCommentsPage() {
                       className="p-1.5 rounded-md transition-colors hover:bg-[var(--orange-dim)]"
                       style={{ color: "var(--orange)" }}
                       title="拒绝"
+                      aria-label="拒绝评论"
                     >
                       <X size={14} aria-hidden="true" />
                     </button>
@@ -185,6 +221,7 @@ export default function AdminCommentsPage() {
                     className="p-1.5 rounded-md transition-colors hover:bg-[var(--rose-dim)]"
                     style={{ color: "var(--rose)" }}
                     title="删除"
+                    aria-label="删除评论"
                   >
                     <Trash2 size={14} aria-hidden="true" />
                   </button>
@@ -195,26 +232,7 @@ export default function AdminCommentsPage() {
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPage(p)}
-              className="w-7 h-7 rounded-md text-xs transition-colors"
-              style={{
-                background: p === page ? "var(--accent)" : "transparent",
-                color: p === page ? "var(--bg)" : "var(--text-muted)",
-                fontFamily: '"JetBrains Mono", monospace',
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} disabled={loading || isPending} onChange={setPage} />
     </div>
   );
 }

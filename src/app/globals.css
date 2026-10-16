@@ -4937,6 +4937,18 @@ select.form-input {
   color: var(--accent);
 }
 
+.pagination-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pagination-gap {
+  min-width: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .pagination-item.active {
   border-color: var(--accent);
   background: var(--accent);

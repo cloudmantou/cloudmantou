@@ -4,6 +4,8 @@ import { useState, useEffect, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Search, Trash2, Edit, Eye, Pin, PinOff } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import { clampPageAfterRemoval } from "@/lib/admin-pagination";
 
 type Post = {
   id: string;
@@ -37,6 +39,7 @@ export default function AdminPostsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -64,22 +67,27 @@ export default function AdminPostsPage() {
     setLoading(false);
   }, []);
 
-  // Only react to page and statusFilter changes; search is triggered manually via handleSearch
+  // 搜索词只在提交后生效，翻页/切换状态始终使用已提交的关键词。
   useEffect(() => {
     loadPosts(page, statusFilter, search);
-  }, [page, statusFilter, loadPosts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, statusFilter, search, loadPosts]);
 
   const handleDelete = (id: string, title: string) => {
     if (!confirm(`确定删除「${title}」？此操作不可撤销。`)) return;
+    setActionError(null);
 
     startTransition(async () => {
       try {
         const res = await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
-        if (res.ok) {
-          loadPosts(page, statusFilter, search);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.message || "删除失败");
         }
-      } catch {
-        // ignore
+        const nextPage = clampPageAfterRemoval(page, posts.length - 1);
+        if (nextPage !== page) setPage(nextPage);
+        else await loadPosts(page, statusFilter, search);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "删除失败，请稍后重试");
       }
     });
   };
@@ -105,7 +113,7 @@ export default function AdminPostsPage() {
 
   const handleSearch = () => {
     setPage(1);
-    loadPosts(1, statusFilter, search);
+    setSearch(searchInput.trim());
   };
 
   return (
@@ -138,8 +146,8 @@ export default function AdminPostsPage() {
         <div className="flex items-center gap-1.5" style={{ minWidth: 240, maxWidth: 320 }}>
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
             placeholder="搜索标题..."
             className="flex-1 px-3 py-1.5 rounded-md text-xs outline-none"
@@ -213,7 +221,10 @@ export default function AdminPostsPage() {
               <tr>
                 <td colSpan={6}>
                   <div style={{ padding: "32px 16px" }}>
-                    <EmptyState title="暂无文章" description="还没有发布任何文章。" />
+                    <EmptyState
+                      title={search || statusFilter ? "没有匹配的文章" : "暂无文章"}
+                      description={search || statusFilter ? "换个关键词或状态筛选试试。" : "还没有发布任何文章。"}
+                    />
                   </div>
                 </td>
               </tr>
@@ -231,7 +242,7 @@ export default function AdminPostsPage() {
                   <td className="px-3 py-2.5">
                     <span
                       className="text-[10px] px-2 py-0.5 rounded-full"
-                      style={{ background: `${STATUS_COLORS[post.status]}15`, color: STATUS_COLORS[post.status], fontFamily: '"JetBrains Mono", monospace' }}
+                      style={{ background: `color-mix(in srgb, ${STATUS_COLORS[post.status]} 12%, transparent)`, color: STATUS_COLORS[post.status], fontFamily: '"JetBrains Mono", monospace' }}
                     >
                       {STATUS_LABELS[post.status] || post.status}
                     </span>
@@ -259,19 +270,33 @@ export default function AdminPostsPage() {
                       >
                         {post.isTop ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
                       </button>
-                      <Link
-                        href={`/post/${post.slug}`}
-                        className="p-1.5 rounded-md transition-colors hover:bg-[var(--card)]"
-                        style={{ color: "var(--text-muted)" }}
-                        title="查看"
-                      >
-                        <Eye size={14} aria-hidden="true" />
-                      </Link>
+                      {post.status === "DRAFT" ? (
+                        <span
+                          className="p-1.5 rounded-md"
+                          style={{ color: "var(--text-muted)", opacity: 0.35, cursor: "not-allowed" }}
+                          title="草稿尚未发布，前台不可访问"
+                        >
+                          <Eye size={14} aria-hidden="true" />
+                        </span>
+                      ) : (
+                        <Link
+                          href={`/post/${post.slug}`}
+                          target="_blank"
+                          rel="noopener"
+                          className="p-1.5 rounded-md transition-colors hover:bg-[var(--card)]"
+                          style={{ color: "var(--text-muted)" }}
+                          title="在新标签页查看"
+                          aria-label={`查看「${post.title}」`}
+                        >
+                          <Eye size={14} aria-hidden="true" />
+                        </Link>
+                      )}
                       <Link
                         href={`/admin/posts/${post.id}/edit`}
                         className="p-1.5 rounded-md transition-colors hover:bg-[var(--card)]"
                         style={{ color: "var(--text-muted)" }}
                         title="编辑"
+                        aria-label={`编辑「${post.title}」`}
                       >
                         <Edit size={14} aria-hidden="true" />
                       </Link>
@@ -281,6 +306,7 @@ export default function AdminPostsPage() {
                         className="p-1.5 rounded-md transition-colors hover:bg-[var(--rose-dim)]"
                         style={{ color: "var(--rose)" }}
                         title="删除"
+                        aria-label={`删除「${post.title}」`}
                         disabled={isPending}
                       >
                         <Trash2 size={14} aria-hidden="true" />
@@ -294,26 +320,7 @@ export default function AdminPostsPage() {
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPage(p)}
-              className="w-7 h-7 rounded-md text-xs transition-colors"
-              style={{
-                background: p === page ? "var(--accent)" : "transparent",
-                color: p === page ? "var(--bg)" : "var(--text-muted)",
-                fontFamily: '"JetBrains Mono", monospace',
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
+      <AdminPagination page={page} totalPages={totalPages} disabled={loading} onChange={setPage} />
     </div>
   );
 }

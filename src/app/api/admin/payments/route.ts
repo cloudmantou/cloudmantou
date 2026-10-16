@@ -39,7 +39,26 @@ export async function GET(req: NextRequest) {
       prisma.payment.count({ where }),
     ]);
 
-    return ok(items, { page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
+    // 全站汇总（不随筛选和翻页变化），用于顶部指标卡。
+    const [statusGroups, successSum] = await Promise.all([
+      prisma.payment.groupBy({ by: ["status"], _count: true }),
+      prisma.payment.aggregate({ _sum: { amount: true }, where: { status: "SUCCESS" } }),
+    ]);
+    const countOf = (s: string) => statusGroups.find((g) => g.status === s)?._count ?? 0;
+
+    return ok(
+      {
+        items: items.map((item) => ({ ...item, amount: Number(item.amount) })),
+        summary: {
+          total: statusGroups.reduce((sum, g) => sum + g._count, 0),
+          success: countOf("SUCCESS"),
+          successAmount: Number(successSum._sum.amount || 0),
+          waiting: countOf("WAITING"),
+          failed: countOf("FAILED"),
+        },
+      },
+      { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    );
   } catch (error) {
     if (error instanceof ApiError) {
       return fail(error.message, error.code, error.status);
