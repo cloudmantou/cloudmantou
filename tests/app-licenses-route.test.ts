@@ -30,6 +30,21 @@ describe("license administration boundary", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(JSON.stringify(mocks.audit.mock.calls[0].slice(1))).not.toContain("PRIVATE-SECRET");
   });
+  it("bounds batch unbinding and audits row ids without device UDIDs", async () => {
+    expect((await POST(request({ action: "binding.delete-batch", ids: Array.from({ length: 101 }, (_, i) => i + 1) }))).status).toBe(422);
+    expect((await POST(request({ action: "binding.delete-batch", ids: [] }))).status).toBe(422);
+    expect((await POST(request({ action: "binding.delete-batch", ids: [1, 2] }, "https://evil.test"))).status).toBe(403);
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect((await POST(request({ action: "binding.delete-batch", ids: [4, 5] }))).status).toBe(200);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), "app-licenses.binding.delete-batch.attempt", expect.objectContaining({ detail: "count=2 ids=4,5" }));
+    expect(mocks.auth).toHaveBeenCalled();
+  });
+  it("validates and audits the automatic unbinding period", async () => {
+    expect((await POST(request({ action: "binding.ttl", days: -1 }))).status).toBe(422);
+    expect((await POST(request({ action: "binding.ttl", days: 3651 }))).status).toBe(422);
+    expect((await POST(request({ action: "binding.ttl", days: 45 }))).status).toBe(200);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.anything(), "app-licenses.binding.ttl.attempt", expect.objectContaining({ detail: "days=45" }));
+  });
   it("never returns database errors containing card secrets", async () => {
     mocks.mutate.mockRejectedValue(new Error("INSERT secret key PRIVATE-SECRET"));
     const response = await POST(request({ action: "card.generate", count: 1 }));

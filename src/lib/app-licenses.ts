@@ -12,6 +12,10 @@ export function licenseDb() {
 }
 
 const id = z.number().int().positive();
+export const MAX_BATCH_UNBIND = 100;
+export const MAX_BINDING_TTL_DAYS = 3650;
+export const DEFAULT_BINDING_TTL_DAYS = 30;
+const BINDING_TTL_KEY = "appLicenses.bindingTtlDays";
 const text = z.string().trim().min(1).max(255);
 const link = z.string().trim().max(255).refine(v => !v || /^https?:\/\//i.test(v), "请输入 http 或 https 地址");
 export const licenseMutationSchema = z.discriminatedUnion("action", [
@@ -25,6 +29,8 @@ export const licenseMutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("card.reset"), id }).strict(),
   z.object({ action: z.literal("binding.add"), udid: text, cardKey: text }).strict(),
   z.object({ action: z.literal("binding.delete"), id }).strict(),
+  z.object({ action: z.literal("binding.delete-batch"), ids: z.array(id).min(1).max(MAX_BATCH_UNBIND) }).strict(),
+  z.object({ action: z.literal("binding.ttl"), days: z.number().int().min(0).max(MAX_BINDING_TTL_DAYS) }).strict(),
 ]);
 export type LicenseMutation = z.infer<typeof licenseMutationSchema>;
 
@@ -48,8 +54,9 @@ export function licenseJson(value: unknown): unknown {
   return value;
 }
 
-export async function listLicenses(params: ReturnType<typeof licensePageParams>, db = licenseDb()) {
+export async function listLicenses(params: ReturnType<typeof licensePageParams>, db = licenseDb(), ttlDays?: number) {
   const { tab, page, search, status } = params;
+  const bindingTtlDays = ttlDays ?? await getBindingTtlDays();
   const pageSize = 30;
   const needle = `%${search}%`;
   const offset = (page - 1) * pageSize;
@@ -75,11 +82,13 @@ export async function listLicenses(params: ReturnType<typeof licensePageParams>,
   } else {
     const where = Prisma.sql`WHERE b.udid LIKE ${needle} OR c.card_key LIKE ${needle}`;
     [rows, totals] = await Promise.all([
-      db.$queryRaw<Row[]>(Prisma.sql`SELECT b.id,b.udid,b.card_id,b.created_at,c.card_key FROM bindings b JOIN cards c ON c.id=b.card_id ${where} ORDER BY b.id DESC LIMIT ${pageSize} OFFSET ${offset}`),
+      // Remaining time is computed by MySQL against its own NOW(), the same clock the
+      // expiry job uses, so legacy DATETIME time zones cannot skew the countdown.
+      db.$queryRaw<Row[]>(Prisma.sql`SELECT b.id,b.udid,b.card_id,b.created_at,c.card_key,${bindingTtlDays > 0 ? Prisma.sql`TIMESTAMPDIFF(SECOND,NOW(),b.created_at + INTERVAL ${bindingTtlDays} DAY)` : Prisma.sql`NULL`} expires_in FROM bindings b JOIN cards c ON c.id=b.card_id ${where} ORDER BY b.id DESC LIMIT ${pageSize} OFFSET ${offset}`),
       db.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT COUNT(*) n FROM bindings b JOIN cards c ON c.id=b.card_id ${where}`),
     ]);
   }
-  return licenseJson({ stats, rows, page, pageSize, total: Number(totals[0].n) });
+  return licenseJson({ stats, rows, page, pageSize, total: Number(totals[0].n), bindingTtlDays });
 }
 
 function conflict(message: string): never { throw new ApiError(message, 40900, 409); }
@@ -145,10 +154,71 @@ export async function mutateLicense(input: LicenseMutation, db = licenseDb()): P
       return { message: "设备已绑定，卡密已标记使用" };
     });
     case "binding.delete": {
-      if (!await db.$executeRaw`DELETE FROM bindings WHERE id=${input.id}`) notFound();
+      if (!await deleteBindings(db, [input.id])) notFound();
       return { message: "设备授权已解除；卡密保持已使用，避免被意外重复发放" };
     }
+    case "binding.delete-batch": {
+      const ids = [...new Set(input.ids)];
+      const removed = await db.$transaction(tx => deleteBindings(tx, ids));
+      const skipped = ids.length - removed;
+      return { message: `已解除 ${removed} 台设备授权${skipped ? `，${skipped} 条记录已不存在` : ""}；卡密保持已使用` };
+    }
+    case "binding.ttl": {
+      await setBindingTtlDays(input.days);
+      return { message: input.days ? `绑定满 ${input.days} 天后将自动解除` : "已关闭到期自动解除" };
+    }
   }
+}
+
+type RawExecutor = Pick<PrismaClient, "$executeRaw">;
+// Shared by single, batch and scheduled unbinding: only the grant is removed and
+// the card stays used, so an expired or revoked key can never be handed out again.
+function deleteBindings(db: RawExecutor, ids: number[], olderThanDays?: number) {
+  const expired = olderThanDays ? Prisma.sql`AND created_at < NOW() - INTERVAL ${olderThanDays} DAY` : Prisma.empty;
+  return db.$executeRaw`DELETE FROM bindings WHERE id IN (${Prisma.join(ids)}) ${expired}`;
+}
+
+type SettingStore = {
+  siteSetting: {
+    findUnique(args: { where: { key: string } }): Promise<{ value: string } | null>;
+    upsert(args: { where: { key: string }; update: { value: string }; create: { key: string; value: string; type: string } }): Promise<unknown>;
+  };
+};
+async function settings(store?: SettingStore): Promise<SettingStore> {
+  return store ?? (await import("@/lib/prisma")).prisma;
+}
+
+export async function getBindingTtlDays(store?: SettingStore) {
+  const row = await (await settings(store)).siteSetting.findUnique({ where: { key: BINDING_TTL_KEY } });
+  const days = Number(row?.value);
+  return row && Number.isInteger(days) && days >= 0 && days <= MAX_BINDING_TTL_DAYS ? days : DEFAULT_BINDING_TTL_DAYS;
+}
+
+export async function setBindingTtlDays(days: number, store?: SettingStore) {
+  const value = String(days);
+  await (await settings(store)).siteSetting.upsert({ where: { key: BINDING_TTL_KEY }, update: { value }, create: { key: BINDING_TTL_KEY, value, type: "number" } });
+}
+
+export type BindingExpiryResult = { ttlDays: number; removed: number; batches: number; more: boolean };
+// Removes grants older than the configured period in bounded batches so one
+// cron tick never holds long locks on the table the legacy clients verify against.
+export async function expireLicenseBindings(options: { db?: PrismaClient; ttlDays?: number; batchSize?: number; maxBatches?: number } = {}): Promise<BindingExpiryResult> {
+  const ttlDays = options.ttlDays ?? await getBindingTtlDays();
+  const { batchSize = 200, maxBatches = 10 } = options;
+  const result = { ttlDays, removed: 0, batches: 0, more: false };
+  if (!ttlDays) return result;
+  const db = options.db ?? licenseDb();
+  while (result.batches < maxBatches) {
+    const due = await db.$queryRaw<{ id: number | bigint }[]>`SELECT id FROM bindings WHERE created_at < NOW() - INTERVAL ${ttlDays} DAY ORDER BY id LIMIT ${batchSize}`;
+    if (!due.length) return result;
+    result.batches++;
+    // The age condition is re-checked on delete, so a device re-bound between the
+    // SELECT and DELETE under a recycled row id is not removed early.
+    result.removed += await deleteBindings(db, due.map(row => Number(row.id)), ttlDays);
+    if (due.length < batchSize) return result;
+  }
+  result.more = true;
+  return result;
 }
 
 const syncItem = z.object({ id: text, name: text, date: z.string().max(255).nullish(), size: z.coerce.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullish(), channel: z.string().max(255).nullish(), build: z.string().max(255).nullish(), version: z.string().max(255).nullish(), identifier: z.string().max(255).nullish(), pkg: link.nullish(), icon: link.nullish(), plist: link.nullish(), webIcon: link.nullish(), type: z.coerce.number().int().nullish() });
