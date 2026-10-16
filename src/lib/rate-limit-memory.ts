@@ -63,3 +63,14 @@ export function memoryRateLimit(
     resetAt: nextEntry.resetAt,
   };
 }
+
+/** 退还一次已计入的配额（用于只统计失败次数的场景，如登录成功后撤销本次计数）。 */
+export function memoryRateLimitRefund(identifier: string): void {
+  const entry = store.get(identifier);
+  if (!entry || entry.resetAt <= Date.now()) return;
+  if (entry.count <= 1) {
+    store.delete(identifier);
+    return;
+  }
+  store.set(identifier, { ...entry, count: entry.count - 1 });
+}

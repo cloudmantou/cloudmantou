@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
-import { memoryRateLimit, type RateLimitResult } from "@/lib/rate-limit-memory";
+import {
+  memoryRateLimit,
+  memoryRateLimitRefund,
+  type RateLimitResult,
+} from "@/lib/rate-limit-memory";
 
 export type { RateLimitResult };
-export { memoryRateLimit };
+export { memoryRateLimit, memoryRateLimitRefund };
 
 /**
  * 同步内存限流（middleware 安全，不引入 ioredis）。
@@ -21,19 +25,34 @@ function trustProxyHeaders(): boolean {
   return process.env.TRUST_PROXY_HEADERS === "true";
 }
 
+/** 受信任的反向代理层数（X-Forwarded-For 从右往左数第 N 个为客户端 IP），默认 1 */
+function trustedProxyHops(): number {
+  const hops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS || "1", 10);
+  return Number.isInteger(hops) && hops > 0 ? hops : 1;
+}
+
+/**
+ * 仅在 TRUST_PROXY_HEADERS=true 时读取代理头。
+ * X-Real-IP 由代理以 $remote_addr 覆盖写入，优先使用；X-Forwarded-For 最左侧可被客户端伪造，
+ * 因此只取最右侧由受信任代理追加的条目。
+ */
 export function getClientIP(req: NextRequest | Request): string {
   if (!trustProxyHeaders()) {
     return "unknown";
   }
 
   const headers = req.headers;
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  const realIP = headers.get("x-real-ip");
+  const realIP = headers.get("x-real-ip")?.trim();
   if (realIP) {
-    return realIP.trim();
+    return realIP;
+  }
+  const forwarded = headers
+    .get("x-forwarded-for")
+    ?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (forwarded?.length) {
+    return forwarded[Math.max(0, forwarded.length - trustedProxyHops())];
   }
   const cfIP = headers.get("cf-connecting-ip");
   if (cfIP) {

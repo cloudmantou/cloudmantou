@@ -131,7 +131,7 @@ describe("release configuration", () => {
     };
     const expectedOverrides = {
       postcss: "8.5.25",
-      sharp: "0.35.3",
+      sharp: "0.35.5",
       esbuild: "0.25.12",
       vite: "6.4.3",
       "brace-expansion@<1.1.18": "1.1.18",

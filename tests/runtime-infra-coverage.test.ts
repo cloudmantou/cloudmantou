@@ -22,6 +22,7 @@ const boundary = vi.hoisted(() => {
       ...config,
     })),
     checkLoginRateLimit: vi.fn(),
+    refundLoginRateLimit: vi.fn(),
     verifyCredentials: vi.fn(),
     userFindUnique: vi.fn(),
     adminAuditCreate: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("next-auth", () => ({ default: boundary.nextAuth }));
 vi.mock("next-auth/providers/credentials", () => ({ default: boundary.credentials }));
 vi.mock("@/lib/login-rate-limit-server", () => ({
   checkLoginRateLimitServer: boundary.checkLoginRateLimit,
+  refundLoginRateLimitServer: boundary.refundLoginRateLimit,
 }));
 vi.mock("@/lib/credentials-auth", () => ({
   verifyCredentials: boundary.verifyCredentials,
@@ -72,6 +74,7 @@ function credentialsAuthorize(): (
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.checkLoginRateLimit.mockResolvedValue({ success: true });
+  boundary.refundLoginRateLimit.mockResolvedValue(undefined);
   boundary.verifyCredentials.mockResolvedValue({ id: "verified-user" });
   boundary.userFindUnique.mockResolvedValue({
     role: "USER",
@@ -225,6 +228,27 @@ describe("runtime NextAuth configuration", () => {
       "Alice@Example.test",
       "secret"
     );
+    expect(boundary.refundLoginRateLimit).toHaveBeenCalledWith(
+      request,
+      "Alice@Example.test"
+    );
+  });
+
+  it("keeps the rate-limit charge when the password is wrong", async () => {
+    boundary.verifyCredentials.mockResolvedValue(null);
+
+    await expect(
+      credentialsAuthorize()({ email: "alice", password: "wrong" }, {})
+    ).resolves.toBeNull();
+    expect(boundary.refundLoginRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("still signs in when the rate-limit refund fails", async () => {
+    boundary.refundLoginRateLimit.mockRejectedValue(new Error("redis down"));
+
+    await expect(
+      credentialsAuthorize()({ email: "alice", password: "secret" }, {})
+    ).resolves.toEqual({ id: "verified-user" });
   });
 
   it("rejects a rate-limited login before password verification", async () => {

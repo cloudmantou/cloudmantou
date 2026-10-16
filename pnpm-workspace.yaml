@@ -4,7 +4,7 @@ packages:
 # pnpm 11 reads dependency overrides from the workspace manifest.
 overrides:
   postcss: 8.5.25
-  sharp: 0.35.3
+  sharp: 0.35.5
   esbuild: 0.25.12
   vite: 6.4.3
   js-yaml: 4.3.1

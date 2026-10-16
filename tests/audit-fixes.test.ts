@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { rateLimit, getClientIP } from "@/lib/rate-limit";
+import { rateLimit, getClientIP, memoryRateLimitRefund } from "@/lib/rate-limit";
 import { checkRateLimit } from "@/lib/rate-limit-server";
 import { dailyPhotoUrlSchema } from "@/lib/daily-record-schema";
 import { NextRequest } from "next/server";
@@ -122,6 +122,19 @@ describe("rateLimit — 窗口过期后计数器重置", () => {
   });
 });
 
+describe("memoryRateLimitRefund — 退还配额", () => {
+  it("退还后可再次通过，且不会把计数降到 0 以下", () => {
+    const id = `refund-${Date.now()}-${Math.random()}`;
+    expect(rateLimit(id, 1, 60_000).success).toBe(true);
+    expect(rateLimit(id, 1, 60_000).success).toBe(false);
+
+    memoryRateLimitRefund(id);
+    memoryRateLimitRefund(id);
+    expect(rateLimit(id, 1, 60_000).success).toBe(true);
+    expect(rateLimit(id, 1, 60_000).success).toBe(false);
+  });
+});
+
 describe("checkRateLimit — 返回 429 响应", () => {
   it("isolates rate-limit buckets by endpoint for the same authenticated user", async () => {
     const userId = uniqueId("scoped-user");
@@ -188,18 +201,31 @@ describe("getClientIP — 客户端 IP 提取", () => {
     expect(getClientIP(req)).toBe("unknown");
   });
 
-  it("TRUST_PROXY_HEADERS=true 时优先使用 x-forwarded-for 的第一个 IP", () => {
+  it("TRUST_PROXY_HEADERS=true 时取 x-forwarded-for 最右侧（代理追加）的 IP，忽略客户端伪造的左侧条目", () => {
     process.env.TRUST_PROXY_HEADERS = "true";
     const req = new NextRequest("http://localhost", {
       headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
-    expect(getClientIP(req)).toBe("1.2.3.4");
+    expect(getClientIP(req)).toBe("5.6.7.8");
   });
 
-  it("TRUST_PROXY_HEADERS=true 时回退到 x-real-ip", () => {
+  it("TRUSTED_PROXY_HOPS 指定多层代理时从右往左取对应条目", () => {
+    process.env.TRUST_PROXY_HEADERS = "true";
+    process.env.TRUSTED_PROXY_HOPS = "2";
+    try {
+      const req = new NextRequest("http://localhost", {
+        headers: { "x-forwarded-for": "6.6.6.6, 1.2.3.4, 10.0.0.2" },
+      });
+      expect(getClientIP(req)).toBe("1.2.3.4");
+    } finally {
+      delete process.env.TRUSTED_PROXY_HOPS;
+    }
+  });
+
+  it("TRUST_PROXY_HEADERS=true 时优先使用代理覆盖写入的 x-real-ip", () => {
     process.env.TRUST_PROXY_HEADERS = "true";
     const req = new NextRequest("http://localhost", {
-      headers: { "x-real-ip": "9.9.9.9" },
+      headers: { "x-real-ip": "9.9.9.9", "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
     expect(getClientIP(req)).toBe("9.9.9.9");
   });

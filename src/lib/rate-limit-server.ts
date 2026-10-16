@@ -3,6 +3,7 @@ import {
   getClientIP,
   getRateLimitIdentifier,
   memoryRateLimit,
+  memoryRateLimitRefund,
   RATE_LIMITS,
   type RateLimitResult,
 } from "@/lib/rate-limit";
@@ -97,6 +98,32 @@ export async function rateLimitAsync(
   }
 
   return memoryRateLimit(identifier, limit, windowMs);
+}
+
+const REDIS_RATE_LIMIT_REFUND_SCRIPT = `
+local count = tonumber(redis.call("GET", KEYS[1]) or "0")
+if count > 1 then
+  return redis.call("DECR", KEYS[1])
+end
+redis.call("DEL", KEYS[1])
+return 0
+`;
+
+/** 退还一次 rateLimitAsync 已计入的配额；Redis 不可用时退回内存实现，失败不影响主流程。 */
+export async function rateLimitRefundAsync(identifier: string): Promise<void> {
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      if (redis.status === "wait") {
+        await redis.connect();
+      }
+      await redis.eval(REDIS_RATE_LIMIT_REFUND_SCRIPT, 1, `rl:${identifier}`);
+      return;
+    } catch (err) {
+      console.warn("[rate-limit] Redis refund failed:", err);
+    }
+  }
+  memoryRateLimitRefund(identifier);
 }
 
 export async function checkRateLimit(

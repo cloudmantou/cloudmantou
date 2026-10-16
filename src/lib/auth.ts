@@ -2,7 +2,10 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { Role } from "@prisma/client";
 import { authConfig } from "./auth.config";
-import { checkLoginRateLimitServer } from "./login-rate-limit-server";
+import {
+  checkLoginRateLimitServer,
+  refundLoginRateLimitServer,
+} from "./login-rate-limit-server";
 import { verifyCredentials } from "./credentials-auth";
 
 export const {
@@ -32,7 +35,14 @@ export const {
           throw new Error("登录尝试过于频繁，请稍后再试");
         }
 
-        return verifyCredentials(identifier, password);
+        const user = await verifyCredentials(identifier, password);
+        if (user) {
+          // 只累计失败尝试：成功登录退还本次占用的配额
+          await refundLoginRateLimitServer(request, identifier).catch((error) => {
+            console.warn("[auth] login rate-limit refund failed:", error);
+          });
+        }
+        return user;
       },
     }),
   ],

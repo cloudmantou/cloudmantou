@@ -67,11 +67,19 @@ pnpm prisma db seed
 
 应用通过 `.env` 中的 `HOSTNAME` 与 `PORT` 监听本机地址。Nginx 应传递：
 
-- `Host`
-- `X-Real-IP`
-- `X-Forwarded-For`
-- `X-Forwarded-Proto`
-- `Authorization`
+```nginx
+proxy_set_header Host              $host;
+proxy_set_header X-Real-IP         $remote_addr;
+proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header Authorization     $http_authorization;
+```
+
+`TRUST_PROXY_HEADERS=true` 时，限流与审计日志优先读取 `X-Real-IP`（必须由代理用
+`$remote_addr` 覆盖写入，不能透传客户端的值）；缺失时取 `X-Forwarded-For` **最右侧**、
+由代理追加的条目，客户端伪造的左侧条目会被忽略。若前面还有 CDN 等多层代理，
+设置 `TRUSTED_PROXY_HOPS` 为代理层数（默认 1），或在 Nginx 用 `real_ip` 模块还原真实 IP。
+应用未经反向代理直接暴露时，务必设置 `TRUST_PROXY_HEADERS=false`。
 
 `AUTH_URL`、`SITE_URL`、`NEXT_PUBLIC_SITE_URL` 应设置为正式公网域名，
 `INTERNAL_SITE_URL` 设置为本机应用地址。

@@ -1,18 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rateLimitAsyncMock = vi.fn();
+const rateLimitRefundAsyncMock = vi.fn();
 
 vi.mock("@/lib/rate-limit-server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/rate-limit-server")>();
   return {
     ...actual,
     rateLimitAsync: rateLimitAsyncMock,
+    rateLimitRefundAsync: rateLimitRefundAsyncMock,
   };
 });
 
 describe("login rate limiting", () => {
   beforeEach(() => {
     rateLimitAsyncMock.mockReset();
+    rateLimitRefundAsyncMock.mockReset();
     vi.stubEnv("TRUST_PROXY_HEADERS", "true");
   });
 
@@ -61,5 +64,27 @@ describe("login rate limiting", () => {
     const identifierKey = rateLimitAsyncMock.mock.calls[1]?.[0] as string;
     expect(identifierKey).toMatch(/^login:id:[a-f0-9]{64}$/);
     expect(identifierKey).not.toContain("example.com");
+  });
+
+  it("refunds both buckets after a successful login", async () => {
+    rateLimitAsyncMock.mockResolvedValue({
+      success: true,
+      limit: 10,
+      remaining: 9,
+      resetAt: Date.now() + 60_000,
+    });
+    const { checkLoginRateLimitServer, refundLoginRateLimitServer } = await import(
+      "@/lib/login-rate-limit-server"
+    );
+    const request = new Request("https://example.test/login", {
+      headers: { "x-forwarded-for": "203.0.113.4" },
+    });
+
+    await checkLoginRateLimitServer(request, "User@Example.com");
+    await refundLoginRateLimitServer(request, " user@example.com ");
+
+    const chargedKeys = rateLimitAsyncMock.mock.calls.map((call) => call[0]);
+    const refundedKeys = rateLimitRefundAsyncMock.mock.calls.map((call) => call[0]);
+    expect(refundedKeys).toEqual(chargedKeys);
   });
 });
