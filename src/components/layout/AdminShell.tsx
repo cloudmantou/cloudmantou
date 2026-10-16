@@ -70,6 +70,7 @@ const navGroups: NavGroup[] = [
     title: "商业运营",
     items: [
       { href: "/admin/store-apps", label: "应用商店", icon: AppWindow },
+      { href: "/admin/app-licenses", label: "应用与设备授权", icon: KeyRound },
       { href: "/admin/orders", label: "订单管理", icon: ShoppingCart },
       { href: "/admin/cards", label: "卡密管理", icon: KeyRound },
       { href: "/admin/points", label: "积分兑换", icon: Gift },
@@ -97,6 +98,7 @@ const pageTitles: Record<string, string> = {
   "/admin/tags": "标签管理",
   "/admin/users": "用户管理",
   "/admin/store-apps": "应用商店",
+  "/admin/app-licenses": "应用与设备授权",
   "/admin/orders": "订单管理",
   "/admin/cards": "卡密管理",
   "/admin/payment-gateway": "支付对接",

@@ -11,7 +11,7 @@ export class RequestBodyTooLargeError extends Error {
 
 /** Read a request body without allowing an untrusted callback to grow memory unbounded. */
 export async function readRequestBodyWithLimit(
-  request: Request,
+  request: Pick<Request, "headers" | "body">,
   limitBytes = DEFAULT_CALLBACK_BODY_LIMIT_BYTES
 ): Promise<string> {
   if (!Number.isSafeInteger(limitBytes) || limitBytes <= 0) {
