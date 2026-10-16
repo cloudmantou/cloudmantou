@@ -7,11 +7,23 @@ overrides:
   sharp: 0.35.5
   esbuild: 0.25.12
   vite: 6.4.3
-  js-yaml: 4.3.1
-  nanoid: 3.3.17
-  brace-expansion@<1.1.18: 1.1.18
-  brace-expansion@>=2.0.0 <2.1.4: 2.1.4
-  brace-expansion@>=4.0.0 <5.0.9: 5.0.9
+  js-yaml: 4.3.2
+  nanoid: 3.3.18
+  # 安全修复（pnpm audit 2026-10）：仅在间接依赖低于修复版本时强制升级
+  undici@>=7.0.0 <7.29.1: 7.29.1
+  browserslist@<4.28.7: 4.28.7
+  source-map-js@>=1.0.0 <1.2.2: 1.2.2
+  "@ai-sdk/provider-utils@>=4.0.0 <4.0.33": 4.0.33
+  brace-expansion@<1.1.21: 1.1.21
+  brace-expansion@>=2.0.0 <2.1.7: 2.1.7
+  brace-expansion@>=4.0.0 <5.0.12: 5.0.12
+
+auditConfig:
+  ignoreGhsas:
+    # braces <=3.0.3 深层嵌套模式栈溢出：上游尚未发布修复版本（first_patched_version 为空）。
+    # 仅经 eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch 进入开发依赖，
+    # 输入是仓库自身的 lint 配置 glob，不接受外部数据。上游发布 3.0.4 后改为 override 并移除此项。
+    - GHSA-vfj7-8cjw-p6xm
 
 allowBuilds:
   "@prisma/client": true
@@ -22,13 +34,13 @@ allowBuilds:
   unrs-resolver: true
 
 minimumReleaseAgeExclude:
-  - brace-expansion@1.1.18
-  - brace-expansion@2.1.4
-  - brace-expansion@5.0.9
+  - brace-expansion@1.1.21
+  - brace-expansion@2.1.7
+  - brace-expansion@5.0.12
   - '@ai-sdk/gateway@4.0.40'
   - '@ai-sdk/openai-compatible@3.0.22'
   - '@ai-sdk/provider-utils@5.0.20'
   - '@ai-sdk/provider@4.0.5'
   - ai@7.0.51
-  - js-yaml@4.3.1
-  - nanoid@3.3.17
+  - js-yaml@4.3.2
+  - nanoid@3.3.18

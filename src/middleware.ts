@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { buildContentSecurityPolicy, generateCspNonce } from "@/config/csp";
 import { isOfficialSite } from "@/config/site";
 import { authConfig } from "@/lib/auth.config";
-import { isAllowedAdminMutationOrigin } from "@/lib/csrf-origin";
+import { isAllowedMutationOrigin, requiresSameOriginMutation } from "@/lib/csrf-origin";
 import {
   OFFICIAL_LOCALE_COOKIE,
   buildOfficialRewriteUrl,
@@ -136,11 +136,9 @@ export default auth(async (req) => {
     }
   }
 
-  if (
-    pathname.startsWith("/api/admin") &&
-    ["POST", "PUT", "DELETE", "PATCH"].includes(req.method || "")
-  ) {
-    if (!isAllowedAdminMutationOrigin(req)) {
+  // 所有浏览器写请求统一同源校验，不只依赖 SameSite=Lax（同站子域仍可携带 cookie）。
+  if (requiresSameOriginMutation(pathname, req.method)) {
+    if (!isAllowedMutationOrigin(req)) {
       return withCsp(
         req,
         NextResponse.json({ code: 40300, message: "跨站请求被拒绝" }, { status: 403 }),

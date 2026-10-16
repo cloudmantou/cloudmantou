@@ -6,6 +6,9 @@ import { ok, fail } from "@/lib/api-response";
 import { z } from "zod";
 import crypto from "crypto";
 import { buildOrderFulfillment } from "@/lib/order-fulfillment";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
+import { CardStockError, reserveCardForOrder } from "@/lib/card-delivery";
+import { expireStalePendingOrders, ORDER_PENDING_TTL_MS } from "@/lib/order-lifecycle";
 import {
   isMembershipProductAvailable,
   type MembershipProductType,
@@ -22,6 +25,14 @@ const createOrderSchema = z.object({
   productType: z.enum(["VIP_MONTH", "VIP_QUARTER", "VIP_YEAR", "PAID_POST", "CARD_PACKAGE"]),
   productId: z.string().optional(),
 });
+
+/** 每个用户同时持有的未支付卡密订单上限，防止通过挂单长期占住库存 */
+const MAX_PENDING_CARD_ORDERS_PER_USER = 3;
+
+/** 支付回调可能略晚于订单过期时间到达，预占卡的有效期额外留出的宽限 */
+const CARD_RESERVATION_GRACE_MS = 10 * 60 * 1000;
+
+class PendingCardOrderLimitError extends Error {}
 
 function generateOrderNo(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -94,6 +105,13 @@ export async function POST(req: NextRequest) {
       return fail("请先登录", 40100, 401);
     }
 
+    const limited = await checkRateLimit(
+      req,
+      { ...RATE_LIMITS.ORDER_CREATE, scope: "order-create" },
+      session.user.id
+    );
+    if (limited) return limited;
+
     const body = await req.json();
     const parsed = createOrderSchema.safeParse(body);
     if (!parsed.success) {
@@ -129,6 +147,8 @@ export async function POST(req: NextRequest) {
       if (!cardPackage) {
         return fail("卡密商品不存在或未发布", 40400, 404);
       }
+      // 先归还超时未付订单的预占卡；挂单上限在下方事务内持用户行锁原子判断。
+      await expireStalePendingOrders({ cardPackageId: cardPackage.id });
       const { countActiveCardStock } = await import("@/lib/card-packages");
       const stock = await countActiveCardStock(prisma, cardPackage.id);
       if (stock <= 0) {
@@ -159,17 +179,47 @@ export async function POST(req: NextRequest) {
 
     const orderNo = generateOrderNo();
 
-    const order = await prisma.order.create({
-      data: {
-        orderNo,
-        userId: session.user.id,
-        productType,
-        productId: productId || null,
-        title,
-        amount,
-        status: "PENDING",
-      },
-    });
+    let order;
+    try {
+      order = await prisma.$transaction(async (tx) => {
+        if (productType === "CARD_PACKAGE") {
+          // 锁住用户行，串行化同一用户的并发下单，使“计数 → 创建 → 预占”整体原子。
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${session.user.id} FOR UPDATE`;
+          const pendingCardOrders = await tx.order.count({
+            where: { userId: session.user.id, productType: "CARD_PACKAGE", status: "PENDING" },
+          });
+          if (pendingCardOrders >= MAX_PENDING_CARD_ORDERS_PER_USER) {
+            throw new PendingCardOrderLimitError();
+          }
+        }
+        const created = await tx.order.create({
+          data: {
+            orderNo,
+            userId: session.user.id,
+            productType,
+            productId: productId || null,
+            title,
+            amount,
+            status: "PENDING",
+          },
+        });
+        // 卡密订单在下单时即预占一张卡；库存被并发抢光时整笔回滚。
+        if (productType === "CARD_PACKAGE" && productId) {
+          // 预占卡须在整个可支付窗口（含回调宽限）内有效，避免付款后发现卡已过期。
+          const validUntil = new Date(Date.now() + ORDER_PENDING_TTL_MS + CARD_RESERVATION_GRACE_MS);
+          await reserveCardForOrder(tx, { id: created.id, productId }, validUntil);
+        }
+        return created;
+      });
+    } catch (error) {
+      if (error instanceof CardStockError) {
+        return fail("该卡密商品库存不足", 40000, 400);
+      }
+      if (error instanceof PendingCardOrderLimitError) {
+        return fail("未支付的卡密订单过多，请先完成或等待其过期", 42900, 429);
+      }
+      throw error;
+    }
 
     return ok({
       id: order.id,
