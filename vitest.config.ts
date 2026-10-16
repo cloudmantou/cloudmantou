@@ -1,9 +1,11 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    // Agent worktrees under .claude/ hold full repo copies; never collect their tests.
+    exclude: [...configDefaults.exclude, ".claude/**"],
     env: {
       SETTINGS_ENCRYPTION_KEY: "vitest-settings-encryption-key-32chars!",
       CARD_SECRET_SALT: "vitest-card-secret-salt-for-unit-tests",
