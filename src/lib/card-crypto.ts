@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import { POINT_CARD_PREFIX, verifyPointCardSecret } from "@/lib/point-card-crypto";
 
 function requireCardSecretSalt(): string {
   const salt = process.env.CARD_SECRET_SALT?.trim();
@@ -31,6 +32,7 @@ export async function hashCardSecret(secret: string): Promise<string> {
  * @returns 验证是否通过
  */
 export async function verifyCardSecret(secret: string, hash: string): Promise<boolean> {
+  if (hash.startsWith(POINT_CARD_PREFIX)) return verifyPointCardSecret(secret, hash);
   // bcrypt 哈希以 $2 开头
   if (hash.startsWith("$2")) {
     return bcrypt.compare(secret + requireCardSecretSalt(), hash);
@@ -48,7 +50,7 @@ export async function verifyCardSecret(secret: string, hash: string): Promise<bo
  * 判断哈希是否为旧版 SHA-256 格式（用于调用方决定是否需要升级）
  */
 export function isLegacyHash(hash: string): boolean {
-  return !hash.startsWith("$2");
+  return !hash.startsWith("$2") && !hash.startsWith(POINT_CARD_PREFIX);
 }
 
 export type CardFormat = "standard" | "uuid" | "numeric" | "custom";

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { POINT_CARD_PREFIX, decryptPointCardSecret } from "@/lib/point-card-crypto";
 
 function getDeliveryKey(): Buffer {
   const raw = process.env.CARD_DELIVERY_KEY || process.env.CARD_SECRET_SALT;
@@ -18,6 +19,7 @@ export function encryptCardSecret(secret: string): string {
 }
 
 export function decryptCardSecret(payload: string): string {
+  if (payload.startsWith(POINT_CARD_PREFIX)) return decryptPointCardSecret(payload);
   const key = getDeliveryKey();
   const buf = Buffer.from(payload, "base64");
   const iv = buf.subarray(0, 12);

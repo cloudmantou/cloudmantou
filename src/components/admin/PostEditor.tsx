@@ -10,6 +10,8 @@ import { importRemoteImagesInMarkdown } from "@/lib/remote-image-client";
 import { replaceImportedImageUrls } from "@/lib/markdown-remote-images";
 import { readApiEnvelope } from "@/lib/client-api-response";
 import { EditorialAiAssistant } from "@/components/admin/EditorialAiAssistant";
+import { ArticleIpaEditor } from "@/components/admin/ArticleIpaEditor";
+import type { ArticleIpa } from "@/lib/article-ipa";
 import { PostTranslationPanel } from "@/components/admin/PostTranslationPanel";
 import {
   MAX_PAID_POST_CONTENT_LENGTH,
@@ -56,6 +58,7 @@ type PostEditorProps = {
     tags: Array<{ id: string }>;
     status: string;
     isTop: boolean;
+    ipaReleases?: ArticleIpa[];
     paidContent: { content: string; price: number } | null;
   };
 };
@@ -76,8 +79,13 @@ function parseSeoKeywords(value: string): string[] {
 
 export function PostEditor({ mode, initialData }: PostEditorProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [transitionPending, startTransition] = useTransition();
+  const [savingPost, setSavingPost] = useState(false);
+  const saveInFlight = useRef(false);
+  const isPending = transitionPending || savingPost;
 
+  const [ipaReleases, setIpaReleases] = useState<ArticleIpa[]>(initialData?.ipaReleases || []);
+  const [ipaUploading, setIpaUploading] = useState(false);
   const [title, setTitle] = useState(initialData?.title || "");
   const [slug, setSlug] = useState(initialData?.slug || "");
   const [excerpt, setExcerpt] = useState(initialData?.excerpt || "");
@@ -282,18 +290,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     if (mode === "create" && !title && !content) return;
     setSaveState("unsaved");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, slug, excerpt, content, coverImage, categoryId, selectedTagIds, isTop, isPaid, paidContent, paidPrice, seoTitle, seoDescription, seoKeywords, socialTitle, socialDescription]);
-
-  // Auto-clear saving badge after 1.2s (cosmetic only — no real autosave)
-  useEffect(() => {
-    if (saveState !== "unsaved") return;
-    const t = setTimeout(() => setSaveState("saving"), 800);
-    const t2 = setTimeout(() => setSaveState("saved"), 2200);
-    return () => {
-      clearTimeout(t);
-      clearTimeout(t2);
-    };
-  }, [saveState]);
+  }, [title, slug, excerpt, content, coverImage, categoryId, selectedTagIds, isTop, isPaid, paidContent, paidPrice, seoTitle, seoDescription, seoKeywords, socialTitle, socialDescription, ipaReleases]);
 
   const toggleTag = (id: string) => {
     setSelectedTagIds((prev) =>
@@ -349,6 +346,9 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
   };
 
   const handleSave = (publishStatus: "DRAFT" | "PUBLISHED" | "PAID_ONLY") => {
+    if (saveInFlight.current) return;
+    if (ipaUploading || uploading) { setError("请等待文件上传完成后保存"); return; }
+    if (ipaReleases.some(item => !item.version.trim())) { setError("请填写 IPA 版本号"); return; }
     if (!title.trim() || !content.trim()) {
       setError("标题和内容不能为空");
       return;
@@ -370,6 +370,9 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
     }
     setError("");
 
+    saveInFlight.current = true;
+    setSavingPost(true);
+    setSaveState("saving");
     startTransition(async () => {
       try {
         const url = mode === "create" ? "/api/admin/posts" : `/api/admin/posts/${initialData?.id}`;
@@ -393,6 +396,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
             tagIds: selectedTagIds,
             status: submission.status,
             isTop,
+            ipaReleases: ipaReleases.map(({ id, version, notes }) => ({ id, version, notes })),
             ...(submission.paidContent !== undefined
               ? { paidContent: submission.paidContent }
               : {}),
@@ -478,7 +482,11 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
         router.push("/admin/posts");
         router.refresh();
       } catch (e: any) {
+        setSaveState("unsaved");
         setError(e.message || "保存失败");
+      } finally {
+        saveInFlight.current = false;
+        setSavingPost(false);
       }
     });
   };
@@ -510,10 +518,10 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
 
   const saveStateLabel =
     saveState === "saved"
-      ? "草稿 · 已自动保存"
+      ? "已保存"
       : saveState === "saving"
         ? "正在保存…"
-        : "草稿 · 未保存";
+        : "未保存";
 
   return (
     <div className="post-editor-root">
@@ -685,7 +693,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               <button
                 type="button"
                 onClick={() => handleSave("DRAFT")}
-                disabled={isPending}
+                disabled={isPending || ipaUploading || uploading}
                 className="e-btn e-btn-ghost e-btn-sm"
               >
                 <Save size={13} aria-hidden="true" />
@@ -694,7 +702,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               <button
                 type="button"
                 onClick={() => handleSave(isPaid ? "PAID_ONLY" : "PUBLISHED")}
-                disabled={isPending}
+                disabled={isPending || ipaUploading || uploading}
                 className="e-btn e-btn-accent e-btn-sm"
               >
                 <Send size={13} aria-hidden="true" />
@@ -702,6 +710,8 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               </button>
             </div>
           </div>
+
+          <ArticleIpaEditor savedIds={initialData?.ipaReleases?.map(item => item.id) || []} releases={ipaReleases} onChange={setIpaReleases} onUploading={setIpaUploading} disabled={isPending} />
 
           <EditorialAiAssistant
             title={title}

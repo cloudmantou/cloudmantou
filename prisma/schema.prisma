@@ -18,6 +18,7 @@ model User {
   vipLevel    Int       @default(0)
   vipExpireAt DateTime?
   balance     Int       @default(0)
+  points      Int       @default(0)
   bio         String?   @db.Text
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -31,6 +32,9 @@ model User {
   dailyRecords DailyRecord[]
   dailyRecordLikes DailyRecordLike[]
   dailyRecordComments DailyRecordComment[]
+  feedbacks    ArticleFeedback[]
+  pointEntries PointEntry[]
+  pointRedemptions PointRedemption[]
 
   @@map("users")
 }
@@ -66,6 +70,8 @@ model Post {
   paidContent  PaidContent?
   entitlements Entitlement[]
   translations PostTranslation[]
+  ipaReleases  ArticleIpaRelease[]
+  feedbacks    ArticleFeedback[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -218,6 +224,7 @@ model Order {
   payment      Payment?
   entitlements Entitlement[]
   delivery     OrderDelivery?
+  pointRedemption PointRedemption?
 
   @@index([userId, status])
   @@index([orderNo])
@@ -307,10 +314,119 @@ model CardPackage {
   updatedAt       DateTime @updatedAt
 
   cards Card[]
+  pointReward PointReward?
 
   @@index([cardType, cardValue])
   @@index([published, enabled])
   @@map("card_packages")
+}
+
+enum FeedbackKind {
+  QUESTION
+  BUG
+  IDEA
+}
+
+enum FeedbackStatus {
+  SUBMITTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+}
+
+model ArticleFeedback {
+  id String @id @default(cuid())
+  postId String
+  userId String
+  kind FeedbackKind
+  title String @db.VarChar(150)
+  content String @db.Text
+  appVersion String? @db.VarChar(64)
+  environment String? @db.VarChar(300)
+  status FeedbackStatus @default(SUBMITTED)
+  published Boolean @default(false)
+  allowPublic Boolean @default(true)
+  resolvedVersion String? @db.VarChar(64)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events FeedbackEvent[]
+  images FeedbackImage[]
+  pointEntries PointEntry[]
+  @@index([postId, published, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("article_feedbacks")
+}
+
+model FeedbackEvent {
+  id String @id @default(cuid())
+  feedbackId String
+  actorId String
+  status FeedbackStatus
+  note String @db.Text
+  awardedPoints Int @default(0)
+  createdAt DateTime @default(now())
+  feedback ArticleFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  @@index([feedbackId, createdAt])
+  @@map("feedback_events")
+}
+
+model FeedbackImage {
+  id String @id @default(cuid())
+  feedbackId String?
+  uploadedBy String
+  storageKey String @unique @db.VarChar(64)
+  bytes Int
+  createdAt DateTime @default(now())
+  feedback ArticleFeedback? @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  @@index([uploadedBy, createdAt])
+  @@map("feedback_images")
+}
+
+model PointEntry {
+  id String @id @default(cuid())
+  userId String
+  feedbackId String?
+  key String @unique @db.VarChar(191)
+  delta Int
+  balanceAfter Int
+  reason String @db.VarChar(200)
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedback ArticleFeedback? @relation(fields: [feedbackId], references: [id], onDelete: SetNull)
+  @@index([userId, createdAt])
+  @@map("point_entries")
+}
+
+model PointReward {
+  id String @id @default(cuid())
+  packageId String @unique
+  cost Int
+  enabled Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  package CardPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  redemptions PointRedemption[]
+  @@map("point_rewards")
+}
+
+model PointRedemption {
+  id String @id @default(cuid())
+  userId String
+  rewardId String
+  requestKey String @db.VarChar(64)
+  orderId String @unique
+  cost Int
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward PointReward @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@unique([userId, requestKey])
+  @@index([userId, createdAt])
+  @@map("point_redemptions")
 }
 
 model DailyRecord {
@@ -554,4 +670,28 @@ model AdminAuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("admin_audit_logs")
+}
+
+/// 文章安装包：未绑定文章的上传不会公开下载。
+model ArticleIpaRelease {
+  id          String   @id @default(cuid())
+  postId      String?
+  uploadedBy  String
+  storageKey  String   @unique @db.VarChar(64)
+  filename    String   @db.VarChar(255)
+  appName     String   @db.VarChar(200)
+  bundleId    String   @db.VarChar(255)
+  version     String   @db.VarChar(64)
+  build       String   @db.VarChar(64)
+  minIos      String?  @db.VarChar(32)
+  bytes       Int
+  sha256      String   @db.Char(64)
+  notes       String   @db.Text
+  sortOrder   Int      @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  post Post? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@index([postId, deletedAt, sortOrder])
+  @@map("article_ipa_releases")
 }

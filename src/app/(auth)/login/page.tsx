@@ -2,14 +2,13 @@
 
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useOfficialI18n } from "@/i18n/OfficialI18nProvider";
 import { localizeOfficialPath } from "@/i18n/official";
 import { normalizeInternalReturnUrl } from "@/lib/return-url";
 
 function LoginForm() {
-  const router = useRouter();
   const { locale, messages } = useOfficialI18n();
   const copy = messages.auth;
   const searchParams = useSearchParams();
@@ -46,8 +45,8 @@ function LoginForm() {
         return;
       }
 
-      router.push(callbackUrl);
-      router.refresh();
+      // Load the authenticated server page once, retaining the feedback anchor.
+      window.location.assign(callbackUrl);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
       setError(locale === "zh" && message.includes("频繁") ? message : copy.loginFailed);

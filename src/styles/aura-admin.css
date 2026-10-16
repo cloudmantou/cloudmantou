@@ -1917,3 +1917,11 @@
   gap: 8px;
   color: var(--text-secondary);
 }
+
+.ipa-editor-item { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); min-width: 0; }
+.ipa-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: 12px; overflow-wrap: anywhere; }
+.ipa-icon-button { padding: 4px; color: var(--text-muted); flex-shrink: 0; }
+.ipa-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ipa-filename { overflow-wrap: anywhere; }
+.ipa-upload-progress { width: 100%; margin: 8px 0; }
+.ipa-editor-error { color: var(--rose); font-size: 12px; margin-top: 10px; }

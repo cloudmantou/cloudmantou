@@ -8,8 +8,12 @@ import { MarkdownRenderer } from "@/components/blog/MarkdownRenderer";
 import { countArticleWords, estimateReadTime } from "@/components/blog/PostMeta";
 import { LikeButton } from "@/components/blog/LikeButton";
 import { CommentSection } from "@/components/blog/CommentSection";
+import { FeedbackSection } from "@/components/feedback/FeedbackSection";
 import type { CommentData } from "@/components/blog/CommentItem";
 import { EditorialArticleChrome } from "@/components/editorial/EditorialArticleChrome";
+import { ArticleIpaDownloads } from "@/components/blog/ArticleIpaDownloads";
+import { ipaDownloadHref, formatIpaSize, type ArticleIpa } from "@/lib/article-ipa";
+import { getArticleDownloadLink } from "@/lib/article-download";
 import { extractArticleHeadings, type AdjacentArticle } from "@/lib/editorial-article";
 import type { OfficialLocale } from "@/i18n/official";
 import { PostPurchaseButton } from "@/components/payment/PostPurchaseButton";
@@ -48,6 +52,7 @@ type PostData = {
     price: number;
   } | null;
   isLiked: boolean;
+  ipaReleases?: ArticleIpa[];
 };
 
 type CommentsData = {
@@ -82,7 +87,9 @@ export function PostContent({
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const isPaidOnly = post.status === "PAID_ONLY";
   const canUseArticleCredit = accessReason === "article_credit_available" && articleCreditsAvailable > 0;
-  const headings = extractArticleHeadings(post.content);
+  const ipaReleases = post.ipaReleases || [];
+  const currentIpa = ipaReleases[0];
+  const headings = [...extractArticleHeadings(post.content), ...(currentIpa ? [{ id: "ipa-downloads", text: locale === "en" ? "App downloads & updates" : "安装包下载与更新", level: 2 as const }] : [])];
   const wordCount = countArticleWords(post.content);
   const readTime = estimateReadTime(post.content, locale);
 
@@ -140,6 +147,7 @@ export function PostContent({
         slug={post.slug}
         title={post.title}
         excerpt={post.excerpt}
+        downloadLink={currentIpa ? { href: ipaDownloadHref(currentIpa.id), label: `${locale === "en" ? "Download" : "下载"} ${currentIpa.appName} ${currentIpa.version} · ${formatIpaSize(currentIpa.bytes)}` } : getArticleDownloadLink(post.content)}
         coverImage={post.coverImage}
         publishedAt={post.publishedAt}
         updatedAt={post.updatedAt}
@@ -161,6 +169,7 @@ export function PostContent({
               <LikeButton slug={post.slug} initialLiked={post.isLiked} initialCount={post.likeCount} />
               <span>{locale === "en" ? "Found this useful? Leave a like." : "觉得不错？点个赞吧"}</span>
             </div>
+            <FeedbackSection slug={post.slug} />
             <CommentSection
               slug={post.slug}
               initialComments={commentsData.comments}
@@ -223,6 +232,7 @@ export function PostContent({
             </div>
           </div>
         ) : null}
+        <ArticleIpaDownloads releases={ipaReleases} locale={locale} />
       </EditorialArticleChrome>
     </>
   );

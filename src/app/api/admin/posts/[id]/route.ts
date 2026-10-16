@@ -1,3 +1,5 @@
+import { articleIpaInputSchema, serializeArticleIpa } from "@/lib/article-ipa";
+import { syncArticleIpas } from "@/lib/article-ipa-server";
 import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +34,7 @@ const updatePostSchema = z.object({
       "付费价格必须是大于等于 0.01 的两位小数",
     ),
   }).optional().nullable(),
+  ipaReleases: articleIpaInputSchema.optional(),
   ...postSeoFieldsSchema.shape,
 });
 
@@ -45,6 +48,7 @@ export async function GET(
     const post = await prisma.post.findUnique({
       where: { id: id },
       include: {
+        ipaReleases: { where: { deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] },
         author: { select: { id: true, username: true, nickname: true } },
         category: { select: { id: true, name: true, slug: true } },
         tags: { select: { tag: { select: { id: true, name: true, slug: true } } } },
@@ -58,6 +62,7 @@ export async function GET(
 
     return ok({
       ...post,
+      ipaReleases: post.ipaReleases.map(serializeArticleIpa),
       tags: post.tags.map((pt) => pt.tag),
       paidContent: post.paidContent
         ? { content: post.paidContent.content, price: Number(post.paidContent.price) }
@@ -78,7 +83,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   try {
-    await requireAdminAndAudit(req, "posts.update", { targetType: "post", targetId: id });
+    const session = await requireAdminAndAudit(req, "posts.update", { targetType: "post", targetId: id });
     const post = await prisma.post.findUnique({
       where: { id: id },
       include: { paidContent: { select: { id: true } } },
@@ -164,6 +169,8 @@ export async function PUT(
           data: { status: "STALE" },
         });
       }
+
+      if (data.ipaReleases !== undefined) await syncArticleIpas(tx, id, session.user.id, data.ipaReleases);
 
       // Update tags if provided
       if (data.tagIds !== undefined) {

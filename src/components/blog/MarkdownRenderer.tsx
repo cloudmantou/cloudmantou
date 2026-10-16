@@ -3,6 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize from "rehype-sanitize";
+import { Download } from "lucide-react";
+import { isArticleDownloadHref } from "@/lib/article-download";
 import { isSafeExternalHref, isSafeMarkdownImageSrc } from "@/lib/safe-image-url";
 import { createHeadingId } from "@/lib/editorial-article";
 
@@ -78,6 +80,14 @@ export function MarkdownRenderer({
           a: ({ href, children }) => {
             if (!href || !isSafeExternalHref(href)) {
               return <span>{children}</span>;
+            }
+            if (isArticleDownloadHref(href)) {
+              return (
+                <a href={href} download className="editorial-button editorial-button-blue article-download-button">
+                  <Download size={20} aria-hidden="true" />
+                  <span>{children}</span>
+                </a>
+              );
             }
             const internal = href.startsWith("#") || (href.startsWith("/") && !href.startsWith("//"));
             return (

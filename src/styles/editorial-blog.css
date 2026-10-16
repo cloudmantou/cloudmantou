@@ -466,6 +466,10 @@
 .editorial-article-author-chip { display: inline-flex; align-items: center; gap: 12px; margin-top: 22px; }
 .editorial-article-author-chip span { width: 36px; height: 36px; display: grid; place-items: center; border: 2px solid var(--ed-ink); background: var(--ed-yellow); box-shadow: 3px 3px 0 var(--ed-ink); font-weight: 950; }
 .editorial-article-author-chip b { font-size: .82rem; }
+.editorial-article-download { margin-top: 24px; padding: 0 7px 7px 0; }
+.article-download-button { max-width: 100%; white-space: normal; text-align: center; line-height: 1.5; }
+.article-download-button svg { flex-shrink: 0; }
+.article-download-button:focus-visible { outline: 3px solid var(--ed-red); outline-offset: 5px; }
 .editorial-article-cover-frame { position: relative; min-width: 0; }
 .editorial-article-cover-frame .editorial-orbit-art { width: 100%; }
 .editorial-article-cover-frame.has-cover .editorial-orbit-art { position: absolute; right: -16px; bottom: -18px; z-index: 2; width: 42%; border-width: 2px; box-shadow: 6px 6px 0 var(--ed-yellow); }
@@ -510,6 +514,7 @@
 .article-prose h3:hover .article-heading-anchor,
 .article-heading-anchor:focus-visible { opacity: 1; }
 .editorial-reading-content .article-prose a { color: var(--ed-blue); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.editorial-reading-content .article-prose a.article-download-button { text-decoration: none; }
 .editorial-reading-content .article-prose blockquote { border: var(--ed-line); border-left: 9px solid var(--ed-red); background: #fff6d7; box-shadow: 5px 5px 0 var(--ed-ink); }
 .editorial-reading-content .article-prose pre { border: var(--ed-line); border-radius: 0; box-shadow: 7px 7px 0 var(--ed-blue); }
 .editorial-reading-content .md-figure img { border: var(--ed-line); border-radius: 0; box-shadow: 7px 7px 0 var(--ed-ink); }
@@ -856,3 +861,16 @@
   .editorial-public-card { min-height: 210px; }
   .editorial-download-card { min-height: 275px; }
 }
+
+.article-ipa-downloads { margin-top: 48px; padding: clamp(18px, 4vw, 30px); border: 2px solid #181818; box-shadow: 5px 5px 0 #181818; background: #fffdf4; scroll-margin-top: 95px; min-width: 0; }
+.article-ipa-downloads h2 { margin: 0 0 24px; font-size: clamp(22px, 4vw, 30px); font-weight: 800; }
+.article-ipa-downloads h3 { margin: 0 0 10px; font-size: 21px; font-weight: 750; overflow-wrap: anywhere; }
+.article-ipa-downloads h4 { margin: 25px 0 8px; font-weight: 750; }
+.article-ipa-meta, .article-ipa-install-hint { font-size: 13px; line-height: 1.8; color: #555; }
+.article-ipa-meta { margin-bottom: 18px; }
+.article-ipa-notes { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.article-ipa-checksum { margin: 18px 0; font-size: 12px; }
+.article-ipa-checksum code { display: block; margin-top: 10px; overflow-wrap: anywhere; }
+.article-ipa-history { margin-top: 24px; border-top: 1px solid #b8b8b8; padding-top: 18px; }
+.article-ipa-history .article-ipa-version { margin-top: 24px; padding-top: 20px; border-top: 1px dashed #b8b8b8; }
+.article-ipa-downloads summary { cursor: pointer; font-weight: 650; }

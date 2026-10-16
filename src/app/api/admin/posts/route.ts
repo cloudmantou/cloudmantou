@@ -1,3 +1,5 @@
+import { articleIpaInputSchema } from "@/lib/article-ipa";
+import { syncArticleIpas } from "@/lib/article-ipa-server";
 import { requireAdmin, requireAdminAndAudit, ApiError } from "@/lib/guards";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +34,7 @@ const createPostSchema = z.object({
       "付费价格必须是大于等于 0.01 的两位小数",
     ),
   }).optional(),
+  ipaReleases: articleIpaInputSchema.optional(),
   ...postSeoFieldsSchema.shape,
 });
 
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      if (data.ipaReleases !== undefined) await syncArticleIpas(tx, newPost.id, session.user.id, data.ipaReleases);
       return newPost;
     });
 

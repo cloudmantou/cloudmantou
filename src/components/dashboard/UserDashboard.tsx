@@ -204,6 +204,7 @@ export function UserDashboard() {
           </article>
         </section>
 
+        <div style={{ marginBottom: 28 }}><Link className="feedback-button" href="/dashboard/points">我的反馈与积分 · 兑换卡密 ↗</Link></div>
         <section id="orders" style={{ ...panelStyle, overflow: "hidden" }}>
           <div style={{ alignItems: "center", borderBottom: "2px solid var(--ed-ink)", display: "flex", justifyContent: "space-between", gap: 16, padding: "18px 21px" }}><h2 style={{ alignItems: "center", display: "flex", gap: 8, fontSize: 18, fontWeight: 950, margin: 0 }}><Receipt size={18} />{copy.orderHistory}</h2><span style={{ color: "var(--ed-muted)", fontFamily: '"DM Mono", monospace', fontSize: 11, fontWeight: 800 }}>{copy.recentOrders}</span></div>
           {searchParams.get("paid") === "1" ? <p style={{ background: "#e9fff8", borderBottom: "2px solid var(--ed-ink)", color: "#08745e", fontWeight: 750, margin: 0, padding: "13px 21px" }}><Sparkles size={14} style={{ display: "inline", marginRight: 6 }} />{copy.paidNotice}</p> : null}

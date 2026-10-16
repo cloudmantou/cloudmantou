@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
         return fail("卡密套餐需要指定套餐 ID", 40000, 400);
       }
       const cardPackage = await prisma.cardPackage.findFirst({
-        where: { id: productId, published: true, enabled: true },
+        where: { id: productId, published: true, enabled: true, pointReward: null },
       });
       if (!cardPackage) {
         return fail("卡密商品不存在或未发布", 40400, 404);

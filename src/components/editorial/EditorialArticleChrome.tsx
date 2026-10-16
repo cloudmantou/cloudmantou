@@ -11,6 +11,7 @@ import {
   Check,
   Clock3,
   Copy,
+  Download,
   Eye,
   FileText,
   MessageCircle,
@@ -20,6 +21,7 @@ import { localizeOfficialPath } from "@/i18n/official";
 import type { AdjacentArticle, EditorialHeading } from "@/lib/editorial-article";
 import { EditorialOrbitArt } from "@/components/editorial/EditorialOrbitArt";
 import { isSafeCoverImageUrl } from "@/lib/safe-image-url";
+import { isArticleDownloadHref, type ArticleDownloadLink } from "@/lib/article-download";
 
 export type EditorialArticleChromeProps = {
   locale: OfficialLocale;
@@ -43,6 +45,7 @@ export type EditorialArticleChromeProps = {
   engagement?: ReactNode;
   recommendationHref?: string;
   recommendationLabel?: string;
+  downloadLink?: ArticleDownloadLink | null;
 };
 
 function formatDate(value: string | null | undefined, locale: OfficialLocale): string {
@@ -157,6 +160,7 @@ export function EditorialArticleChrome(props: EditorialArticleChromeProps) {
     engagement,
     recommendationHref = "/pricing",
     recommendationLabel,
+    downloadLink,
   } = props;
   const permalink = localizeOfficialPath(`/post/${slug}`, locale);
   const publishedLabel = formatDate(publishedAt, locale);
@@ -172,6 +176,14 @@ export function EditorialArticleChrome(props: EditorialArticleChromeProps) {
           ) : null}
           <h1>{title}</h1>
           {excerpt ? <p>{excerpt}</p> : null}
+          {downloadLink && isArticleDownloadHref(downloadLink.href) ? (
+            <div className="editorial-article-download">
+              <a href={downloadLink.href} download className="editorial-button editorial-button-blue article-download-button">
+                <Download size={20} aria-hidden="true" />
+                <span>{downloadLink.label}</span>
+              </a>
+            </div>
+          ) : null}
           <div className="editorial-article-stats">
             <span><CalendarDays size={17} />{publishedLabel}</span>
             <span className="article-word-count"><FileText size={17} />{locale === "en" ? `${wordCount.toLocaleString("en-US")} words` : `${wordCount.toLocaleString("zh-CN")} 字`}</span>

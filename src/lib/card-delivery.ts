@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { POINT_CARD_PREFIX, encryptPointCardSecret } from "@/lib/point-card-crypto";
 import {
   encryptCardSecret,
   decryptCardSecret,
@@ -97,7 +98,7 @@ export async function deliverCardPackageOrder(
         orderId: order.id,
         cardId: pooled.id,
         cardNo: pooled.cardNo,
-        cardSecretEnc: encryptCardSecret(cardSecret),
+        cardSecretEnc: pooled.cardSecretEnc.startsWith(POINT_CARD_PREFIX) ? encryptPointCardSecret(cardSecret) : encryptCardSecret(cardSecret),
         status: "DELIVERED",
       },
     });

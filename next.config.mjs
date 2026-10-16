@@ -35,6 +35,7 @@ const nextConfig = {
     minimumCacheTTL: 2592000,
   },
   turbopack: {},
+  experimental: { proxyClientMaxBodySize: "201mb" },
   webpack(config, { dev }) {
     if (dev) {
       config.watchOptions = {

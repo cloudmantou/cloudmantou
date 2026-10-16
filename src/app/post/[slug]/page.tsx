@@ -1,3 +1,4 @@
+import { serializeArticleIpa } from "@/lib/article-ipa";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -120,6 +121,7 @@ export default async function PostPage({ params }: PageProps) {
     .findUnique({
       where: { slug },
       include: {
+      ipaReleases: { where: { deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] },
       author: {
         select: { id: true, username: true, nickname: true, avatar: true },
       },
@@ -363,6 +365,7 @@ export default async function PostPage({ params }: PageProps) {
               paidContent: post.paidContent
                 ? { price: Number(post.paidContent.price) }
                 : null,
+              ipaReleases: access.hasAccess ? post.ipaReleases.map(serializeArticleIpa) : [],
               isLiked,
             }}
             accessReason={access.reason}

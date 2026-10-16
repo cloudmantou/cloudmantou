@@ -11,6 +11,7 @@ import "@/styles/cards.css";
 import "@/styles/official.css";
 import "@/styles/official-home.css";
 import "@/styles/editorial-blog.css";
+import "@/styles/feedback.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
