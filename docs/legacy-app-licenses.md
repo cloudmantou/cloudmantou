@@ -41,7 +41,7 @@ LEGACY_APP_SOURCE_URL=https://ipa.cloudmantoua.top/api/list
 
 ### 到期自动解除
 
-设备绑定以 `bindings.created_at`（绑定时间）计算，满期限后自动解除，默认 30 天。期限保存在博客主库 `site_settings` 的 `appLicenses.bindingTtlDays`，可在「设备绑定」页修改，0 表示关闭。到期判断与剩余时间都用 MySQL 的 `NOW()` 计算，与原库时区一致。
+历史设备授权长期保留。首次启用规则时，在博客主库保存当时绑定表最大 ID（`appLicenses.bindingExpiryAfterId`），之后仅 ID 更大的新绑定进入到期规则；调整期限或关闭后重开不重置此边界。新绑定以 `bindings.created_at`（绑定时间）计算，满期限后自动解除，默认 30 天。未初始化保护边界时，维护任务跳过自动解绑，不会追溯删除旧授权。期限保存在博客主库 `site_settings` 的 `appLicenses.bindingTtlDays`，可在「设备绑定」页修改，0 表示关闭。到期判断与剩余时间都用 MySQL 的 `NOW()` 计算，与原库时区一致。
 
 自动解除由订单维护定时任务 `/api/cron/expire-orders`（`CRON_SECRET` Bearer 鉴权）一并执行：每次最多 10 批、每批 200 条，删除时再次校验绑定时间。逻辑与手动解除相同，只删除绑定。到期解除后卡密不会恢复为未使用，原卡密随之作废。有解除时写一条 `app-licenses.binding.expire` 审计（`actorId=system:cron`，只记数量）。未配置 `LEGACY_CARD_DATABASE_URL` 时跳过；原库出错只在响应的 `licenseBindings` 中报告，不影响订单维护。
 

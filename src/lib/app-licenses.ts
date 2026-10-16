@@ -16,6 +16,7 @@ export const MAX_BATCH_UNBIND = 100;
 export const MAX_BINDING_TTL_DAYS = 3650;
 export const DEFAULT_BINDING_TTL_DAYS = 30;
 const BINDING_TTL_KEY = "appLicenses.bindingTtlDays";
+const BINDING_BASELINE_KEY = "appLicenses.bindingExpiryAfterId";
 const text = z.string().trim().min(1).max(255);
 const link = z.string().trim().max(255).refine(v => !v || /^https?:\/\//i.test(v), "请输入 http 或 https 地址");
 export const licenseMutationSchema = z.discriminatedUnion("action", [
@@ -54,9 +55,10 @@ export function licenseJson(value: unknown): unknown {
   return value;
 }
 
-export async function listLicenses(params: ReturnType<typeof licensePageParams>, db = licenseDb(), ttlDays?: number) {
+export async function listLicenses(params: ReturnType<typeof licensePageParams>, db = licenseDb(), ttlDays?: number, afterId?: number | null) {
   const { tab, page, search, status } = params;
   const bindingTtlDays = ttlDays ?? await getBindingTtlDays();
+  const bindingExpiryAfterId = afterId !== undefined ? afterId : await getBindingExpiryAfterId();
   const pageSize = 30;
   const needle = `%${search}%`;
   const offset = (page - 1) * pageSize;
@@ -84,11 +86,11 @@ export async function listLicenses(params: ReturnType<typeof licensePageParams>,
     [rows, totals] = await Promise.all([
       // Remaining time is computed by MySQL against its own NOW(), the same clock the
       // expiry job uses, so legacy DATETIME time zones cannot skew the countdown.
-      db.$queryRaw<Row[]>(Prisma.sql`SELECT b.id,b.udid,b.card_id,b.created_at,c.card_key,${bindingTtlDays > 0 ? Prisma.sql`TIMESTAMPDIFF(SECOND,NOW(),b.created_at + INTERVAL ${bindingTtlDays} DAY)` : Prisma.sql`NULL`} expires_in FROM bindings b JOIN cards c ON c.id=b.card_id ${where} ORDER BY b.id DESC LIMIT ${pageSize} OFFSET ${offset}`),
+      db.$queryRaw<Row[]>(Prisma.sql`SELECT b.id,b.udid,b.card_id,b.created_at,c.card_key,${bindingTtlDays > 0 && bindingExpiryAfterId !== null ? Prisma.sql`CASE WHEN b.id > ${bindingExpiryAfterId} THEN TIMESTAMPDIFF(SECOND,NOW(),b.created_at + INTERVAL ${bindingTtlDays} DAY) ELSE NULL END` : Prisma.sql`NULL`} expires_in FROM bindings b JOIN cards c ON c.id=b.card_id ${where} ORDER BY b.id DESC LIMIT ${pageSize} OFFSET ${offset}`),
       db.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT COUNT(*) n FROM bindings b JOIN cards c ON c.id=b.card_id ${where}`),
     ]);
   }
-  return licenseJson({ stats, rows, page, pageSize, total: Number(totals[0].n), bindingTtlDays });
+  return licenseJson({ stats, rows, page, pageSize, total: Number(totals[0].n), bindingTtlDays, bindingExpiryAfterId });
 }
 
 function conflict(message: string): never { throw new ApiError(message, 40900, 409); }
@@ -164,7 +166,7 @@ export async function mutateLicense(input: LicenseMutation, db = licenseDb()): P
       return { message: `已解除 ${removed} 台设备授权${skipped ? `，${skipped} 条记录已不存在` : ""}；卡密保持已使用` };
     }
     case "binding.ttl": {
-      await setBindingTtlDays(input.days);
+      await setBindingTtlDays(input.days, undefined, db);
       return { message: input.days ? `绑定满 ${input.days} 天后将自动解除` : "已关闭到期自动解除" };
     }
   }
@@ -173,15 +175,16 @@ export async function mutateLicense(input: LicenseMutation, db = licenseDb()): P
 type RawExecutor = Pick<PrismaClient, "$executeRaw">;
 // Shared by single, batch and scheduled unbinding: only the grant is removed and
 // the card stays used, so an expired or revoked key can never be handed out again.
-function deleteBindings(db: RawExecutor, ids: number[], olderThanDays?: number) {
+function deleteBindings(db: RawExecutor, ids: number[], olderThanDays?: number, afterId?: number) {
   const expired = olderThanDays ? Prisma.sql`AND created_at < NOW() - INTERVAL ${olderThanDays} DAY` : Prisma.empty;
-  return db.$executeRaw`DELETE FROM bindings WHERE id IN (${Prisma.join(ids)}) ${expired}`;
+  const eligible = afterId !== undefined ? Prisma.sql`AND id > ${afterId}` : Prisma.empty;
+  return db.$executeRaw`DELETE FROM bindings WHERE id IN (${Prisma.join(ids)}) ${expired} ${eligible}`;
 }
 
 type SettingStore = {
   siteSetting: {
     findUnique(args: { where: { key: string } }): Promise<{ value: string } | null>;
-    upsert(args: { where: { key: string }; update: { value: string }; create: { key: string; value: string; type: string } }): Promise<unknown>;
+    upsert(args: { where: { key: string }; update: { value?: string }; create: { key: string; value: string; type: string } }): Promise<unknown>;
   };
 };
 async function settings(store?: SettingStore): Promise<SettingStore> {
@@ -194,27 +197,45 @@ export async function getBindingTtlDays(store?: SettingStore) {
   return row && Number.isInteger(days) && days >= 0 && days <= MAX_BINDING_TTL_DAYS ? days : DEFAULT_BINDING_TTL_DAYS;
 }
 
-export async function setBindingTtlDays(days: number, store?: SettingStore) {
-  const value = String(days);
-  await (await settings(store)).siteSetting.upsert({ where: { key: BINDING_TTL_KEY }, update: { value }, create: { key: BINDING_TTL_KEY, value, type: "number" } });
+export async function getBindingExpiryAfterId(store?: SettingStore) {
+  const row = await (await settings(store)).siteSetting.findUnique({ where: { key: BINDING_BASELINE_KEY } });
+  if (!row || !/^\d+$/.test(row.value)) return null;
+  const id = Number(row.value);
+  return Number.isSafeInteger(id) && id >= 0 ? id : null;
 }
 
-export type BindingExpiryResult = { ttlDays: number; removed: number; batches: number; more: boolean };
+export async function setBindingTtlDays(days: number, store?: SettingStore, db?: PrismaClient) {
+  if (!Number.isInteger(days) || days < 0 || days > MAX_BINDING_TTL_DAYS) throw new ApiError("自动解除天数无效", 42200, 422);
+  const target = await settings(store);
+  if (days > 0 && await getBindingExpiryAfterId(target) === null) {
+    // Freeze an immutable AUTO_INCREMENT high-water mark. Existing grants stay
+    // permanent even if their dates are old, the TTL changes, or clocks differ.
+    const [row] = await (db ?? licenseDb()).$queryRaw<{ maxId: number | bigint }[]>`SELECT COALESCE(MAX(id),0) maxId FROM bindings`;
+    await target.siteSetting.upsert({ where: { key: BINDING_BASELINE_KEY }, update: {}, create: { key: BINDING_BASELINE_KEY, value: String(row.maxId), type: "number" } });
+    if (await getBindingExpiryAfterId(target) === null) throw new ApiError("历史授权保护设置异常，未启用自动解除", 50300, 503);
+  }
+  const value = String(days);
+  await target.siteSetting.upsert({ where: { key: BINDING_TTL_KEY }, update: { value }, create: { key: BINDING_TTL_KEY, value, type: "number" } });
+}
+
+export type BindingExpiryResult = { ttlDays: number; removed: number; batches: number; more: boolean; skipped?: string };
 // Removes grants older than the configured period in bounded batches so one
 // cron tick never holds long locks on the table the legacy clients verify against.
-export async function expireLicenseBindings(options: { db?: PrismaClient; ttlDays?: number; batchSize?: number; maxBatches?: number } = {}): Promise<BindingExpiryResult> {
+export async function expireLicenseBindings(options: { db?: PrismaClient; ttlDays?: number; afterId?: number | null; batchSize?: number; maxBatches?: number } = {}): Promise<BindingExpiryResult> {
   const ttlDays = options.ttlDays ?? await getBindingTtlDays();
   const { batchSize = 200, maxBatches = 10 } = options;
   const result = { ttlDays, removed: 0, batches: 0, more: false };
   if (!ttlDays) return result;
+  const afterId = options.afterId !== undefined ? options.afterId : await getBindingExpiryAfterId();
+  if (afterId === null) return { ...result, skipped: "尚未初始化历史授权保护，请在后台启用新绑定到期规则" };
   const db = options.db ?? licenseDb();
   while (result.batches < maxBatches) {
-    const due = await db.$queryRaw<{ id: number | bigint }[]>`SELECT id FROM bindings WHERE created_at < NOW() - INTERVAL ${ttlDays} DAY ORDER BY id LIMIT ${batchSize}`;
+    const due = await db.$queryRaw<{ id: number | bigint }[]>`SELECT id FROM bindings WHERE id > ${afterId} AND created_at < NOW() - INTERVAL ${ttlDays} DAY ORDER BY id LIMIT ${batchSize}`;
     if (!due.length) return result;
     result.batches++;
     // The age condition is re-checked on delete, so a device re-bound between the
     // SELECT and DELETE under a recycled row id is not removed early.
-    result.removed += await deleteBindings(db, due.map(row => Number(row.id)), ttlDays);
+    result.removed += await deleteBindings(db, due.map(row => Number(row.id)), ttlDays, afterId);
     if (due.length < batchSize) return result;
   }
   result.more = true;
