@@ -108,14 +108,14 @@ function isDeliverableCard(card: ClaimableCard, packageId: string, now: Date): b
   );
 }
 
-/** 从库存池原子领取一张卡并写入 orderId；库存不足时抛错。 */
+/** 从库存池原子领取一张卡并写入 orderId；`validAt` 时仍未过期的卡才可领取，库存不足时抛 CardStockError。 */
 async function claimPooledCard(
   tx: Tx,
   packageId: string,
   orderId: string,
-  now: Date
+  validAt: Date
 ): Promise<ClaimableCard & { cardSecretEnc: string }> {
-  const availableCardWhere = deliverableCardWhere(packageId, now);
+  const availableCardWhere = deliverableCardWhere(packageId, validAt);
   const availableAtStart = await tx.card.count({ where: availableCardWhere });
   if (availableAtStart === 0) {
     throw new CardStockError();
@@ -154,7 +154,8 @@ async function claimPooledCard(
     skippedCardIds = [...skippedCardIds, pooled.id];
   }
 
-  throw new Error("卡密库存领取冲突，请稍后重试");
+  // 起始可见的候选卡全部被并发事务抢走：对调用方而言就是库存不足。
+  throw new CardStockError();
 }
 
 export class CardStockError extends Error {
@@ -171,9 +172,10 @@ export class CardStockError extends Error {
 export async function reserveCardForOrder(
   tx: Tx,
   order: { id: string; productId: string },
-  now = new Date()
+  /** 订单可支付窗口的结束时间：只预占在此之前不会过期的卡 */
+  validUntil: Date
 ): Promise<void> {
-  await claimPooledCard(tx, order.productId, order.id, now);
+  await claimPooledCard(tx, order.productId, order.id, validUntil);
 }
 
 /** 归还未支付订单预占的卡（仅在订单进入 EXPIRED/CANCELLED 时调用）。 */

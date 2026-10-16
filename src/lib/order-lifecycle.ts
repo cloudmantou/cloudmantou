@@ -1,4 +1,4 @@
-import type { OrderStatus } from "@prisma/client";
+import type { OrderStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   assertOrderTransition,
@@ -28,6 +28,38 @@ export function assertOrderPayable(status: OrderStatus, createdAt: Date, now = n
  */
 const STALE_ORDER_BATCH_SIZE = 100;
 
+type ExpirableOrder = {
+  id: string;
+  status: OrderStatus;
+  payment: { id: string; status: PaymentStatus } | null;
+};
+
+/**
+ * 条件更新 PENDING → EXPIRED：读取快照之后可能已有支付回调把订单改为 PAID，
+ * 因此以数据库当前状态为准，未发生转换时不关闭支付单、不归还预占卡。
+ */
+async function expirePendingOrderInTx(
+  tx: Prisma.TransactionClient,
+  order: ExpirableOrder
+): Promise<boolean> {
+  const { orderStatus, paymentStatus } = pairedStatusesForExpired();
+  assertOrderTransition(order.status, orderStatus);
+  const updated = await tx.order.updateMany({
+    where: { id: order.id, status: "PENDING" },
+    data: { status: orderStatus },
+  });
+  if (updated.count !== 1) return false;
+
+  if (order.payment) {
+    assertPaymentTransition(order.payment.status, paymentStatus);
+    await tx.payment.update({
+      where: { id: order.payment.id },
+      data: { status: paymentStatus },
+    });
+  }
+  return true;
+}
+
 export async function expireStalePendingOrders(options?: {
   userId?: string;
   /** 仅处理某个卡密套餐的订单，用于下单前及时归还超时预占的库存 */
@@ -36,7 +68,6 @@ export async function expireStalePendingOrders(options?: {
 }): Promise<number> {
   const now = options?.now ?? new Date();
   const cutoff = new Date(now.getTime() - ORDER_PENDING_TTL_MS);
-  const { orderStatus, paymentStatus } = pairedStatusesForExpired();
   let totalExpired = 0;
 
   while (true) {
@@ -55,26 +86,17 @@ export async function expireStalePendingOrders(options?: {
 
     if (stale.length === 0) break;
 
-    await prisma.$transaction(async (tx) => {
+    const expiredIds = await prisma.$transaction(async (tx) => {
+      const transitioned: string[] = [];
       for (const order of stale) {
-        assertOrderTransition(order.status, orderStatus);
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: orderStatus },
-        });
-
-        if (order.payment) {
-          assertPaymentTransition(order.payment.status, paymentStatus);
-          await tx.payment.update({
-            where: { id: order.payment.id },
-            data: { status: paymentStatus },
-          });
-        }
+        if (await expirePendingOrderInTx(tx, order)) transitioned.push(order.id);
       }
-      await releaseCardReservations(tx, stale.map((order) => order.id));
+      // 只归还真正由本事务置为 EXPIRED 的订单；并发已支付的订单保留预占卡用于发卡。
+      await releaseCardReservations(tx, transitioned);
+      return transitioned;
     });
 
-    totalExpired += stale.length;
+    totalExpired += expiredIds.length;
     if (stale.length < STALE_ORDER_BATCH_SIZE) break;
   }
 
@@ -97,29 +119,15 @@ export async function ensureOrderPayable(order: {
     return { expired: false };
   }
 
-  const { orderStatus, paymentStatus } = pairedStatusesForExpired();
-
   await prisma.$transaction(async (tx) => {
     const current = await tx.order.findUnique({
       where: { id: order.id },
       select: { status: true, payment: { select: { id: true, status: true } } },
     });
     if (!current || current.status !== "PENDING") return;
-
-    assertOrderTransition(current.status, orderStatus);
-    await tx.order.update({
-      where: { id: order.id },
-      data: { status: orderStatus },
-    });
-
-    if (current.payment) {
-      assertPaymentTransition(current.payment.status, paymentStatus);
-      await tx.payment.update({
-        where: { id: current.payment.id },
-        data: { status: paymentStatus },
-      });
+    if (await expirePendingOrderInTx(tx, { ...current, id: order.id })) {
+      await releaseCardReservations(tx, [order.id]);
     }
-    await releaseCardReservations(tx, [order.id]);
   });
 
   return { expired: true };

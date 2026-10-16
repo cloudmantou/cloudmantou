@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   orderCount: vi.fn(),
   orderCreate: vi.fn(),
   transaction: vi.fn(),
+  queryRaw: vi.fn(),
   countActiveCardStock: vi.fn(),
   expireStalePendingOrders: vi.fn(),
   reserveCardForOrder: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/card-packages", () => ({ countActiveCardStock: mocks.countActiveCardStock }));
 vi.mock("@/lib/order-lifecycle", () => ({
   expireStalePendingOrders: mocks.expireStalePendingOrders,
+  ORDER_PENDING_TTL_MS: 30 * 60 * 1000,
 }));
 vi.mock("@/lib/card-delivery", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/card-delivery")>();
@@ -188,20 +190,41 @@ describe("card package order reservation", () => {
     mocks.countActiveCardStock.mockResolvedValue(1);
     mocks.expireStalePendingOrders.mockResolvedValue(0);
     mocks.orderCreate.mockImplementation(async ({ data }) => ({ id: "order-1", ...data }));
+    mocks.queryRaw.mockResolvedValue([{ id: "user-1" }]);
     mocks.transaction.mockImplementation(async (callback) =>
-      callback({ order: { create: mocks.orderCreate } })
+      callback({
+        $queryRaw: mocks.queryRaw,
+        order: { create: mocks.orderCreate, count: mocks.orderCount },
+      })
     );
   });
 
-  it("reserves a card inside the order transaction", async () => {
+  it("reserves a card valid for the whole payment window inside the order transaction", async () => {
     mocks.reserveCardForOrder.mockResolvedValue(undefined);
+    const before = Date.now();
     const res = await createOrderPOST(jsonRequest("/api/orders", cardOrder));
     expect(res.status).toBe(200);
     expect(mocks.expireStalePendingOrders).toHaveBeenCalledWith({ cardPackageId: "package-1" });
-    expect(mocks.reserveCardForOrder).toHaveBeenCalledWith(expect.anything(), {
-      id: "order-1",
-      productId: "package-1",
-    });
+    expect(mocks.reserveCardForOrder).toHaveBeenCalledWith(
+      expect.anything(),
+      { id: "order-1", productId: "package-1" },
+      expect.any(Date)
+    );
+    const validUntil = mocks.reserveCardForOrder.mock.calls[0][2] as Date;
+    // 30 分钟支付窗口 + 回调宽限
+    expect(validUntil.getTime()).toBeGreaterThanOrEqual(before + 30 * 60 * 1000);
+  });
+
+  it("locks the user row before counting pending orders", async () => {
+    const order: string[] = [];
+    mocks.queryRaw.mockImplementation(async () => { order.push("lock"); return []; });
+    mocks.orderCount.mockImplementation(async () => { order.push("count"); return 0; });
+    mocks.orderCreate.mockImplementation(async ({ data }) => { order.push("create"); return { id: "order-1", ...data }; });
+    mocks.reserveCardForOrder.mockImplementation(async () => { order.push("reserve"); });
+    await createOrderPOST(jsonRequest("/api/orders", cardOrder));
+    expect(order).toEqual(["lock", "count", "create", "reserve"]);
+    const [strings] = mocks.queryRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(strings.join("?")).toMatch(/FROM users WHERE id = \? FOR UPDATE/);
   });
 
   it("answers out-of-stock when the last card was reserved concurrently", async () => {
@@ -215,7 +238,8 @@ describe("card package order reservation", () => {
     mocks.orderCount.mockResolvedValue(3);
     const res = await createOrderPOST(jsonRequest("/api/orders", cardOrder));
     expect(res.status).toBe(429);
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.orderCreate).not.toHaveBeenCalled();
+    expect(mocks.reserveCardForOrder).not.toHaveBeenCalled();
   });
 
   it("rate-limits order creation", async () => {
@@ -225,12 +249,10 @@ describe("card package order reservation", () => {
     expect(mocks.cardPackageFindFirst).not.toHaveBeenCalled();
   });
 
-  it("does not reserve cards for non-card products", async () => {
-    mocks.transaction.mockImplementation(async (callback) =>
-      callback({ order: { create: mocks.orderCreate } })
-    );
+  it("does not lock or reserve for non-card products", async () => {
     const res = await createOrderPOST(jsonRequest("/api/orders", { productType: "VIP_QUARTER" }));
     expect(res.status).toBe(200);
+    expect(mocks.queryRaw).not.toHaveBeenCalled();
     expect(mocks.reserveCardForOrder).not.toHaveBeenCalled();
   });
 });

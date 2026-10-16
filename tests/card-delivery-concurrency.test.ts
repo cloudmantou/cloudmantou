@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deliverCardPackageOrder,
   ensureCardDeliveryForPaidOrder,
+  reserveCardForOrder,
   retryCardDeliveriesForOrders,
 } from "@/lib/card-delivery";
 import {
@@ -348,7 +349,7 @@ describe("deliverCardPackageOrder concurrency", () => {
     expect(deliveries[0].cardId).toBe("card-next");
   });
 
-  it("fails explicitly after bounded claim conflicts", async () => {
+  it("reports out-of-stock after bounded claim conflicts exhaust candidates", async () => {
     const candidates = Array.from({ length: 5 }, (_, index) => ({
       id: `card-conflict-${index}`,
       cardNo: `NO-CONFLICT-${index}`,
@@ -379,7 +380,7 @@ describe("deliverCardPackageOrder concurrency", () => {
 
     await expect(
       deliverCardPackageOrder(tx as never, createOrder("order-conflict"))
-    ).rejects.toThrow("卡密库存领取冲突，请稍后重试");
+    ).rejects.toThrow("该商品卡密库存不足，请先在后台导入或生成卡密");
     expect(claimAttempts).toBe(5);
   });
 
@@ -417,5 +418,22 @@ describe("deliverCardPackageOrder concurrency", () => {
 
     expect(result?.cardNo).toBe("NO-RACE-5");
     expect(claimAttempts).toBe(6);
+  });
+
+  it("reserves only cards that stay valid until the end of the payment window", async () => {
+    const validUntil = new Date("2026-10-17T12:40:00Z");
+    const seenWhere: Array<{ OR?: Array<{ expireAt?: null | { gt: Date } }> }> = [];
+    const tx = {
+      card: {
+        count: async ({ where }: { where: (typeof seenWhere)[number] }) => {
+          seenWhere.push(where);
+          return 0;
+        },
+      },
+    };
+    await expect(
+      reserveCardForOrder(tx as never, { id: "order-1", productId: PACKAGE_ID }, validUntil)
+    ).rejects.toThrow("该商品卡密库存不足");
+    expect(seenWhere[0].OR).toEqual([{ expireAt: null }, { expireAt: { gt: validUntil } }]);
   });
 });

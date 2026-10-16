@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => {
   const transactionClient = {
     order: {
       findUnique: mocks.orderFindUnique,
-      update: mocks.orderUpdate,
+      updateMany: mocks.orderUpdate,
     },
     payment: { update: mocks.paymentUpdate },
     card: { updateMany: mocks.cardUpdateMany },
@@ -48,7 +48,7 @@ beforeEach(() => {
   const tx = {
     order: {
       findUnique: mocks.orderFindUnique,
-      update: mocks.orderUpdate,
+      updateMany: mocks.orderUpdate,
     },
     payment: { update: mocks.paymentUpdate },
     card: { updateMany: mocks.cardUpdateMany },
@@ -56,7 +56,7 @@ beforeEach(() => {
   mocks.transaction.mockImplementation(
     async (callback: (client: typeof tx) => unknown) => callback(tx)
   );
-  mocks.orderUpdate.mockResolvedValue({});
+  mocks.orderUpdate.mockResolvedValue({ count: 1 });
   mocks.paymentUpdate.mockResolvedValue({});
   mocks.cardUpdateMany.mockResolvedValue({ count: 0 });
 });
@@ -164,7 +164,7 @@ describe("batch expiry", () => {
     expect(mocks.transaction).toHaveBeenCalledTimes(2);
     expect(mocks.orderUpdate).toHaveBeenCalledTimes(101);
     expect(mocks.orderUpdate).toHaveBeenCalledWith({
-      where: { id: "order-100" },
+      where: { id: "order-100", status: "PENDING" },
       data: { status: "EXPIRED" },
     });
     expect(mocks.paymentUpdate).toHaveBeenCalledTimes(51);
@@ -174,6 +174,38 @@ describe("batch expiry", () => {
       where: { id: "payment-100" },
       data: { status: "CLOSED" },
     });
+  });
+});
+
+describe("expiry racing a payment callback", () => {
+  it("neither closes the payment nor releases the card of an order paid after the snapshot", async () => {
+    mocks.orderFindMany.mockResolvedValueOnce([
+      { id: "order-paid", status: "PENDING", payment: { id: "pay-paid", status: "WAITING" } },
+      { id: "order-stale", status: "PENDING", payment: { id: "pay-stale", status: "WAITING" } },
+    ]);
+    // order-paid 已被支付回调提交为 PAID：条件更新命中 0 行
+    mocks.orderUpdate.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      count: where.id === "order-paid" ? 0 : 1,
+    }));
+
+    await expect(expireStalePendingOrders({ now: NOW })).resolves.toBe(1);
+    expect(mocks.paymentUpdate).toHaveBeenCalledTimes(1);
+    expect(mocks.paymentUpdate).toHaveBeenCalledWith({
+      where: { id: "pay-stale" },
+      data: { status: "CLOSED" },
+    });
+    expect(mocks.cardUpdateMany).toHaveBeenCalledWith({
+      where: { orderId: { in: ["order-stale"] }, delivery: { is: null } },
+      data: { orderId: null },
+    });
+  });
+
+  it("keeps the reservation when a single-order check loses the race", async () => {
+    mocks.orderFindUnique.mockResolvedValue({ id: "order-1", status: "PENDING", payment: null });
+    mocks.orderUpdate.mockResolvedValue({ count: 0 });
+
+    await ensureOrderPayable({ id: "order-1", status: "PENDING", createdAt: STALE });
+    expect(mocks.cardUpdateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -218,7 +250,7 @@ describe("single-order payable reconciliation", () => {
       ensureOrderPayable({ id: "order-1", status: "PENDING", createdAt: STALE })
     ).resolves.toEqual({ expired: true });
     expect(mocks.orderUpdate).toHaveBeenCalledWith({
-      where: { id: "order-1" },
+      where: { id: "order-1", status: "PENDING" },
       data: { status: "EXPIRED" },
     });
     expect(mocks.paymentUpdate).not.toHaveBeenCalled();
