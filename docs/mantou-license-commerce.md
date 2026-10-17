@@ -17,3 +17,5 @@
 生产维护任务访问 `/api/cron/expire-orders`，仅接受私密 `Authorization: Bearer ...`，不接受 URL 密钥。任务每 5 分钟运行，重试支付发卡、清理未付订单、分批解除到期的新绑定。首次启用必须保存历史编号边界；没有边界时到期任务安全跳过。
 
 回滚代码前先暂停新建的应用授权商品和积分兑换，避免旧代码把通用类型当作博客核销卡。新增列可保留；不要删除历史发卡记录、原授权卡或加密密钥。
+
+维护脚本为 `scripts/run-maintenance.mjs`，只连接本机，禁止跟随重定向，超时 55 秒；不会把密钥放在命令行或 URL。服务器使用 `ops/systemd/cloudmantou-maintenance.{service,timer}`，可用 `systemctl list-timers cloudmantou-maintenance.timer` 查看下次运行时间。替换发布目录时保留同一份私密 `.env`。

@@ -1,0 +1,16 @@
+[Unit]
+Description=CloudMantou order delivery and new device binding maintenance
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/www/wwwroot/cloudmantoua.top/app/current
+Environment=MAINTENANCE_PORT=3100
+ExecStart=/www/server/nodejs/v24.15.0/bin/node --env-file=/www/wwwroot/cloudmantoua.top/app/current/.env /www/wwwroot/cloudmantoua.top/app/current/scripts/run-maintenance.mjs
+TimeoutStartSec=65
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
