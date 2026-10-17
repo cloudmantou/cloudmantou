@@ -91,24 +91,34 @@ export default function AdminUsersPage() {
     setTimeout(() => setToast(null), 2400);
   };
 
+  // 网络失败时也要释放 busyId，否则该行按钮会一直保持禁用。
+  const updateUser = async (id: string, body: { role?: string; vipLevel?: number }, successText: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        flash(data?.message || "更新失败", "err");
+        return;
+      }
+      flash(successText);
+      load(page);
+    } catch {
+      flash("网络异常，更新失败", "err");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleRoleChange = async (u: UserItem) => {
     const { id, role: currentRole } = u;
     const next = currentRole === "EDITOR" ? "USER" : "EDITOR";
     if (!window.confirm(`确定将「${u.nickname || u.username}」设为${ROLE_LABELS[next]}？`)) return;
-    setBusyId(id);
-    const res = await fetch(`/api/admin/users/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: next }),
-    });
-    const data = await res.json().catch(() => null);
-    setBusyId(null);
-    if (!res.ok) {
-      flash(data?.message || "更新失败", "err");
-      return;
-    }
-    flash(`已设为${ROLE_LABELS[next]}`);
-    load(page);
+    await updateUser(id, { role: next }, `已设为${ROLE_LABELS[next]}`);
   };
 
   // 会员等级会直接影响付费权益：每次调整都明确告知结果，并防止连续误点。
@@ -120,20 +130,7 @@ export default function AdminUsersPage() {
       ? `确定取消「${name}」的会员？会员权益将立即失效。`
       : `确定将「${name}」的会员等级调整为 Lv.${next}？\n到期时间取“现有到期时间”和“今天起 30 天”中较晚者。`;
     if (!window.confirm(message)) return;
-    setBusyId(id);
-    const res = await fetch(`/api/admin/users/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vipLevel: next }),
-    });
-    const data = await res.json().catch(() => null);
-    setBusyId(null);
-    if (!res.ok) {
-      flash(data?.message || "更新失败", "err");
-      return;
-    }
-    flash(next === 0 ? "已重置为免费用户" : `VIP 等级 → ${next}`);
-    load(page);
+    await updateUser(id, { vipLevel: next }, next === 0 ? "已重置为免费用户" : `VIP 等级 → ${next}`);
   };
 
   return (

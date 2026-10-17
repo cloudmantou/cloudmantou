@@ -384,6 +384,9 @@ export default function AdminCardsPage() {
   const handleExport = () => {
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
+    if (packageFilter) params.set("packageId", packageFilter);
+    if (hideVipCards) params.set("excludeType", "VIP_DAYS");
+    if (search) params.set("search", search);
     window.open(`/api/admin/cards/export?${params}`, "_blank");
   };
 

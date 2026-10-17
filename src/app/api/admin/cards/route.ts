@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { requireAdmin, ApiError } from "@/lib/guards";
+import { buildAdminCardWhere, displayCardStatus } from "@/lib/admin-card-filters";
 import {
   hashCardSecret,
   generateCardNo,
@@ -56,30 +57,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
-    const type = searchParams.get("type") || undefined;
-    const status = searchParams.get("status") || undefined;
-    const packageId = searchParams.get("packageId") || undefined;
-    const excludeType = searchParams.get("excludeType") || undefined;
-    const batchNo = searchParams.get("batchNo") || undefined;
-    const search = searchParams.get("search")?.trim() || undefined;
-
-    const where: any = {
-      ...(type && { type }),
-      ...(packageId && { packageId }),
-      ...(excludeType && { type: { not: excludeType } }),
-      ...(batchNo && { batchNo }),
-      ...(search && {
-        OR: [
-          { cardNo: { contains: search } },
-          { batchNo: { contains: search } },
-        ],
-      }),
-      ...(status === "ACTIVE" && { status: "ACTIVE", orderId: null }),
-      ...(status === "USED" && {
-        OR: [{ status: "USED" }, { orderId: { not: null } }],
-      }),
-      ...(status && !["ACTIVE", "USED"].includes(status) && { status }),
-    };
+    const where = buildAdminCardWhere(searchParams);
 
     const [cards, total] = await Promise.all([
       prisma.card.findMany({
@@ -100,7 +78,7 @@ export async function GET(req: NextRequest) {
       cardNo: c.cardNo,
       type: c.type,
       value: c.value,
-      status: c.orderId ? "SOLD" : c.status,
+      status: displayCardStatus(c),
       batchNo: c.batchNo,
       packageId: c.packageId,
       packageName: c.package?.name || null,

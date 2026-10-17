@@ -84,7 +84,7 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   CARD_PACKAGE: "卡密销售",
 };
 
-const REVENUE_COLORS = ["var(--accent)", "var(--teal)", "var(--orange)", "var(--text-muted)"];
+const REVENUE_COLORS = ["var(--accent)", "var(--teal)", "var(--orange)", "var(--blue)", "var(--text-muted)"];
 
 const modules = [
   { label: "文章管理", desc: "创建、编辑、发布文章。", href: "/admin/posts", icon: FileText, color: "var(--accent)" },
@@ -369,7 +369,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="mono">{p.viewCount}</td>
                           <td style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                            {p.publishedAt ? formatRelativeTime(p.publishedAt) : "未发布"}
+                            {p.publishedAt && p.status !== "DRAFT" ? formatRelativeTime(p.publishedAt) : "未发布"}
                           </td>
                         </tr>
                       ))
