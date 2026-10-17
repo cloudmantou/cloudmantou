@@ -164,6 +164,7 @@ function PaymentResultInner() {
                 </div>
               </div>
             ) : fulfillmentMessage ? <p>{fulfillmentMessage}</p> : null}
+            {fulfillment?.card?.deliverySource === "MANTOU_ADMIN" && <p>请在 App 内输入卡密绑定设备，无需在博客核销。</p>}
             <p className="payment-result-saved">{copy.redirecting}</p>
             {copyError ? <p className="payment-result-copy-error" role="alert">{copyError}</p> : null}
             <Link href={dashboardOrdersUrl} className="payment-result-link">{copy.viewOrders}</Link>

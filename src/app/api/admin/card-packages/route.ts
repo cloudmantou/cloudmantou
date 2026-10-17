@@ -19,6 +19,7 @@ const packageSchema = z.object({
   intro: z.string().max(8000).optional().nullable(),
   highlights: z.array(z.string().max(200)).max(12).optional(),
   usageSteps: z.array(z.string().max(300)).max(8).optional(),
+  deliverySource: z.enum(["BLOG", "MANTOU_ADMIN"]).default("BLOG"),
   cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE", "GENERIC"]),
   redemptionNote: z.string().max(500).optional().nullable(),
   cardValue: z.number().int().min(1),
@@ -49,13 +50,13 @@ async function listPackagesWithStock() {
     }
   }
 
-  return packages.map((pkg) => ({
+  return Promise.all(packages.map(async (pkg) => ({
     ...pkg,
     price: Number(pkg.price),
     highlights: pkg.highlights,
     usageSteps: pkg.usageSteps,
-    stock: stockMap.get(pkg.id) || 0,
-  }));
+    stock: pkg.deliverySource === "MANTOU_ADMIN" ? await countActiveCardStock(prisma, pkg.id, pkg.deliverySource) : stockMap.get(pkg.id) || 0,
+  })));
 }
 
 export async function GET() {
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    if (data.deliverySource === "MANTOU_ADMIN" && (data.cardType !== "GENERIC" || data.cardValue !== 1)) return fail("应用授权商品须为通用卡密，每份授权一台设备", 42200, 422);
     const lists = serializeCardPackageLists(data);
     const existingSlug = await prisma.cardPackage.findUnique({ where: { slug: data.slug } });
     if (existingSlug) {
@@ -122,6 +124,7 @@ export async function POST(req: NextRequest) {
         highlights: lists.highlights,
         usageSteps: lists.usageSteps,
         cardType: data.cardType,
+        deliverySource: data.deliverySource,
         cardValue: data.cardValue,
         price: data.price,
         badge: data.badge || "NEW",
@@ -134,7 +137,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const stock = await countActiveCardStock(prisma, created.id);
+    const stock = await countActiveCardStock(prisma, created.id, created.deliverySource);
     return ok({ ...created, price: Number(created.price), stock });
   } catch (error) {
     if (error instanceof ApiError) {

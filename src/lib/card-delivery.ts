@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { legacyCardUsable, MANTOU_SOURCE } from "@/lib/legacy-license-commerce";
 import { POINT_CARD_PREFIX, encryptPointCardSecret } from "@/lib/point-card-crypto";
 import {
   encryptCardSecret,
@@ -49,7 +50,7 @@ export async function deliverCardPackageOrder(
 
   const deliveryTime = new Date();
   const reserved = await tx.card.findUnique({ where: { orderId: order.id } });
-  const card = reserved && isDeliverableCard(reserved, pkg.id, deliveryTime)
+  const card = reserved && (pkg.deliverySource !== MANTOU_SOURCE || reserved.legacyCardId != null) && isDeliverableCard(reserved, pkg.id, deliveryTime) && await legacyCardUsable(reserved)
     ? reserved
     : await (async () => {
         // 预占卡已被后台禁用/删除或过期：先释放旧占用（orderId 唯一），再从库存池补领。
@@ -59,7 +60,7 @@ export async function deliverCardPackageOrder(
             data: { orderId: null },
           });
         }
-        return claimPooledCard(tx, pkg.id, order.id, deliveryTime);
+        return claimPooledCard(tx, pkg.id, order.id, deliveryTime, pkg.deliverySource);
       })();
 
   const cardSecret = decryptCardSecret(card.cardSecretEnc!);
@@ -69,6 +70,7 @@ export async function deliverCardPackageOrder(
       cardId: card.id,
       cardNo: card.cardNo,
       cardSecretEnc: card.cardSecretEnc!.startsWith(POINT_CARD_PREFIX) ? encryptPointCardSecret(cardSecret) : encryptCardSecret(cardSecret),
+      deliverySource: card.legacyCardId != null ? MANTOU_SOURCE : "BLOG",
       status: "DELIVERED",
     },
   });
@@ -87,6 +89,7 @@ type ClaimableCard = {
   packageId: string | null;
   status: string;
   expireAt?: Date | null;
+  legacyCardId?: number | null;
 };
 
 function deliverableCardWhere(packageId: string, now: Date): Prisma.CardWhereInput {
@@ -113,9 +116,10 @@ async function claimPooledCard(
   tx: Tx,
   packageId: string,
   orderId: string,
-  validAt: Date
+  validAt: Date,
+  source?: string
 ): Promise<ClaimableCard & { cardSecretEnc: string }> {
-  const availableCardWhere = deliverableCardWhere(packageId, validAt);
+  const availableCardWhere = { ...deliverableCardWhere(packageId, validAt), ...(source === MANTOU_SOURCE && { legacyCardId: { not: null } }) };
   const availableAtStart = await tx.card.count({ where: availableCardWhere });
   if (availableAtStart === 0) {
     throw new CardStockError();
@@ -138,6 +142,10 @@ async function claimPooledCard(
 
     if (!pooled?.cardSecretEnc) {
       throw new CardStockError();
+    }
+    if (!await legacyCardUsable(pooled)) {
+      skippedCardIds = [...skippedCardIds, pooled.id];
+      continue;
     }
 
     const claimed = await tx.card.updateMany({
@@ -173,9 +181,10 @@ export async function reserveCardForOrder(
   tx: Tx,
   order: { id: string; productId: string },
   /** 订单可支付窗口的结束时间：只预占在此之前不会过期的卡 */
-  validUntil: Date
+  validUntil: Date,
+  source?: string
 ): Promise<void> {
-  await claimPooledCard(tx, order.productId, order.id, validUntil);
+  await claimPooledCard(tx, order.productId, order.id, validUntil, source);
 }
 
 /** 归还未支付订单预占的卡（仅在订单进入 EXPIRED/CANCELLED 时调用）。 */

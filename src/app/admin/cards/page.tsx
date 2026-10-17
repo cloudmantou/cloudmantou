@@ -143,6 +143,7 @@ export default function AdminCardsPage() {
         if (first) {
           setGenType(first.cardType);
           setGenValue(String(first.cardValue));
+          if (first.cardType === "GENERIC") setGenMode(first.deliverySource === "MANTOU_ADMIN" ? "random" : "import");
           return first.id;
         }
         return prev;
@@ -202,12 +203,13 @@ export default function AdminCardsPage() {
     setGenType(pkg.cardType);
     setGenValue(String(pkg.cardValue));
     if (pkg.cardType === "GENERIC") {
-      setGenMode("import");
+      setGenMode(pkg.deliverySource === "MANTOU_ADMIN" ? "random" : "import");
       setImportMode("secrets");
     }
   };
 
   const selectedPackage = cardPackages.find((p) => p.id === selectedPackageId);
+  const isAppLicense = selectedPackage?.deliverySource === "MANTOU_ADMIN";
   const importLineCount = genImport.split("\n").map((l) => l.trim()).filter(Boolean).length;
 
   const savePackage = (payload: CardPackageSavePayload) => {
@@ -542,6 +544,7 @@ export default function AdminCardsPage() {
                 ) : null}
               </div>
 
+              {isAppLicense && <p className="admin-form-hint">卡密写入 Mantou Admin，可在原 App 中使用。随机生成 16 位授权卡密；导入时仅接受已存在且未使用的授权卡密。设备到期规则在「应用与设备授权」设置。</p>}
               {genMode === "import" ? (
                 <>
                   <div className="admin-form-group">
@@ -562,7 +565,7 @@ export default function AdminCardsPage() {
                       value={genPrefix}
                       onChange={(e) => setGenPrefix(e.target.value.slice(0, 10))}
                       placeholder="CM"
-                      disabled={importMode === "pairs"}
+                      disabled={importMode === "pairs" || isAppLicense}
                     />
                   </div>
                   <div className="admin-form-group full">
@@ -601,7 +604,7 @@ export default function AdminCardsPage() {
                   </div>
                   <div className="admin-form-group">
                     <label className="admin-form-label">卡号格式</label>
-                    <select className="admin-form-select" value={genFormat} onChange={(e) => setGenFormat(e.target.value)}>
+                    <select className="admin-form-select" value={genFormat} disabled={isAppLicense} onChange={(e) => setGenFormat(e.target.value)}>
                       <option value="standard">标准格式 (XXXX-XXXX-XXXX)</option>
                       <option value="uuid">UUID 格式</option>
                       <option value="numeric">纯数字 (16位)</option>
@@ -612,6 +615,7 @@ export default function AdminCardsPage() {
                     <label className="admin-form-label">卡号前缀</label>
                     <input
                       className="admin-form-input"
+                      disabled={isAppLicense}
                       value={genPrefix}
                       onChange={(e) => setGenPrefix(e.target.value.slice(0, 10))}
                       placeholder="CM"
@@ -621,7 +625,8 @@ export default function AdminCardsPage() {
                     <label className="admin-form-label">有效期</label>
                     <select
                       className="admin-form-select"
-                      value={genExpireDays}
+                      disabled={isAppLicense}
+                      value={isAppLicense ? "0" : genExpireDays}
                       onChange={(e) => setGenExpireDays(e.target.value)}
                     >
                       <option value="0">永不过期</option>
@@ -665,7 +670,7 @@ export default function AdminCardsPage() {
               </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              {genMode === "random" && (
+              {genMode === "random" && !isAppLicense && (
                 <button type="button" className="admin-btn admin-btn-ghost admin-btn-sm" onClick={previewKeys}>
                   预览卡号
                 </button>

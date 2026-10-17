@@ -5,16 +5,8 @@ import { auditAdminAction, auditAdminActionStrict } from "@/lib/admin-audit-log"
 import { isVaultTotpConfigured } from "@/lib/vault-totp";
 import { verifyVaultUnlockToken, VAULT_UNLOCK_COOKIE } from "@/lib/vault-session";
 
-export class ApiError extends Error {
-  code: number;
-  status: number;
-
-  constructor(message: string, code: number, status: number) {
-    super(message);
-    this.code = code;
-    this.status = status;
-  }
-}
+import { ApiError } from "@/lib/api-error";
+export { ApiError } from "@/lib/api-error";
 
 /**
  * 后台 API 权限守卫

@@ -11,6 +11,7 @@ import {
 import { encryptCardSecret } from "@/lib/card-secret-storage";
 import { z } from "zod";
 import { auditAdminAction } from "@/lib/admin-audit-log";
+import { MANTOU_SOURCE, provisionLegacyStock } from "@/lib/legacy-license-commerce";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,7 @@ export async function GET(req: NextRequest) {
       usedAt: c.usedAt,
       expireAt: c.expireAt,
       createdAt: c.createdAt,
+      deliverySource: c.legacyCardId != null ? MANTOU_SOURCE : "BLOG",
       user: c.user,
     }));
 
@@ -147,6 +149,12 @@ export async function POST(req: NextRequest) {
     const pkg = await prisma.cardPackage.findUnique({ where: { id: packageId } });
     if (!pkg) {
       return fail("关联商品不存在", 40400, 404);
+    }
+    if (pkg.deliverySource === MANTOU_SOURCE) {
+      const keys = importLines?.map(line => parseImportLine(line, importMode)?.secret || "");
+      const result = await provisionLegacyStock({ packageId, count, keys, batchNo, active: autoActivate });
+      await auditAdminAction(req, session.user.id, "cards.mantou-stock", { targetType: "card_package", targetId: packageId, detail: `count=${result.count}` });
+      return ok(result);
     }
 
     const type = pkg.cardType;

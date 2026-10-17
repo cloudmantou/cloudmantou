@@ -3,7 +3,7 @@ import { decryptCardSecret } from "@/lib/card-secret-storage";
 export type OrderFulfillment = {
   kind: "none" | "card" | "membership" | "article";
   message: string | null;
-  card: { cardNo: string; cardSecret: string } | null;
+  card: { cardNo: string; cardSecret: string; deliverySource?: string } | null;
 };
 
 type FulfillmentOrder = {
@@ -12,6 +12,7 @@ type FulfillmentOrder = {
   delivery: {
     cardNo: string;
     cardSecretEnc: string;
+    deliverySource?: string;
   } | null;
 };
 
@@ -25,10 +26,11 @@ export function buildOrderFulfillment(order: FulfillmentOrder): OrderFulfillment
     if (order.delivery) {
       return {
         kind: "card",
-        message: "卡密已发放，请妥善保存",
+        message: order.delivery.deliverySource === "MANTOU_ADMIN" ? "应用授权卡密已发放，请在 App 内输入卡密绑定设备，无需在博客核销" : "卡密已发放，请妥善保存",
         card: {
           cardNo: order.delivery.cardNo,
           cardSecret: decryptCardSecret(order.delivery.cardSecretEnc),
+          ...(order.delivery.deliverySource === "MANTOU_ADMIN" && { deliverySource: "MANTOU_ADMIN" }),
         },
       };
     }
