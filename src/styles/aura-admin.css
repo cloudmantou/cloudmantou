@@ -1,40 +1,63 @@
-/* Aura Admin — 对齐 code (2) 紫色后台侧栏体系，作用域 .admin-root */
+/* Aura Admin — 与首页 editorial 风格统一的浅色后台，作用域 .admin-root。
+ * 色板取自 editorial-blog.css：纸色底 + 墨色描边 + 蓝/红/黄强调，硬投影、小圆角。
+ * 首页只有浅色主题，后台同样只提供浅色。 */
 
 .admin-root {
-  --bg: #0a0a0f;
-  --sidebar: #0e0e16;
-  --surface: #13131d;
-  --surface-2: #1a1a28;
-  --card: #13131d;
-  --card-hover: #1a1a28;
-  --border: #2a2a40;
-  --border-light: #353550;
-  --accent: #6c5ce7;
-  --accent-light: #a29bfe;
-  --accent-dim: rgba(108, 92, 231, 0.15);
-  --accent-hover: #5a4bd4;
-  --teal: #00d2d3;
-  --teal-dim: rgba(0, 210, 211, 0.1);
-  --rose: #ff6b6b;
-  --rose-dim: rgba(255, 107, 107, 0.1);
-  --orange: #feca57;
-  --orange-dim: rgba(254, 202, 87, 0.1);
-  --blue: #48dbfb;
-  --blue-dim: rgba(72, 219, 251, 0.1);
-  --text: #e8e8f0;
-  --text-secondary: #8888a8;
-  --text-muted: #555570;
+  /* 首页 editorial 基础色 */
+  --ink: #101820;
+  --paper: #f6f3ea;
+  --paper-strong: #fffdf6;
+  --ed-blue: #145ee8;
+  --ed-red: #ef432f;
+  --ed-yellow: #ffd23f;
+  --ink-line: 2px solid var(--ink);
+  --ink-shadow: 5px 5px 0 var(--ink);
+  --ink-shadow-sm: 3px 3px 0 var(--ink);
+
+  /* 后台语义令牌（页面与内联样式都依赖这些名字，名字保持不变） */
+  --bg: var(--paper);
+  --sidebar: var(--paper-strong);
+  --surface: var(--paper-strong);
+  --surface-2: #efeadc;
+  --card: var(--paper-strong);
+  --card-hover: #f1ecdf;
+  --border: #d3ccba;
+  --border-light: #8d887b;
+  --accent: var(--ed-blue);
+  --accent-light: #0f4cc0;
+  --accent-dim: rgba(20, 94, 232, 0.07);
+  --accent-hover: #0f4cc0;
+  --teal: #096b43;
+  --teal-dim: rgba(9, 107, 67, 0.12);
+  --rose: #c92a17;
+  --rose-dim: rgba(239, 67, 47, 0.12);
+  --orange: #965400;
+  --orange-dim: rgba(255, 210, 63, 0.35);
+  --blue: #1b4fb4;
+  --blue-dim: rgba(27, 79, 180, 0.1);
+  --text: var(--ink);
+  --text-secondary: #36424d;
+  --text-muted: #53606b;
   --admin-sidebar-w: 260px;
   --admin-topbar-h: 64px;
+  color-scheme: light;
 }
 
 .admin-root {
   display: flex;
   min-height: 100vh;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(16, 24, 32, 0.055) 0.7px, transparent 0.7px);
+  background-size: 7px 7px;
   color: var(--text);
-  font-family: "Noto Sans SC", system-ui, sans-serif;
+  font-family: "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
   font-size: 14px;
+}
+
+/* 后台页面滚动越界时露出的也是纸色，而不是全站深色底 */
+html:has(.admin-root),
+body:has(.admin-root) {
+  background: var(--paper, #f6f3ea);
 }
 
 .admin-sidebar {
@@ -64,10 +87,12 @@
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  box-shadow: 4px 4px 0 var(--ed-blue);
   color: #fff;
   font-weight: 900;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 
@@ -163,11 +188,12 @@
 .admin-avatar-sm {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 6px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #e17055, #fdcb6e);
-  color: #fff;
+  border: 2px solid var(--ink);
+  background: var(--ed-yellow);
+  color: var(--ink);
   font-weight: 700;
   font-size: 14px;
   flex-shrink: 0;
@@ -340,7 +366,7 @@
   position: fixed;
   inset: 0;
   z-index: 99;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(16, 24, 32, 0.5);
 }
 
 .admin-overlay.show {
@@ -354,7 +380,7 @@
 
   .admin-sidebar.open {
     transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    box-shadow: 6px 0 0 var(--ink);
   }
 
   .admin-main {
@@ -625,7 +651,7 @@
   display: flex;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(42, 42, 64, 0.4);
+  border-bottom: 1px solid var(--border);
 }
 
 .admin-activity-item:last-child {
@@ -820,12 +846,12 @@
 .admin-key-table td {
   padding: 12px 14px;
   font-size: 12.5px;
-  border-bottom: 1px solid rgba(42, 42, 64, 0.4);
+  border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
 }
 
 .admin-key-table tr:hover td {
-  background: rgba(108, 92, 231, 0.03);
+  background: rgba(255, 210, 63, 0.16);
 }
 
 .admin-key-table .mono {
@@ -879,7 +905,7 @@
 .admin-btn-accent {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(108, 92, 231, 0.3);
+  box-shadow: var(--ink-shadow-sm);
 }
 
 .admin-btn-accent:hover {
@@ -890,7 +916,7 @@
 .admin-btn-danger {
   background: transparent;
   color: var(--rose);
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  border: 2px solid var(--rose);
 }
 
 .admin-btn-sm {
@@ -1055,7 +1081,7 @@
 
 .admin-test-banner {
   background: var(--orange-dim);
-  border: 1px solid rgba(254, 202, 87, 0.2);
+  border: 2px solid var(--ink);
   border-radius: 8px;
   padding: 12px 18px;
   display: flex;
@@ -1096,7 +1122,7 @@
 
 .admin-gateway-card.active {
   border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(108, 92, 231, 0.1);
+  box-shadow: 5px 5px 0 var(--ed-blue);
 }
 
 .admin-gateway-card.inactive {
@@ -1316,7 +1342,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(42, 42, 64, 0.4);
+  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
@@ -1349,12 +1375,12 @@
 
 .admin-badge.wechat {
   background: rgba(7, 193, 96, 0.1);
-  color: #07c160;
+  color: #067a3c;
 }
 
 .admin-badge.stripe {
   background: rgba(99, 91, 255, 0.1);
-  color: #635bff;
+  color: #4b45c6;
 }
 
 /* ===== Post Editor (code 8) ===== */
@@ -1554,13 +1580,13 @@
 
 .admin-root .editor-success {
   margin: 0.65rem 0;
-  color: var(--mint, #55d6a8);
+  color: var(--teal);
   font-size: 0.75rem;
 }
 
 .admin-root .editor-ai-assistant {
   background: linear-gradient(145deg, var(--accent-dim), var(--surface) 52%);
-  border-color: rgba(162, 155, 254, 0.35);
+  border-color: var(--border-light);
 }
 
 .admin-root .editor-ai-heading,
@@ -1648,7 +1674,7 @@
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(10, 10, 15, 0.42);
+  background: var(--paper);
 }
 
 .admin-root .editor-ai-candidate strong {
@@ -1694,7 +1720,7 @@
 .admin-root .editor-ai-keywords span {
   padding: 3px 7px;
   border-radius: 999px;
-  background: rgba(111, 76, 255, 0.1);
+  background: var(--accent-dim);
   color: var(--accent-light);
   font-size: 10px;
 }
@@ -1849,7 +1875,7 @@
   position: fixed;
   inset: 0;
   z-index: 120;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(16, 24, 32, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1926,3 +1952,478 @@
 .ipa-filename { overflow-wrap: anywhere; }
 .ipa-upload-progress { width: 100%; margin: 8px 0; }
 .ipa-editor-error { color: var(--rose); font-size: 12px; margin-top: 10px; }
+
+/* ============================================================
+ * Editorial skin — 与首页一致的墨色描边、硬投影与小圆角。
+ * 只覆盖视觉属性；布局沿用上面的规则。
+ * ============================================================ */
+
+/* 外壳 */
+.admin-sidebar {
+  border-right: 3px solid var(--ink);
+}
+
+.admin-brand,
+.admin-sidebar-footer {
+  border-color: var(--ink);
+  border-width: 2px;
+}
+
+.admin-brand-text h2 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.admin-brand-text span,
+.admin-nav-group-title {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.admin-nav-item {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.admin-nav-item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.admin-nav-item.active {
+  border-color: var(--ink);
+  background: var(--ed-yellow);
+  box-shadow: var(--ink-shadow-sm);
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.admin-nav-item.active::before {
+  display: none;
+}
+
+.admin-nav-item:focus-visible,
+.admin-topbar-btn:focus-visible,
+.admin-mobile-toggle:focus-visible,
+.admin-btn:focus-visible,
+.admin-chip:focus-visible,
+.admin-page-btn:focus-visible {
+  outline: 3px solid var(--ed-red);
+  outline-offset: 2px;
+}
+
+.admin-topbar {
+  background: rgba(246, 243, 234, 0.96);
+  border-bottom: 3px solid var(--ink);
+}
+
+.admin-topbar-left h1 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.admin-breadcrumb .current {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.admin-topbar-btn,
+.admin-mobile-toggle {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  color: var(--ink);
+}
+
+.admin-topbar-btn:hover,
+.admin-mobile-toggle:hover {
+  border-color: var(--ink);
+  background: var(--ed-blue);
+  color: #fff;
+}
+
+/* 卡片、面板、表格容器 */
+.admin-page-header h2 {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.admin-page-header p {
+  color: var(--text-muted);
+}
+
+.admin-stat-card,
+.admin-panel,
+.admin-table-wrap,
+.admin-config-card,
+.admin-gateway-card,
+.admin-product-card,
+.admin-route-loading-card,
+.admin-route-loading-panel,
+.admin-root .data-panel,
+.admin-root .metric-card,
+.admin-root .publish-box,
+.admin-root .editor-main-card,
+.admin-root .vault-editor-panel,
+.admin-root .product-detail-modal {
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper-strong);
+  box-shadow: var(--ink-shadow);
+}
+
+.admin-stat-card:hover,
+.admin-root .metric-card:hover {
+  border-color: var(--ink);
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--ed-blue);
+}
+
+/* 仪表盘“管理模块”等可点击面板 */
+a.admin-panel {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+a.admin-panel:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--ed-blue);
+}
+
+.admin-gateway-card:hover {
+  border-color: var(--ink);
+}
+
+.admin-gateway-card.active {
+  border-color: var(--ink);
+  box-shadow: 5px 5px 0 var(--ed-blue);
+}
+
+.admin-panel-header,
+.admin-config-header,
+.admin-root .data-panel-header {
+  border-bottom: 2px solid var(--ink);
+  background: var(--paper-strong);
+}
+
+.admin-gateway-footer,
+.admin-config-actions {
+  border-top: 2px solid var(--ink);
+}
+
+.admin-panel-title,
+.admin-config-title,
+.admin-root .data-panel-title {
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.admin-stat-icon {
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+}
+
+.admin-stat-value,
+.admin-root .metric-value {
+  color: var(--ink);
+}
+
+.admin-chart-bar {
+  border: 2px solid var(--ink);
+  border-radius: 2px;
+  background: var(--ed-blue);
+}
+
+.admin-donut {
+  border: 2px solid var(--ink);
+}
+
+.admin-donut::after {
+  border: 2px solid var(--ink);
+  background: var(--paper-strong);
+}
+
+/* 表格 */
+.admin-key-table th,
+.admin-root .data-table thead th {
+  border-bottom: 2px solid var(--ink);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-weight: 800;
+}
+
+.admin-key-table td {
+  color: var(--text-secondary);
+}
+
+.admin-root table tbody tr:hover > td {
+  background: rgba(255, 210, 63, 0.16);
+}
+
+/* 标签与徽章 */
+.admin-badge {
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.admin-chip,
+.admin-root .filter-button {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.admin-chip:hover,
+.admin-chip.active,
+.admin-root .filter-button:hover,
+.admin-root .filter-button.active {
+  border-color: var(--ink);
+  background: var(--ed-yellow);
+  color: var(--ink);
+}
+
+.admin-tabs {
+  border-bottom: 2px solid var(--ink);
+}
+
+.admin-tab {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.admin-tab:hover {
+  color: var(--ink);
+}
+
+.admin-tab.active {
+  border-bottom-width: 3px;
+  border-color: var(--ed-blue);
+  color: var(--ink);
+}
+
+/* 表单 */
+.admin-form-label,
+.admin-root .form-label,
+.admin-root .form-field-label {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.admin-form-input,
+.admin-form-select,
+.admin-form-textarea,
+.admin-search-box,
+.admin-root .form-input,
+.admin-root .form-select,
+.admin-root .form-textarea,
+.admin-root .search-input {
+  border: 2px solid var(--border-light);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.admin-form-input:focus,
+.admin-form-select:focus,
+.admin-form-textarea:focus,
+.admin-search-box:focus-within,
+.admin-root .form-input:focus,
+.admin-root .form-select:focus,
+.admin-root .form-textarea:focus,
+.admin-root .search-input:focus-within {
+  border-color: var(--ink);
+  background: #fff;
+  box-shadow: 3px 3px 0 var(--ed-blue);
+}
+
+.admin-root input::placeholder,
+.admin-root textarea::placeholder {
+  color: #6b7580;
+}
+
+/* 按钮 */
+.admin-btn,
+.admin-root .e-btn,
+.admin-root .primary-button,
+.admin-root .secondary-button {
+  border-radius: 4px;
+  font-weight: 800;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.admin-btn-ghost,
+.admin-root .e-btn-ghost,
+.admin-root .secondary-button {
+  border: 2px solid var(--ink);
+  background: var(--paper-strong);
+  box-shadow: var(--ink-shadow-sm);
+  color: var(--ink);
+}
+
+.admin-btn-ghost:hover:not(:disabled),
+.admin-root .e-btn-ghost:hover:not(:disabled),
+.admin-root .secondary-button:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: var(--surface-2);
+  color: var(--ink);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.admin-btn-accent,
+.admin-root .e-btn-accent,
+.admin-root .primary-button {
+  border: 2px solid var(--ink);
+  background: var(--ed-blue);
+  box-shadow: var(--ink-shadow-sm);
+  color: #fff;
+}
+
+.admin-btn-accent:hover:not(:disabled),
+.admin-root .e-btn-accent:hover:not(:disabled),
+.admin-root .primary-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* 危险操作：白底红字红框，悬停填充红色，任何背景下都醒目 */
+.admin-btn-danger {
+  border: 2px solid var(--rose);
+  background: var(--paper-strong);
+  box-shadow: 3px 3px 0 var(--rose);
+  color: var(--rose);
+}
+
+.admin-btn-danger:hover:not(:disabled) {
+  background: var(--rose);
+  color: #fff;
+}
+
+.admin-btn:disabled,
+.admin-root .e-btn:disabled,
+.admin-root .primary-button:disabled,
+.admin-root .secondary-button:disabled {
+  box-shadow: none;
+  transform: none;
+}
+
+.admin-page-btn,
+.admin-root .pagination-item {
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.admin-page-btn:hover {
+  border-color: var(--ink);
+  background: var(--surface-2);
+}
+
+.admin-page-btn.active {
+  border-color: var(--ink);
+  background: var(--ed-blue);
+  color: #fff;
+}
+
+.admin-toggle {
+  background: #d3ccba;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.admin-toggle::after {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.admin-toggle.on {
+  background: var(--ed-blue);
+}
+
+.admin-product-card:hover,
+.admin-product-card.selected {
+  border-color: var(--ink);
+  box-shadow: 5px 5px 0 var(--ed-blue);
+}
+
+.admin-product-price {
+  color: var(--accent-light);
+}
+
+.admin-test-banner {
+  background: rgba(255, 210, 63, 0.35);
+}
+
+/* 全局样式里写死的深色值，在后台范围内换成浅色 */
+.admin-root .toggle-row + .toggle-row {
+  border-top-color: var(--border);
+}
+
+.admin-root .seo-preview {
+  background: #fff;
+}
+
+.admin-root .seo-preview-title {
+  color: #1a0dab;
+}
+
+.admin-root .seo-preview-url {
+  color: #0b6b3a;
+}
+
+.admin-root .seo-preview-desc {
+  color: #4d5156;
+}
+
+.admin-root .product-detail-intro {
+  background: var(--surface-2);
+}
+
+.admin-root .product-detail-modal {
+  border-radius: 6px;
+}
+
+.admin-root .vault-editor-panel {
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.admin-root .editor-ai-assistant {
+  border-color: var(--ink);
+}
+
+/* 页面眉标（复用前台 .home-greeting / .page-title），沿用首页 DM Mono 蓝色眉标 */
+.admin-root .home-greeting {
+  color: var(--accent-light);
+  font-family: "DM Mono", monospace;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: none;
+}
+
+.admin-root .page-title {
+  color: var(--ink);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+/* 需求与 Bug：feedback.css 的后台变量指向不存在的 --bg-card，落到深色兜底值 */
+.admin-root .feedback-admin {
+  --fb-ink: var(--ink);
+  --fb-paper: var(--paper-strong);
+  --fb-blue: var(--ed-blue);
+}
+
+.admin-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .admin-page-header {
+    flex-wrap: wrap;
+  }
+}

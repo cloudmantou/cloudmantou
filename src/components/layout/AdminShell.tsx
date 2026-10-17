@@ -166,11 +166,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <p className="admin-nav-group-title">{group.title}</p>
               {group.items.map((item) => {
                 const Icon = item.icon;
+                // 编辑器路由（新建/编辑文章、发布日常）只高亮对应的“发布”入口，不同时点亮列表入口。
                 const active =
                   item.href === "/admin/posts/new"
-                    ? isEditorRoute(pathname)
-                    : item.href === "/admin/posts"
-                      ? pathname.startsWith("/admin/posts") && !isEditorRoute(pathname)
+                    ? isEditorRoute(pathname) && pathname.startsWith("/admin/posts")
+                    : item.href === "/admin/posts" || item.href === "/admin/daily-records"
+                      ? pathname.startsWith(item.href) && !isEditorRoute(pathname)
                       : item.exact
                         ? pathname === item.href
                         : pathname.startsWith(item.href) && item.href !== "/admin";

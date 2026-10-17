@@ -593,7 +593,7 @@ export function PostEditor({ mode, initialData }: PostEditorProps) {
               }}
             />
           </div>
-          <div className="editor-md-wrap" data-color-mode="dark" style={{ position: "relative" }}>
+          <div className="editor-md-wrap" data-color-mode="light" style={{ position: "relative" }}>
             {slashOpen && (
               <div className="slash-menu show" role="listbox">
                 <div className="slash-menu-title">插入内容</div>
