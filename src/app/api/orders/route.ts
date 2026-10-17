@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
     // 服务端查价，不信任客户端传入的 title/amount
     let title: string;
     let amount: number;
+    let deliverySource: string | undefined;
 
     if (productType === "PAID_POST") {
       if (!productId) {
@@ -150,10 +151,11 @@ export async function POST(req: NextRequest) {
       // 先归还超时未付订单的预占卡；挂单上限在下方事务内持用户行锁原子判断。
       await expireStalePendingOrders({ cardPackageId: cardPackage.id });
       const { countActiveCardStock } = await import("@/lib/card-packages");
-      const stock = await countActiveCardStock(prisma, cardPackage.id);
+      const stock = await countActiveCardStock(prisma, cardPackage.id, cardPackage.deliverySource);
       if (stock <= 0) {
         return fail("该卡密商品库存不足", 40000, 400);
       }
+      deliverySource = cardPackage.deliverySource;
       title = cardPackage.name;
       amount = Number(cardPackage.price);
     } else {
@@ -207,7 +209,7 @@ export async function POST(req: NextRequest) {
         if (productType === "CARD_PACKAGE" && productId) {
           // 预占卡须在整个可支付窗口（含回调宽限）内有效，避免付款后发现卡已过期。
           const validUntil = new Date(Date.now() + ORDER_PENDING_TTL_MS + CARD_RESERVATION_GRACE_MS);
-          await reserveCardForOrder(tx, { id: created.id, productId }, validUntil);
+          await reserveCardForOrder(tx, { id: created.id, productId }, validUntil, ...(deliverySource ? [deliverySource] : []));
         }
         return created;
       });

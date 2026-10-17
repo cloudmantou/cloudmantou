@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     if (!card) {
       return fail("卡密不存在或卡号卡密不匹配", 40400, 404);
     }
+    if (card.legacyCardId != null) return fail("这是应用授权卡密，请在 App 的卡密验证页面输入使用，无需在博客账户核销", 42200, 422);
 
     // 使用 bcrypt（新卡密）或 SHA-256（存量旧卡密）验证
     const isValid = await verifyCardSecret(cardSecret, card.cardSecretHash);

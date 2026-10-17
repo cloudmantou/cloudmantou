@@ -1,15 +1,9 @@
-import { randomInt } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { ApiError } from "@/lib/guards";
 
-// This connection deliberately uses the original licensing database. The signing
-// service and published clients continue reading the very same rows and IDs.
-const shared = globalThis as unknown as { appLicenseDb?: PrismaClient };
-export function licenseDb() {
-  if (!process.env.LEGACY_CARD_DATABASE_URL) throw new ApiError("应用授权数据库尚未配置", 50300, 503);
-  return shared.appLicenseDb ??= new PrismaClient({ datasources: { db: { url: process.env.LEGACY_CARD_DATABASE_URL } } });
-}
+import { licenseDb, generateLicenseKey } from "@/lib/legacy-license-db";
+export { licenseDb } from "@/lib/legacy-license-db";
 
 const id = z.number().int().positive();
 export const MAX_BATCH_UNBIND = 100;
@@ -118,7 +112,7 @@ export async function mutateLicense(input: LicenseMutation, db = licenseDb()): P
     case "card.generate":
     case "card.import": {
       const keys = input.action === "card.generate"
-        ? Array.from({ length: input.count }, () => Array.from({ length: 16 }, () => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[randomInt(62)]).join(""))
+        ? Array.from({ length: input.count }, generateLicenseKey)
         : [...new Set(input.cards)];
       return db.$transaction(async tx => {
         const cards: string[] = [];

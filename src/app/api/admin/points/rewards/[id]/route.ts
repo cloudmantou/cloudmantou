@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { feedbackJson, privateOk, feedbackFail } from "@/lib/feedback-request";
 import { generateCardNo, generateCardSecret } from "@/lib/card-crypto";
 import { encryptPointCardSecret, hashPointCardSecret } from "@/lib/point-card-crypto";
+import { provisionLegacyStock } from "@/lib/legacy-license-commerce";
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("update"), cost: z.number().int().min(1).max(1000000), enabled: z.boolean() }).strict(),
   z.object({ action: z.literal("stock"), count: z.number().int().min(1).max(30), importLines: z.array(z.string().trim().min(1).max(300)).max(30).optional() }).strict(),
@@ -16,6 +17,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const reward = await prisma.pointReward.findUnique({ where: { id }, include: { package: true } }); if (!reward) throw new ApiError("兑换商品不存在", 40400, 404);
     if (p.data.action === "update") { await prisma.pointReward.update({ where: { id }, data: { cost: p.data.cost, enabled: p.data.enabled } }); return privateOk({ saved: true }); }
     const { count, importLines } = p.data;
+    if (reward.package.deliverySource === "MANTOU_ADMIN") {
+      const keys = importLines?.map(line => line.includes(",") ? line.slice(line.indexOf(",") + 1).trim() : line.trim());
+      const result = await provisionLegacyStock({ packageId: reward.packageId, count, keys, batchNo: `POINTS-${id}` });
+      return privateOk({ added: result.count });
+    }
     if (importLines && !importLines.length) throw new ApiError("请填写导入卡密", 42200, 422);
     if (reward.package.cardType === "GENERIC" && !importLines) throw new ApiError("通用或外部卡密须导入实际可用的卡号和卡密", 42200, 422);
     const cards = [];

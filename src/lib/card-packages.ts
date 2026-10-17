@@ -1,4 +1,5 @@
 import type { CardPackage, CardType } from "@prisma/client";
+import { MANTOU_SOURCE, usableLegacyIds } from "@/lib/legacy-license-commerce";
 import type { Accent, Product } from "@/types";
 
 export type CardPackageInput = {
@@ -166,6 +167,7 @@ export function cardPackageToProduct(
     productSlug: pkg.slug,
     cardType: pkg.cardType,
     cardValue: pkg.cardValue,
+    deliverySource: pkg.deliverySource,
   };
 }
 
@@ -199,10 +201,18 @@ export async function countActiveCardStock(
       count: (args: {
         where: { packageId: string; status: "ACTIVE"; orderId: null };
       }) => Promise<number>;
+      findMany?: (args: { where: { packageId: string; status: "ACTIVE"; orderId: null; legacyCardId: { not: null } }; select: { legacyCardId: true } }) => Promise<{ legacyCardId: number | null }[]>;
     };
   },
-  packageId: string
+  packageId: string,
+  source?: string
 ) {
+  if (source === MANTOU_SOURCE) {
+    if (!prisma.card.findMany) return 0;
+    const rows = await prisma.card.findMany({ where: { ...availableCardStockWhere(packageId), legacyCardId: { not: null } }, select: { legacyCardId: true } });
+    try { return (await usableLegacyIds(rows.flatMap(row => row.legacyCardId == null ? [] : [row.legacyCardId]))).size; }
+    catch { return 0; }
+  }
   return prisma.card.count({
     where: availableCardStockWhere(packageId),
   });

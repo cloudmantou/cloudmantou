@@ -15,7 +15,7 @@ async function loadPublishedCardProducts(): Promise<Product[]> {
 
     const cardProducts: Product[] = [];
     for (const pkg of packages) {
-      const stock = await countActiveCardStock(prisma, pkg.id);
+      const stock = await countActiveCardStock(prisma, pkg.id, pkg.deliverySource);
       cardProducts.push(cardPackageToProduct(pkg, stock));
     }
     return cardProducts;

@@ -11,6 +11,7 @@ export type CardPackageRecord = {
   intro?: string | null;
   highlights?: string[] | null;
   usageSteps?: string[] | null;
+  deliverySource?: string;
   cardType: string;
   cardValue: number;
   price: number;
@@ -25,6 +26,7 @@ export type CardPackageRecord = {
 };
 
 type EditorForm = {
+  deliverySource: string;
   slug: string;
   name: string;
   description: string;
@@ -42,6 +44,7 @@ type EditorForm = {
 };
 
 export type CardPackageSavePayload = {
+  deliverySource?: string;
   slug?: string;
   cardType?: string;
   cardValue?: number;
@@ -85,6 +88,7 @@ function arrayToLines(value?: string[] | null) {
 
 export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, onSave }: Props) {
   const [form, setForm] = useState<EditorForm>({
+    deliverySource: "MANTOU_ADMIN",
     slug: defaultSlug(),
     name: "",
     description: "",
@@ -105,7 +109,8 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
     if (!open) return;
     if (mode === "create") {
       setForm({
-        slug: defaultSlug(),
+        deliverySource: "MANTOU_ADMIN",
+    slug: defaultSlug(),
         name: "",
         description: "",
         intro: "",
@@ -124,6 +129,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
     }
     if (!pkg) return;
     setForm({
+      deliverySource: pkg.deliverySource || "BLOG",
       slug: pkg.slug,
       name: pkg.name,
       description: pkg.description,
@@ -172,6 +178,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
     onSave({
       ...(mode === "create" && {
         slug,
+        deliverySource: form.deliverySource,
         cardType: form.cardType,
         cardValue,
       }),
@@ -210,7 +217,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
               </h2>
               <p className="product-detail-summary">
                 {mode === "create"
-                  ? "填写标题、描述和售价，保存后到「生成卡密」导入库存"
+                  ? "填写标题、描述和售价，保存后到「生成卡密」添加库存"
                   : `库存 ${pkg?.stock ?? 0} · ${pkg?.cardType} / ${pkg?.cardValue}${
                       pkg?.published ? " · 已发布到商店" : " · 未发布"
                     }`}
@@ -239,9 +246,17 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
                   />
                 </div>
                 <div className="admin-form-group">
+                  <label className="admin-form-label">卡密来源</label>
+                  <select className="admin-form-select" value={form.deliverySource} onChange={e => setForm(f => ({ ...f, deliverySource: e.target.value, ...(e.target.value === "MANTOU_ADMIN" ? { cardType: "GENERIC", cardValue: "1" } : {}) }))}>
+                    <option value="MANTOU_ADMIN">Mantou Admin 应用授权</option>
+                    <option value="BLOG">博客权益 / 外部卡密</option>
+                  </select>
+                </div>
+                <div className="admin-form-group">
                   <label className="admin-form-label">卡密类型</label>
                   <select
                     className="admin-form-select"
+                    disabled={form.deliverySource === "MANTOU_ADMIN"}
                     value={form.cardType}
                     onChange={(e) => setForm((f) => ({ ...f, cardType: e.target.value }))}
                   >
@@ -257,6 +272,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
                     className="admin-form-input"
                     type="number"
                     min={1}
+                    disabled={form.deliverySource === "MANTOU_ADMIN"}
                     value={form.cardValue}
                     onChange={(e) => setForm((f) => ({ ...f, cardValue: e.target.value }))}
                     placeholder={form.cardType === "VIP_DAYS" ? "30" : "1"}
@@ -264,6 +280,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
                 </div>
               </>
             )}
+            {form.deliverySource === "MANTOU_ADMIN" && <p className="admin-form-hint">应用授权卡密可在原 App 内绑定设备，无需在博客核销。新绑定的有效期由「应用与设备授权」统一设置。</p>}
             <div className="admin-form-group full">
               <label className="admin-form-label">商品名称</label>
               <input
@@ -308,7 +325,7 @@ export function CardPackageEditor({ pkg, open, mode = "edit", saving, onClose, o
                 rows={4}
                 value={form.usageStepsText}
                 onChange={(e) => setForm((f) => ({ ...f, usageStepsText: e.target.value }))}
-                placeholder="登录个人中心 → 卡密兑换 → 输入卡号卡密"
+                placeholder={form.deliverySource === "MANTOU_ADMIN" ? "下载 App → 输入卡密 → 绑定设备" : "登录个人中心 → 卡密兑换 → 输入卡号卡密"}
               />
             </div>
             <div className="admin-form-group">

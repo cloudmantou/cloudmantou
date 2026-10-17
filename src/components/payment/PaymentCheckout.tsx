@@ -350,6 +350,7 @@ export function PaymentCheckout({ order, open, onClose, onPaid, returnPath }: Pr
             ) : fulfillmentMessage ? (
               <p className="payment-checkout-fulfillment">{fulfillmentMessage}</p>
             ) : null}
+            {receipt.fulfillment.card?.deliverySource === "MANTOU_ADMIN" && <p>请在 App 内输入卡密绑定设备，无需在博客核销。</p>}
             <p className="payment-checkout-save-hint">{copy.keepReceipt}</p>
             <div className="payment-checkout-receipt-actions">
               {paidReturnPath !== dashboardOrdersUrl ? <Link href={paidReturnPath} onClick={notifyPaidOnce}>{copy.continue}</Link> : null}

@@ -253,6 +253,7 @@ model Card {
   cardNo          String     @unique
   cardSecretHash  String     @unique
   cardSecretEnc   String?    @db.Text
+  legacyCardId    Int?       @unique
   type            CardType
   value           Int
   status          CardStatus @default(ACTIVE)
@@ -283,6 +284,7 @@ model OrderDelivery {
   cardId        String         @unique
   cardNo        String
   cardSecretEnc String         @db.Text
+  deliverySource String       @default("BLOG") @db.VarChar(32)
   status        DeliveryStatus @default(DELIVERED)
   createdAt     DateTime       @default(now())
 
@@ -301,6 +303,7 @@ model CardPackage {
   highlights  Json?
   usageSteps  Json?
   cardType    CardType
+  deliverySource String      @default("BLOG") @db.VarChar(32)
   cardValue   Int
   price       Decimal  @db.Decimal(10, 2)
   badge       String   @default("NEW")

@@ -7,6 +7,7 @@ import { feedbackCreateSchema, feedbackUpdateSchema } from "@/lib/feedback";
 import { deliverCardPackageOrder } from "@/lib/card-delivery";
 import { decryptCardSecret } from "@/lib/card-secret-storage";
 import { randomUUID } from "crypto";
+import { countActiveCardStock } from "@/lib/card-packages";
 
 export const feedbackInclude = {
   user: { select: { id: true, nickname: true, username: true } },
@@ -92,15 +93,16 @@ export async function redeemPointReward(userId: string, rewardId: string, reques
     return tx.pointRedemption.create({ data: { userId, rewardId, requestKey, orderId: order.id, cost: reward.cost }, include: { order: { include: { delivery: true } } } });
   }, { maxWait: 10000, timeout: 20000 });
 }
-export function pointReceipt(item: { id: string; cost: number; createdAt: Date; order: { delivery: { cardNo: string; cardSecretEnc: string } | null } }) {
-  return { id: item.id, cost: item.cost, createdAt: item.createdAt, card: item.order.delivery ? { cardNo: item.order.delivery.cardNo, cardSecret: decryptCardSecret(item.order.delivery.cardSecretEnc) } : null };
+export function pointReceipt(item: { id: string; cost: number; createdAt: Date; order: { delivery: { cardNo: string; cardSecretEnc: string; deliverySource?: string } | null } }) {
+  return { id: item.id, cost: item.cost, createdAt: item.createdAt, card: item.order.delivery ? { cardNo: item.order.delivery.cardNo, cardSecret: decryptCardSecret(item.order.delivery.cardSecretEnc), ...(item.order.delivery.deliverySource === "MANTOU_ADMIN" && { deliverySource: "MANTOU_ADMIN" }) } : null };
 }
-export async function rewardStock(packageId: string) {
+export async function rewardStock(packageId: string, source?: string) {
+  if (source === "MANTOU_ADMIN") return countActiveCardStock(prisma, packageId, source);
   return prisma.card.count({ where: { packageId, status: "ACTIVE", orderId: null, cardSecretEnc: { not: null }, OR: [{ expireAt: null }, { expireAt: { gt: new Date() } }] } });
 }
 export async function listPointRewards(admin = false) {
   const rows = await prisma.pointReward.findMany({ where: admin ? {} : { enabled: true, package: { enabled: true } }, include: { package: true }, orderBy: { createdAt: "desc" } });
-  return Promise.all(rows.map(async row => ({ id: row.id, cost: row.cost, enabled: row.enabled, name: row.package.name, description: row.package.description, note: row.package.redemptionNote, type: row.package.cardType, value: row.package.cardValue, stock: await rewardStock(row.packageId) })));
+  return Promise.all(rows.map(async row => ({ id: row.id, cost: row.cost, enabled: row.enabled, name: row.package.name, description: row.package.description, note: row.package.redemptionNote, type: row.package.cardType, deliverySource: row.package.deliverySource, value: row.package.cardValue, stock: await rewardStock(row.packageId, row.package.deliverySource) })));
 }
 export function feedbackPage(req: { nextUrl: URL }) {
   const raw = Number(req.nextUrl.searchParams.get("page") || 1);

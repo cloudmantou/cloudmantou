@@ -15,6 +15,7 @@ const updateSchema = z.object({
   intro: z.string().max(8000).optional().nullable(),
   highlights: z.array(z.string().max(200)).max(12).optional(),
   usageSteps: z.array(z.string().max(300)).max(8).optional(),
+  deliverySource: z.enum(["BLOG", "MANTOU_ADMIN"]).optional(),
   cardType: z.enum(["VIP_DAYS", "PAID_ARTICLE", "BALANCE", "GENERIC"]).optional(),
   redemptionNote: z.string().max(500).optional().nullable(),
   cardValue: z.number().int().min(1).optional(),
@@ -45,6 +46,11 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
 
     const data = parsed.data;
+    const source = data.deliverySource ?? existing.deliverySource;
+    if (source === "MANTOU_ADMIN" && ((data.cardType ?? existing.cardType) !== "GENERIC" || (data.cardValue ?? existing.cardValue) !== 1)) return fail("应用授权商品须为通用卡密，每份授权一台设备", 42200, 422);
+    if ((data.deliverySource !== undefined && data.deliverySource !== existing.deliverySource) || (data.cardType !== undefined && data.cardType !== existing.cardType)) {
+      if (await prisma.card.count({ where: { packageId: id } })) return fail("已有卡密或历史发卡记录的商品不能更换卡密来源或类型，请新建商品", 40900, 409);
+    }
     if (data.slug && data.slug !== existing.slug) {
       const slugTaken = await prisma.cardPackage.findUnique({ where: { slug: data.slug } });
       if (slugTaken) return fail("slug 已存在", 40900, 409);
@@ -63,6 +69,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
         ...(data.usageSteps !== undefined && {
           usageSteps: serializeCardPackageLists({ usageSteps: data.usageSteps }).usageSteps ?? [],
         }),
+        ...(data.deliverySource !== undefined && { deliverySource: data.deliverySource }),
         ...(data.cardType !== undefined && { cardType: data.cardType }),
         ...(data.cardValue !== undefined && { cardValue: data.cardValue }),
         ...(data.price !== undefined && { price: data.price }),
@@ -76,7 +83,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
       },
     });
 
-    const stock = await countActiveCardStock(prisma, updated.id);
+    const stock = await countActiveCardStock(prisma, updated.id, updated.deliverySource);
     return ok({ ...updated, price: Number(updated.price), stock });
   } catch (error) {
     if (error instanceof ApiError) {

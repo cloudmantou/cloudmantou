@@ -4,6 +4,7 @@ import { ApiError, requireAdmin, requireAdminAndStrictAudit } from "@/lib/guards
 import { fail } from "@/lib/api-response";
 import { feedbackJson, privateOk } from "@/lib/feedback-request";
 import { rateLimit } from "@/lib/rate-limit";
+import { protectCommerceLicenseMutation } from "@/lib/legacy-license-commerce";
 import { licenseMutationSchema, licensePageParams, listLicenses, mutateLicense, type LicenseMutation } from "@/lib/app-licenses";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       targetId: "id" in input ? String(input.id) : undefined,
       detail: auditDetail(input),
     });
+    await protectCommerceLicenseMutation(input);
     return privateOk(await mutateLicense(input));
   } catch (error) { return errorResponse(error); }
 }

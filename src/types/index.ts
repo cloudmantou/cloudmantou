@@ -45,6 +45,7 @@ export type Product = {
   productSlug?: string;
   cardType?: "VIP_DAYS" | "PAID_ARTICLE" | "BALANCE" | "GENERIC";
   cardValue?: number;
+  deliverySource?: string;
 };
 
 export type MoodType = "happy" | "productive" | "tired" | "excited" | "chill";
