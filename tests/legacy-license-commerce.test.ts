@@ -93,11 +93,10 @@ describe("legacy availability and mutation boundaries", () => {
     expect(await countActiveCardStock({ card: { count: db.card.count } }, "pkg", "MANTOU_ADMIN")).toBe(0);
     await expect(usableLegacyIds([1])).rejects.toMatchObject({ status: 503 });
   });
-  it("blocks legacy reset/delete/manual binding for commerce keys and permits unrelated administration", async () => {
+  it("blocks legacy delete/manual binding for commerce keys and permits unrelated administration", async () => {
     await expect(protectCommerceLicenseMutation({ action: "app.sync" })).resolves.toBeUndefined();
-    await expect(protectCommerceLicenseMutation({ action: "card.reset", id: row.id })).resolves.toBeUndefined();
     mocks.blog.card.findUnique.mockResolvedValue({ id: "mirrored" });
-    for (const action of ["card.reset", "card.delete"]) await expect(protectCommerceLicenseMutation({ action, id: row.id })).rejects.toMatchObject({ status: 409 });
+    await expect(protectCommerceLicenseMutation({ action: "card.delete", id: row.id })).rejects.toMatchObject({ status: 409 });
     await expect(protectCommerceLicenseMutation({ action: "binding.add", cardKey: row.card_key })).rejects.toMatchObject({ status: 409 });
     mocks.old.$queryRaw.mockResolvedValue([]);
     await expect(protectCommerceLicenseMutation({ action: "binding.add", cardKey: "unknown" })).resolves.toBeUndefined();

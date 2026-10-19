@@ -78,7 +78,7 @@ export async function provisionLegacyStock(input: { packageId: string; count: nu
 
 export async function protectCommerceLicenseMutation(input: { action: string; id?: number | string; cardKey?: string }) {
   let legacyId: number | undefined;
-  if (input.action === "card.delete" || input.action === "card.reset") legacyId = Number(input.id);
+  if (input.action === "card.delete") legacyId = Number(input.id);
   else if (input.action === "binding.add" && input.cardKey) {
     const rows = await licenseDb().$queryRaw<{ id: number }[]>`SELECT id FROM cards WHERE card_key=${input.cardKey}`;
     legacyId = rows[0]?.id;

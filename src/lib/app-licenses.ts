@@ -21,7 +21,6 @@ export const licenseMutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("card.generate"), count: z.number().int().min(1).max(500) }).strict(),
   z.object({ action: z.literal("card.import"), cards: z.array(text).min(1).max(500) }).strict(),
   z.object({ action: z.literal("card.delete"), id }).strict(),
-  z.object({ action: z.literal("card.reset"), id }).strict(),
   z.object({ action: z.literal("binding.add"), udid: text, cardKey: text }).strict(),
   z.object({ action: z.literal("binding.delete"), id }).strict(),
   z.object({ action: z.literal("binding.delete-batch"), ids: z.array(id).min(1).max(MAX_BATCH_UNBIND) }).strict(),
@@ -129,14 +128,6 @@ export async function mutateLicense(input: LicenseMutation, db = licenseDb()): P
       await tx.$executeRaw`DELETE FROM bindings WHERE card_id=${input.id}`;
       await tx.$executeRaw`DELETE FROM cards WHERE id=${input.id}`;
       return { message: "卡密及关联设备授权已删除" };
-    });
-    case "card.reset": return db.$transaction(async tx => {
-      const cards = await tx.$queryRaw<Row[]>`SELECT id FROM cards WHERE id=${input.id} FOR UPDATE`;
-      if (!cards.length) notFound();
-      const bindings = await tx.$queryRaw<Row[]>`SELECT id FROM bindings WHERE card_id=${input.id} FOR UPDATE`;
-      if (bindings.length) conflict("请先解除该卡密的全部设备绑定，再重置卡密");
-      await tx.$executeRaw`UPDATE cards SET used=0,used_at=NULL WHERE id=${input.id}`;
-      return { message: "卡密已恢复为未使用" };
     });
     case "binding.add": return db.$transaction(async tx => {
       // Lock the card before checking used state, so concurrent claims cannot

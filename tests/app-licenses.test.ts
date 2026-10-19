@@ -77,16 +77,6 @@ describe("shared database reads and mutations", () => {
     await expect(mutateLicense({ action: "binding.add", udid: "DEVICE", cardKey: "unused" }, db)).rejects.toThrow("此设备已有授权");
     expect(execute).not.toHaveBeenCalled();
   });
-  it("rejects resetting a key with device grants", async () => {
-    query.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce([{ id: 4 }]);
-    await expect(mutateLicense({ action: "card.reset", id: 1 }, db)).rejects.toThrow("请先解除");
-    expect(execute).not.toHaveBeenCalled();
-  });
-  it("allows reuse only after all grants have been removed", async () => {
-    query.mockResolvedValueOnce([{ id: 1 }]).mockResolvedValueOnce([]);
-    await mutateLicense({ action: "card.reset", id: 1 }, db);
-    expect(execute.mock.calls[0][0].join("?")).toContain("used=0,used_at=NULL");
-  });
   it("deletes all grants before deleting a key transactionally", async () => {
     query.mockResolvedValueOnce([{ id: 1 }]);
     await mutateLicense({ action: "card.delete", id: 1 }, db);
