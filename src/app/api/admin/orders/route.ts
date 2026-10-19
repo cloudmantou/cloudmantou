@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
+import { canReadCardSecret, decryptCardSecret } from "@/lib/card-secret-storage";
 
 const ORDER_STATUSES = new Set(["PENDING", "PAID", "CANCELLED", "REFUNDED", "EXPIRED"]);
 
@@ -34,6 +35,7 @@ export async function GET(req: NextRequest) {
         include: {
           user: { select: { id: true, username: true, nickname: true, email: true } },
           payment: { select: { channel: true, status: true, tradeNo: true } },
+          delivery: { select: { cardNo: true, cardSecretEnc: true, deliverySource: true, status: true } },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -46,6 +48,16 @@ export async function GET(req: NextRequest) {
       orders.map((o) => ({
         ...o,
         amount: Number(o.amount),
+        delivery: o.delivery
+          ? {
+              cardNo: o.delivery.cardNo,
+              cardSecret: canReadCardSecret(o.delivery.cardSecretEnc)
+                ? decryptCardSecret(o.delivery.cardSecretEnc!)
+                : null,
+              deliverySource: o.delivery.deliverySource,
+              status: o.delivery.status,
+            }
+          : null,
       })),
       { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     );

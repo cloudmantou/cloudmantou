@@ -12,6 +12,7 @@ import {
 type Card = {
   id: string;
   cardNo: string;
+  cardSecret?: string | null;
   type: string;
   value: number;
   status: string;
@@ -793,6 +794,7 @@ export default function AdminCardsPage() {
               <thead>
                 <tr>
                   <th>卡号</th>
+                  <th>卡密</th>
                   <th>所属商品</th>
                   <th>类型</th>
                   <th>权益</th>
@@ -806,19 +808,19 @@ export default function AdminCardsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
+                    <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "var(--text-muted)" }}>
                       加载中...
                     </td>
                   </tr>
                 ) : loadError ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: "center", padding: 32, color: "var(--rose)" }}>
+                    <td colSpan={10} style={{ textAlign: "center", padding: 32, color: "var(--rose)" }}>
                       {loadError}
                     </td>
                   </tr>
                 ) : cards.length === 0 ? (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={10}>
                       <div style={{ padding: 32 }}>
                         <EmptyState title="暂无卡密" description="还没有任何卡密记录。" />
                       </div>
@@ -828,6 +830,19 @@ export default function AdminCardsPage() {
                   cards.map((c) => (
                     <tr key={c.id}>
                       <td className="mono">{c.cardNo}</td>
+                      <td className="mono" style={{ color: c.cardSecret ? "var(--teal)" : "var(--text-muted)" }}>
+                        {c.cardSecret ? (
+                          <span
+                            title="点击复制卡密"
+                            style={{ cursor: "pointer", textDecoration: "underline text-dotted" }}
+                            onClick={() => copyToClipboard(c.cardSecret!)}
+                          >
+                            {c.cardSecret}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td style={{ fontSize: 11, maxWidth: 120 }}>{c.packageName || "—"}</td>
                       <td>
                         <span className="admin-badge purple">{TYPE_LABELS[c.type] || c.type}</span>
@@ -855,13 +870,25 @@ export default function AdminCardsPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-ghost admin-btn-sm"
-                            onClick={() => copyToClipboard(c.cardNo)}
-                          >
-                            复制
-                          </button>
+                          {c.cardSecret ? (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-ghost admin-btn-sm"
+                              onClick={() => copyToClipboard(c.cardSecret!)}
+                              title="复制卡密明文"
+                            >
+                              复制卡密
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-ghost admin-btn-sm"
+                              onClick={() => copyToClipboard(c.cardNo)}
+                              title="复制卡号"
+                            >
+                              复制卡号
+                            </button>
+                          )}
                           {(c.status === "ACTIVE" || c.status === "DISABLED") && (
                             <button
                               type="button"

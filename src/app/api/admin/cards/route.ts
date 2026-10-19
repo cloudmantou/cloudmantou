@@ -8,6 +8,7 @@ import {
   type CardFormat,
 } from "@/lib/card-crypto";
 import { encodeInventoryCardSecret } from "@/lib/card-inventory-crypto";
+import { canReadCardSecret, decryptCardSecret } from "@/lib/card-secret-storage";
 import { z } from "zod";
 import { auditAdminAction } from "@/lib/admin-audit-log";
 import { MANTOU_SOURCE, provisionLegacyStock } from "@/lib/legacy-license-commerce";
@@ -98,6 +99,7 @@ export async function GET(req: NextRequest) {
     const safe = cards.map((c) => ({
       id: c.id,
       cardNo: c.cardNo,
+      cardSecret: canReadCardSecret(c.cardSecretEnc) ? decryptCardSecret(c.cardSecretEnc!) : null,
       type: c.type,
       value: c.value,
       status: c.orderId ? "SOLD" : c.status,

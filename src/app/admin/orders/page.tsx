@@ -16,6 +16,12 @@ type Order = {
   createdAt: string;
   user: { username: string; nickname: string | null; email: string };
   payment: { channel: string; status: string; tradeNo: string | null } | null;
+  delivery?: {
+    cardNo: string;
+    cardSecret: string | null;
+    deliverySource: string;
+    status: string;
+  } | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -150,6 +156,12 @@ export default function AdminOrdersPage() {
                 <td className="px-3 py-2 text-xs" style={{ color: "var(--text-secondary)" }}>
                   <div>{o.title}</div>
                   <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{PRODUCT_LABELS[o.productType]}</div>
+                  {o.delivery && (
+                    <div className="mt-1 font-mono text-[10px]" style={{ color: "var(--teal)" }}>
+                      <div>卡号: {o.delivery.cardNo}</div>
+                      {o.delivery.cardSecret && <div>卡密: {o.delivery.cardSecret}</div>}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-xs font-medium" style={{ color: "var(--accent)", fontFamily: '"JetBrains Mono", monospace' }}>¥{o.amount.toFixed(2)}</td>
                 <td className="px-3 py-2">
