@@ -4,6 +4,7 @@ import { POINT_CARD_PREFIX, encryptPointCardSecret } from "@/lib/point-card-cryp
 import {
   encryptCardSecret,
   decryptCardSecret,
+  canReadCardSecret,
 } from "@/lib/card-secret-storage";
 
 type Tx = Prisma.TransactionClient;
@@ -50,7 +51,7 @@ export async function deliverCardPackageOrder(
 
   const deliveryTime = new Date();
   const reserved = await tx.card.findUnique({ where: { orderId: order.id } });
-  const card = reserved && (pkg.deliverySource !== MANTOU_SOURCE || reserved.legacyCardId != null) && isDeliverableCard(reserved, pkg.id, deliveryTime) && await legacyCardUsable(reserved)
+  const card = reserved && (pkg.deliverySource !== MANTOU_SOURCE || reserved.legacyCardId != null) && isDeliverableCard(reserved, pkg.id, deliveryTime) && canReadCardSecret(reserved.cardSecretEnc) && await legacyCardUsable(reserved)
     ? reserved
     : await (async () => {
         // 预占卡已被后台禁用/删除或过期：先释放旧占用（orderId 唯一），再从库存池补领。
@@ -129,6 +130,7 @@ async function claimPooledCard(
   // already claimed, so exclude each lost candidate from later attempts. The
   // initial inventory count keeps retries bounded without an arbitrary cap.
   let skippedCardIds: string[] = [];
+  let unreadable = false;
   for (let attempt = 0; attempt < availableAtStart; attempt += 1) {
     const pooled = await tx.card.findFirst({
       where: {
@@ -142,6 +144,11 @@ async function claimPooledCard(
 
     if (!pooled?.cardSecretEnc) {
       throw new CardStockError();
+    }
+    if (!canReadCardSecret(pooled.cardSecretEnc)) {
+      unreadable = true;
+      skippedCardIds = [...skippedCardIds, pooled.id];
+      continue;
     }
     if (!await legacyCardUsable(pooled)) {
       skippedCardIds = [...skippedCardIds, pooled.id];
@@ -162,8 +169,16 @@ async function claimPooledCard(
     skippedCardIds = [...skippedCardIds, pooled.id];
   }
 
-  // 起始可见的候选卡全部被并发事务抢走：对调用方而言就是库存不足。
+  // A key/configuration failure is different from ordinary exhausted stock.
+  if (unreadable) throw new CardDeliveryUnavailableError();
   throw new CardStockError();
+}
+
+export class CardDeliveryUnavailableError extends Error {
+  constructor() {
+    super("该商品卡密暂时无法发放，请联系管理员；订单未创建");
+    this.name = "CardDeliveryUnavailableError";
+  }
 }
 
 export class CardStockError extends Error {

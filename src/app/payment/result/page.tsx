@@ -120,7 +120,9 @@ function PaymentResultInner() {
     }
   };
 
-  const fulfillmentMessage = fulfillment?.kind === "membership"
+  const fulfillmentMessage = fulfillment?.unavailable
+    ? "历史卡密暂不可读取，请联系管理员"
+    : fulfillment?.kind === "membership"
     ? paymentCopy.membershipDelivered
     : fulfillment?.kind === "article"
       ? paymentCopy.articleDelivered

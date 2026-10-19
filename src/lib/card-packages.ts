@@ -1,4 +1,6 @@
 import type { CardPackage, CardType } from "@prisma/client";
+import { hasLegacyCardDeliveryKey } from "@/lib/card-secret-storage";
+import { POINT_CARD_PREFIX } from "@/lib/point-card-crypto";
 import { MANTOU_SOURCE, usableLegacyIds } from "@/lib/legacy-license-commerce";
 import type { Accent, Product } from "@/types";
 
@@ -177,6 +179,7 @@ export function availableCardStockWhere(packageId: string) {
     packageId,
     status: "ACTIVE" as const,
     orderId: null,
+    ...(!hasLegacyCardDeliveryKey() && { cardSecretEnc: { startsWith: POINT_CARD_PREFIX } }),
   };
 }
 

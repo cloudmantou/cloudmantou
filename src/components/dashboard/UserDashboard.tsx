@@ -33,6 +33,7 @@ type UserProfile = {
 };
 
 type OrderFulfillment = {
+  unavailable?: true;
   kind: "none" | "card" | "membership" | "article";
   message: string | null;
   card: { cardNo: string; cardSecret: string; deliverySource?: string } | null;
@@ -157,6 +158,7 @@ export function UserDashboard() {
     return locale === "en" && translated ? translated : order.title;
   };
   const fulfillmentLabel = (order: OrderItem) => {
+    if (order.fulfillment?.unavailable) return locale === "en" ? "Card unavailable; contact support" : "历史卡密暂不可读取，请联系管理员";
     if (order.fulfillment?.kind === "membership") return copy.membershipBenefit;
     if (order.fulfillment?.kind === "article") return copy.productTypes.PAID_POST;
     return order.fulfillment?.message || copy.none;

@@ -14,7 +14,7 @@ try {
   });
   if (!response.ok) throw new Error("Maintenance request failed");
   const result = await response.json();
-  if (result.code !== 0 || result.data?.licenseBindings?.error) throw new Error("Maintenance reported a failure");
+  if (result.code !== 0 || result.data?.licenseBindings?.error || result.data?.cardDeliveries?.failed > 0) throw new Error("Maintenance reported a failure");
   const { expired, cardDeliveries, licenseBindings } = result.data;
   console.log(JSON.stringify({ expired, cardDeliveries, licenseBindings }));
 } catch {

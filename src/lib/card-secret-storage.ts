@@ -29,3 +29,13 @@ export function decryptCardSecret(payload: string): string {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
 }
+
+/** A missing or invalid key must be caught before an order can reserve stock. */
+export function canReadCardSecret(payload: string | null | undefined): boolean {
+  if (!payload) return false;
+  try { return Boolean(decryptCardSecret(payload)); } catch { return false; }
+}
+
+export function hasLegacyCardDeliveryKey(): boolean {
+  return Boolean(process.env.CARD_DELIVERY_KEY || process.env.CARD_SECRET_SALT);
+}

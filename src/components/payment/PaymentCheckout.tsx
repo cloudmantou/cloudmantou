@@ -295,7 +295,9 @@ export function PaymentCheckout({ order, open, onClose, onPaid, returnPath }: Pr
   };
 
   const wechatDisabled = scene === "wechat_inapp";
-  const fulfillmentMessage = receipt?.fulfillment.kind === "membership"
+  const fulfillmentMessage = receipt?.fulfillment.unavailable
+    ? "历史卡密暂不可读取，请联系管理员"
+    : receipt?.fulfillment.kind === "membership"
     ? copy.membershipDelivered
     : receipt?.fulfillment.kind === "article"
       ? copy.articleDelivered

@@ -7,7 +7,7 @@ import { z } from "zod";
 import crypto from "crypto";
 import { buildOrderFulfillment } from "@/lib/order-fulfillment";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit-server";
-import { CardStockError, reserveCardForOrder } from "@/lib/card-delivery";
+import { CardDeliveryUnavailableError, CardStockError, reserveCardForOrder } from "@/lib/card-delivery";
 import { expireStalePendingOrders, ORDER_PENDING_TTL_MS } from "@/lib/order-lifecycle";
 import {
   isMembershipProductAvailable,
@@ -214,6 +214,7 @@ export async function POST(req: NextRequest) {
         return created;
       });
     } catch (error) {
+      if (error instanceof CardDeliveryUnavailableError) return fail(error.message, 50300, 503);
       if (error instanceof CardStockError) {
         return fail("该卡密商品库存不足", 40000, 400);
       }

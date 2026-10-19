@@ -3,12 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api-response";
 import { requireAdmin, ApiError } from "@/lib/guards";
 import {
-  hashCardSecret,
   generateCardNo,
   generateCardSecret,
   type CardFormat,
 } from "@/lib/card-crypto";
-import { encryptCardSecret } from "@/lib/card-secret-storage";
+import { encodeInventoryCardSecret } from "@/lib/card-inventory-crypto";
 import { z } from "zod";
 import { auditAdminAction } from "@/lib/admin-audit-log";
 import { MANTOU_SOURCE, provisionLegacyStock } from "@/lib/legacy-license-commerce";
@@ -193,8 +192,7 @@ export async function POST(req: NextRequest) {
 
       cardNos.add(normalized);
 
-      const hash = await hashCardSecret(plainSecret);
-      const enc = encryptCardSecret(plainSecret);
+      const { hash, enc } = await encodeInventoryCardSecret(plainSecret);
       cards.push({ cardNo: normalized, secret: plainSecret, hash, enc });
       return true;
     };
