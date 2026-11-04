@@ -9,6 +9,7 @@ import {
 } from "@/lib/editorial-translations";
 import { MANTOU_ASSISTANT_ARTICLE_EN } from "@/config/editorial-blog";
 import { canUseStaticEnglishMantouFallback } from "@/lib/editorial-static-fallback";
+import { HONGJIAN_NAV, getHongjianPage } from "@/config/hongjian-app";
 
 // Sitemap includes database-backed editorial entries, so generate it at request time.
 // This keeps release builds independent from production database availability.
@@ -40,6 +41,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: baseUrl, changeFrequency: "daily", priority: 1 },
     ...(isOfficialSite ? [{ url: `${baseUrl}/en`, changeFrequency: "daily" as const, priority: 1 }] : []),
     ...officialPages,
+    ...HONGJIAN_NAV.map((key) => ({
+      url: `${baseUrl}${getHongjianPage(key).path}`,
+      changeFrequency: "monthly" as const,
+      priority: key === "home" ? 0.6 : 0.4,
+    })),
   ];
 
   try {
