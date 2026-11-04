@@ -9,7 +9,7 @@ export const HONGJIAN_APP = {
   name: "红笺墨语",
   englishName: "Hongjian Reader",
   operator: "mantou",
-  bundleId: "com.mantou.mtsk1",
+  bundleId: "com.mantou.mtsk",
   minimumIos: "15.0",
   contactEmail: "modianwuhen@gmail.com",
   qqGroupUrl: "https://qm.qq.com/q/hnQ9sXO6Uo",
