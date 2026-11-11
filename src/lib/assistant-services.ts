@@ -40,4 +40,3 @@ export async function readIPAToolStatus(fetcher: typeof fetch = fetch): Promise<
     }
   }));
 }
-
