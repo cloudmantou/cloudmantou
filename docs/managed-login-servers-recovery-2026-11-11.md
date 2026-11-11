@@ -1,5 +1,7 @@
 # 登录服务器后台管理与受控认证恢复（2026-11-11）
 
+> 后续已取消 5 分钟缓存与刷新时禁止登录的策略，改为启动/回前台/打开登录页自动请求；详见 [自动更新修复记录](catalog-autorefresh-2026-11-11.md)。
+
 ## 使用方式
 
 后台入口：https://cloudmantoua.top/admin/assistant-services
