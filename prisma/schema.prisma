@@ -698,3 +698,30 @@ model ArticleIpaRelease {
   @@index([postId, deletedAt, sortOrder])
   @@map("article_ipa_releases")
 }
+
+// Assistant OTA metadata only. No IPA or signing certificate is uploaded.
+model AssistantInstallManifest {
+  id String @id @db.Char(32)
+  bundleId String @db.VarChar(255)
+  version String @db.VarChar(64)
+  title String @db.VarChar(200)
+  encryptedPlist String @db.Text
+  signatureVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  fetchedAt DateTime?
+  fetchCount Int @default(0)
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("assistant_install_manifests")
+}
+
+model AssistantServiceSnapshot {
+  id String @id @default(cuid())
+  region String @db.VarChar(2)
+  reachable Boolean
+  summary Json
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@map("assistant_service_snapshots")
+}

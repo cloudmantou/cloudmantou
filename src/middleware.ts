@@ -113,6 +113,7 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/site/settings/public") &&
     !pathname.startsWith("/api/payment/notify") &&
     !pathname.startsWith("/api/cron") &&
+    !pathname.startsWith("/api/assistant/") &&
     !pathname.startsWith("/api/auth") &&
     pathname !== "/maintenance"
   ) {
@@ -192,7 +193,8 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/auth/login") &&
     !pathname.startsWith("/api/auth") &&
     !pathname.startsWith("/api/payment/notify") &&
-    !pathname.startsWith("/api/site/settings/public")
+    !pathname.startsWith("/api/site/settings/public") &&
+    !pathname.startsWith("/api/assistant/")
   ) {
     if (!session) {
       return withCsp(

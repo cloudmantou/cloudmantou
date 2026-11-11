@@ -82,6 +82,7 @@ const navGroups: NavGroup[] = [
     title: "系统",
     items: [
       { href: "/admin/vault", label: "私密笔记", icon: Lock },
+      { href: "/admin/assistant-services", label: "助手服务", icon: AppWindow },
       { href: "/admin/settings", label: "系统设置", icon: Settings },
     ],
   },
@@ -105,6 +106,7 @@ const pageTitles: Record<string, string> = {
   "/admin/payments": "支付记录",
   "/admin/vault": "私密笔记",
   "/admin/settings": "系统设置",
+  "/admin/assistant-services": "助手服务",
 };
 
 function isEditorRoute(pathname: string) {
