@@ -42,3 +42,10 @@ Nginx 兼容规则：`/www/server/panel/vhost/nginx/extension/install.cloudmanto
 中区首次切换因新 release 目录权限 0700 导致服务用户不可执行，已回滚旧服务；修正为 0755，并增加服务用户执行权限预检后重新部署成功。最终两区 systemd 均 active，实际进程路径与上述最终 SHA 一致。
 
 源代码位置：CloudMantou 原工作区、mtzs 原工作区，以及独立 IPATool 工作区 `/Users/mantou/Documents/personalProject/ipatool-cloudmantou-20261111`。原有其他业务未提交修改保留。
+
+## 源码归档补充
+
+- IPATool：`codex/cloudmantou-operations`，提交 `e6156f4`，保留上游 v2.8.0 合并关系。
+- CloudMantou：独立工作区 `/Users/mantou/Documents/mantouuser/cloudmantou-assistant-20261111`，分支 `codex/assistant-services`，功能提交 `d3427ee`；只归档本任务改动，原工作区其他业务修改保留。
+- mtzs：App 修改提交 `c931140`，已在 main。以上为本地提交，本文未声称已推送远端。
+- 独立 CloudMantou 分支的 19 个针对性测试同样通过。使用原工作区共享的生成版 Prisma client 做全项目类型检查时，旧支付代码与新 client 的 nullable userId 不一致；此组合未通过全项目类型检查。前述 TypeScript 通过指原工作区完整源代码组合；生产 release 则已独立构建及探针验证成功。
