@@ -1,5 +1,7 @@
 "use client";
 
+import { recoveryAdvice } from "@/lib/assistant-recovery-advice";
+import LoginServerEditor from "@/components/admin/LoginServerEditor";
 import { useCallback, useEffect, useState } from "react";
 import type { RegionStatus } from "@/lib/assistant-services";
 
@@ -14,6 +16,8 @@ export default function AssistantServicesPage() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [recovering, setRecovering] = useState<string | null>(null);
+  const [operationMessage, setOperationMessage] = useState("");
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
@@ -25,6 +29,14 @@ export default function AssistantServicesPage() {
       if (!signal?.aborted) setError(err instanceof Error ? err.message : "读取失败");
     } finally { if (!signal?.aborted) setLoading(false); }
   }, []);
+  async function recover(region: "cn" | "us") {
+    setRecovering(region); setOperationMessage("");
+    try {
+      const response = await fetch("/api/admin/assistant-services/recover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ region }) });
+      const body = await response.json(); setOperationMessage(body.message || "操作结果未知，请刷新查看"); await load();
+    } catch { setOperationMessage("请求中断，请先刷新状态，勿连续重试。"); }
+    finally { setRecovering(null); }
+  }
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
@@ -33,7 +45,9 @@ export default function AssistantServicesPage() {
   }, [load]);
   const requests = data?.regions.flatMap(region => (region.data?.requests?.recent || []).map(event => ({ ...event, region: region.region }))).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 100) || [];
   return <div className="space-y-6">
-    <div className="flex items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold">助手服务</h1><p className="mt-2 text-sm text-gray-500">在线安装清单与中美区下载服务。每 30 秒刷新；这里只监控，不会触发登录或下载。</p></div><button className="rounded-lg border px-4 py-2" disabled={loading} onClick={() => void load()}>{loading ? "读取中…" : "刷新"}</button></div>
+    <div className="flex items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold">助手服务</h1><p className="mt-2 text-sm text-gray-500">在线安装清单与中美区下载服务。每 30 秒刷新；查看不会触发登录，重新认证需点击操作按钮。</p></div><button className="rounded-lg border px-4 py-2" disabled={loading} onClick={() => void load()}>{loading ? "读取中…" : "刷新"}</button></div>
+    <LoginServerEditor />
+    {operationMessage && <p role="status" className="rounded bg-blue-50 p-3 text-blue-900">{operationMessage}</p>}
     {error && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{error}。下方已有数据可能已过期。</p>}
     <div className="grid gap-4 md:grid-cols-2">{data?.regions.map(region => {
       const service = region.data; const auth = service?.auth;
@@ -48,6 +62,10 @@ export default function AssistantServicesPage() {
           <p className="text-gray-500">统计起点：{date(service.requests?.startedAt)}（进程重启后重新计数）</p>
           <div className="flex flex-wrap gap-2">{Object.entries(service.requests?.counts || {}).map(([key, count]) => <span key={key} className="rounded bg-gray-100 px-2 py-1">{key.split(":")[0]} · {labels[key.split(":")[1]] || key.split(":")[1]}：{count}</span>)}</div>
           <p className="text-gray-500">服务可达不代表 Apple 账号当前可用。认证状态来自最近业务请求。</p>
+          <p className="rounded bg-gray-50 p-3">诊断建议：{recoveryAdvice(region)}</p>
+          {service.recovery && <p>恢复状态：{service.recovery.running ? "重新认证中…" : service.recovery.result ? labels[service.recovery.result] || service.recovery.result : "尚未执行"} {service.recovery.finishedAt ? date(service.recovery.finishedAt) : ""}<br />{service.recovery.diagnostic.kind || ""}</p>}
+          <button className="rounded border px-3 py-2 disabled:opacity-50" disabled={!!recovering || auth?.locked || !!cooldown || service.recovery?.running || !!service.busy || !service.recovery} onClick={() => void recover(region.region)}>重新认证一次</button>
+          <p className="text-xs text-gray-500">只使用服务器已有地区凭证；不清除验证码/停用锁，不跳过冷却，不中断下载。资源或协议故障仍需维护处理。</p>
         </div>}
       </section>;
     })}</div>

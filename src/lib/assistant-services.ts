@@ -3,6 +3,7 @@ import { z } from "zod";
 const diagnostic = z.object({ stage: z.string().max(40).optional(), kind: z.string().max(40).optional(), upstreamStatus: z.number().int().optional() });
 const event = z.object({ id: z.string().max(64), at: z.string().max(40), endpoint: z.enum(["prepare", "download"]), appId: z.string().max(20), appVerId: z.string().max(20), result: z.string().max(64), durationMs: z.number(), diagnostic });
 const status = z.object({
+  recovery: z.object({ id: z.string().max(64).optional(), running: z.boolean(), startedAt: z.string().max(40).optional(), finishedAt: z.string().max(40).optional(), result: z.string().max(64).optional(), diagnostic }).optional(),
   profile: z.enum(["cn", "us"]), busy: z.string().max(20).optional(),
   auth: z.object({ locked: z.boolean(), lockCode: z.string().max(64).optional(), failureCount: z.number(), lastSignIn: z.string().max(40).optional(), lastError: z.string().max(64).optional(), cooldownUntil: z.string().max(40).optional() }),
   artifacts: z.object({ count: z.number(), bytes: z.number(), maxBytes: z.number(), highWaterBytes: z.number(), lowWaterBytes: z.number(), evicted: z.number() }),
@@ -39,3 +40,4 @@ export async function readIPAToolStatus(fetcher: typeof fetch = fetch): Promise<
     }
   }));
 }
+
