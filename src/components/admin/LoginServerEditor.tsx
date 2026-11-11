@@ -12,7 +12,7 @@ export default function LoginServerEditor() {
   useEffect(() => { void load(); }, []);
   async function publish() {
     setWorking(true);
-    try { const r = await fetch("/api/admin/assistant-services/servers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catalog) }); const b = await r.json(); if (!r.ok) throw new Error(b.message); setCatalog(b.data); setMessage("已发布。新版 App 打开登录页时更新，最迟 5 分钟；也可手动刷新。"); }
+    try { const r = await fetch("/api/admin/assistant-services/servers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(catalog) }); const b = await r.json(); if (!r.ok) throw new Error(b.message); setCatalog(b.data); setMessage("已发布。新版 App 启动、回到前台和打开登录页时自动更新；停留在登录页时每 15 秒检查，也可手动刷新。"); }
     catch (e) { setMessage(e instanceof Error ? e.message : "发布失败"); } finally { setWorking(false); }
   }
   function update(index: number, patch: Partial<LoginServerCatalog["servers"][number]>) { setCatalog(c => c ? { ...c, servers: c.servers.map((s, i) => i === index ? { ...s, ...patch } : s) } : c); }
