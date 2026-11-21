@@ -234,7 +234,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
         <Field label="Base URL" hint="系统设置仅允许标准 HTTPS 公网接口；本机代理请继续使用服务器环境变量">
           <input type="url" value={settings.baseURL} onChange={(event) => edit({ baseURL: event.target.value }, { invalidateApiKey: true })} className="form-input mono" maxLength={500} />
         </Field>
-        <Field label="模型 ID" hint="例如 deepseek-v4-flash、mimo-v2.5-pro、MiniMax-M3">
+        <Field label="模型 ID" hint="例如 deepseek-v4-flash、mimo-v2.6-flash、MiniMax-M3">
           <input type="text" value={settings.textModel} onChange={(event) => edit({ textModel: event.target.value })} className="form-input mono" maxLength={200} />
         </Field>
         <Field label="API Key" hint={settings.apiKeyConfigured ? "已配置；留空保留原密钥，输入新值可轮换" : "后台模式启用前必须填写"}>

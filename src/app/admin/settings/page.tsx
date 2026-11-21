@@ -5,6 +5,7 @@ import { readApiEnvelope } from "@/lib/client-api-response";
 import { Save, Loader2, RefreshCw } from "lucide-react";
 import { ContactLinksEditor } from "@/components/admin/ContactLinksEditor";
 import { AiSettingsEditor } from "@/components/admin/AiSettingsEditor";
+import { ReaderSpeechSettingsEditor } from "@/components/admin/ReaderSpeechSettingsEditor";
 import type { ContactLink } from "@/lib/contact-links";
 
 const TIMEZONES = [
@@ -156,7 +157,7 @@ export default function AdminSettingsPage() {
         <div>
           <p className="home-greeting">Settings</p>
           <h1 className="page-title">系统设置</h1>
-          <p className="page-desc">配置站点基本信息和系统参数。右上角按钮保存除 AI 模型外的全部设置，AI 模型在其卡片内单独保存。</p>
+          <p className="page-desc">站点资料和开关用右上角保存。AI 模型和听书服务在各自卡片中保存。</p>
         </div>
         <button
           type="button"
@@ -172,6 +173,7 @@ export default function AdminSettingsPage() {
 
       <div className="settings-grid">
         <AiSettingsEditor onNotify={flash} />
+        <ReaderSpeechSettingsEditor onNotify={flash} />
 
         {/* Basic Settings */}
         <section className="data-panel">

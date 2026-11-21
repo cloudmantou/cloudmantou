@@ -40,7 +40,7 @@ export const AI_PROVIDER_PRESETS: readonly AiProviderPreset[] = [
     providerType: "openai-compatible",
     providerName: "mimo",
     baseURL: "https://api.xiaomimimo.com/v1",
-    textModel: "mimo-v2.5-pro",
+    textModel: "mimo-v2.6-flash",
     supportsStructuredOutputs: true,
     openAiAuthMode: "api-key",
     anthropicAuthMode: "api-key",
