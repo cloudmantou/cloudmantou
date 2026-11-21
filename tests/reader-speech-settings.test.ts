@@ -101,6 +101,24 @@ describe("reader speech settings", () => {
     await expect(resolveReaderSpeechTest(roles)).rejects.toMatchObject({ status: 409 });
   });
 
+  it("keeps an existing connection's key when editing its model and requires a fresh key when changing providers or auth", async () => {
+    const input = readerSpeechSettingsInput.parse({
+      ...roles, provider: "deepseek", baseURL: "https://api.deepseek.com",
+      authMode: "bearer", model: "deepseek-flash", apiKey: "fixture-deepseek",
+    });
+    await saveReaderSpeechSettings(input);
+    await saveReaderSpeechSettings({ ...input, apiKey: "", model: "deepseek-v4-pro" });
+    expect(await resolveReaderSpeechService("roles")).toMatchObject({ model: "deepseek-v4-pro", apiKey: "fixture-deepseek" });
+    if (input.service !== "roles") throw new Error("Expected role settings");
+    for (const changed of [
+      { ...input, provider: "custom-openai", apiKey: "" },
+      { ...input, authMode: "api-key", apiKey: "" },
+    ]) {
+      const draft = readerSpeechSettingsInput.parse(changed);
+      await expect(resolveReaderSpeechTest(draft)).rejects.toMatchObject({ status: 422, code: 42211 });
+      await expect(saveReaderSpeechSettings(draft)).rejects.toMatchObject({ status: 422, code: 42211 });
+    }
+  });
   it.each([
     "http://roles.example.com/v1",
     "https://localhost/v1",

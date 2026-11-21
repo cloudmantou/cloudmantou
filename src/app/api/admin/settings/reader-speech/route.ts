@@ -21,7 +21,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const session = await requireAdmin();
-    const input = await parseSpeechRequest(req, readerSpeechSettingsInput, 4_096);
+    const input = await parseSpeechRequest(req, readerSpeechSettingsInput, 16 * 1_024);
     const saved = await saveReaderSpeechSettings(input);
     await auditAdminAction(req, session.user.id, "settings.reader-speech.update", {
       targetId: input.service,

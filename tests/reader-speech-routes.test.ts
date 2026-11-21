@@ -30,8 +30,8 @@ vi.mock("@/lib/reader-speech/settings", async (importOriginal) => ({
   resolveReaderSpeechTest: mocks.resolveReaderSpeechTest,
   resolveReaderSpeechService: mocks.resolveReaderSpeechService,
 }));
-vi.mock("@/lib/reader-speech/mimo", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/reader-speech/mimo")>(),
+vi.mock("@/lib/reader-speech/upstream", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/reader-speech/upstream")>(),
   suggestReaderRoles: mocks.suggestReaderRoles,
   synthesizeReaderSpeech: mocks.synthesizeReaderSpeech,
 }));
@@ -41,8 +41,11 @@ import { POST as adminTest } from "@/app/api/admin/settings/reader-speech/test/r
 import { GET as capabilities } from "@/app/api/reader/speech/route";
 import { POST as officialSpeech } from "@/app/api/reader/speech/[service]/route";
 
-const roleSettings = { service: "roles", enabled: true, model: "mimo-v2.6-flash", baseURL: "https://roles.example.com/v1", dailyLimit: 100 } as const;
-const voiceSettings = { service: "tts", enabled: true, model: "mimo-v2.5-tts", baseURL: "https://tts.example.com/v1", voice: "苏打", dailyLimit: 1_000 } as const;
+const roleSettings = { service: "roles", enabled: true, model: "mimo-v2.6-flash", baseURL: "https://roles.example.com/v1", provider: "mimo", authMode: "bearer", dailyLimit: 100 } as const;
+const voiceSettings = {
+  service: "tts", enabled: true, model: "third-party-tts", baseURL: "https://tts.example.com/v1",
+  provider: "custom-openai", authMode: "bearer", voice: "voice-a", additionalVoices: ["voice-b"], dailyLimit: 1_000,
+} as const;
 const fallback = new Uint8Array([0x49, 0x44, 0x33]);
 
 function request(method: string, path: string, data: unknown) {
@@ -108,9 +111,10 @@ describe("reader speech routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const { data } = await response.json();
     expect(data[0]).toEqual({ service: "roles", available: false, model: "mimo-v2.6-flash" });
-    expect(data[1]).toMatchObject({ service: "tts", available: true, voice: "苏打" });
+    expect(data[1]).toMatchObject({ service: "tts", available: true, voice: "voice-a", voices: ["voice-a", "voice-b"] });
     expect(data[1]).not.toHaveProperty("apiKey");
     expect(data[1]).not.toHaveProperty("baseURL");
+    expect(data[1]).not.toHaveProperty("authMode");
     expect(data[1]).not.toHaveProperty("dailyLimit");
   });
 });

@@ -2,9 +2,9 @@ import type { NextRequest } from "next/server";
 import { fail, ok } from "@/lib/api-response";
 import { requireAuth } from "@/lib/guards";
 import { checkRateLimit } from "@/lib/rate-limit-server";
-import type { ReaderSpeechSettings } from "@/lib/reader-speech/config";
+import { readerSpeechVoices, type ReaderSpeechSettings } from "@/lib/reader-speech/config";
 import { parseSpeechRequest, readerSpeechErrorResponse } from "@/lib/reader-speech/http";
-import { rolesInput, speechInput, suggestReaderRoles, synthesizeReaderSpeech } from "@/lib/reader-speech/mimo";
+import { rolesInput, speechInput, suggestReaderRoles, synthesizeReaderSpeech } from "@/lib/reader-speech/upstream";
 import { resolveReaderSpeechService } from "@/lib/reader-speech/settings";
 
 export const runtime = "nodejs";
@@ -37,6 +37,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ servic
     }
 
     const input = await parseSpeechRequest(req, speechInput, 28 * 1_024);
+    if (input.voice && !readerSpeechVoices(config).includes(input.voice)) {
+      return fail("请使用当前语音服务提供的音色 ID", 42212, 422);
+    }
     const limit = await checkSpeechLimits(req, config, session.user.id);
     if (limit) return limit;
     const audio = await synthesizeReaderSpeech(config, input, req.signal);

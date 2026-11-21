@@ -1,15 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { validateAiBaseUrl } from "@/lib/ai/config";
-import { MIMO_API_BASE_URL, mimoSettingsError } from "@/lib/ai/mimo-config";
+import { MIMO_API_BASE_URL, isMimoApiURL } from "@/lib/ai/mimo-config";
 import { ApiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/lib/secret-crypto";
 import {
-  defaultReaderSpeechSettings, MIMO_ROLE_MODELS, MIMO_TTS_MODEL, MIMO_TTS_VOICES,
-  normalizeReaderSpeechBaseURL, readerSpeechApiKeyError, READER_SPEECH_BASE_URL_ERROR, READER_SPEECH_SERVICES,
-  type AdminReaderSpeechSettings, type ReaderSpeechCredentials,
-  type ReaderSpeechService, type ReaderSpeechSettings,
+  defaultReaderSpeechSettings, normalizeReaderSpeechBaseURL, readerSpeechApiKeyError, readerSpeechEndpointError,
+  sameReaderSpeechConnection, READER_SPEECH_AUTH_MODES, READER_SPEECH_BASE_URL_ERROR, READER_SPEECH_SERVICES,
+  MIMO_TTS_MODEL, MIMO_TTS_VOICES, ROLE_PRESETS, ROLE_PROVIDER_IDS, TTS_PRESETS, TTS_PROVIDER_IDS,
+  type AdminReaderSpeechSettings, type ReaderSpeechCredentials, type ReaderSpeechService, type ReaderSpeechSettings,
 } from "@/lib/reader-speech/config";
 
 const keys = {
@@ -17,49 +17,81 @@ const keys = {
   tts: "readerSpeechTts",
 } as const;
 
-const baseURLSchema = z.string().trim().max(500, "Base URL 最多 500 个字符").transform((value, ctx) => {
+function allowPublicBaseURL(value: string): string | undefined {
   const normalized = normalizeReaderSpeechBaseURL(value);
-  if (normalized) {
-    try {
-      const url = validateAiBaseUrl(normalized, { allowLoopback: false });
-      const message = mimoSettingsError({ baseURL: url, providerType: "openai-compatible" });
-      if (!message) return url;
-      ctx.addIssue({ code: "custom", message });
-      return z.NEVER;
-    } catch {
-      // Use a safe validation message without echoing a submitted URL.
-    }
+  if (!normalized) return undefined;
+  try {
+    return validateAiBaseUrl(normalized, { allowLoopback: false });
+  } catch {
+    return undefined;
   }
+}
+
+const baseURL = z.string().trim().max(500, "Base URL 最多 500 个字符").transform((value, ctx) => {
+  const normalized = allowPublicBaseURL(value);
+  if (normalized) return normalized;
   ctx.addIssue({ code: "custom", message: READER_SPEECH_BASE_URL_ERROR });
   return z.NEVER;
 });
-
-const sharedFields = { enabled: z.boolean(), dailyLimit: z.number().int().min(1).max(100_000) };
-const roles = z.object({ ...sharedFields, service: z.literal("roles"), model: z.enum(MIMO_ROLE_MODELS) }).strict();
-const tts = z.object({
-  ...sharedFields, service: z.literal("tts"), model: z.literal(MIMO_TTS_MODEL), voice: z.enum(MIMO_TTS_VOICES),
-}).strict();
-const keyFields = {
-  baseURL: baseURLSchema.optional(),
-  apiKey: z.string().trim().max(512, "API Key 最多 512 个字符"),
-  clearApiKey: z.boolean(),
+const shared = {
+  baseURL: baseURL.optional(),
+  authMode: z.enum(READER_SPEECH_AUTH_MODES).optional(),
+  enabled: z.boolean(),
+  dailyLimit: z.number().int().min(1).max(100_000),
+  model: z.string().trim().min(1, "请填写模型 ID").max(200).regex(/^[\x21-\x7e]+$/, "模型 ID 格式无效"),
 };
+const voiceID = z.string().trim().min(1, "请填写默认音色 ID").max(120).regex(/^[^\p{Cc}]+$/u, "音色 ID 格式无效");
+const roles = z.object({ ...shared, service: z.literal("roles"), provider: z.enum(ROLE_PROVIDER_IDS).optional() }).strict();
+const tts = z.object({
+  ...shared, service: z.literal("tts"), provider: z.enum(TTS_PROVIDER_IDS).optional(),
+  voice: voiceID, additionalVoices: z.array(voiceID).max(16, "最多可添加 16 个音色").optional(),
+}).strict();
+type Draft = z.infer<typeof roles> | z.infer<typeof tts>;
 
+function legacyAuthMode(url: string) {
+  return isMimoApiURL(url) ? "api-key" : "bearer";
+}
+
+function fillSettings(input: Draft): ReaderSpeechSettings {
+  const provider = input.provider ?? "mimo";
+  const preset = input.service === "roles" ? ROLE_PRESETS[input.provider ?? "mimo"] : TTS_PRESETS[input.provider ?? "mimo"];
+  const url = input.baseURL ?? preset.baseURL;
+  const connection = {
+    baseURL: url,
+    authMode: input.authMode ?? (provider === "mimo" ? legacyAuthMode(url) : preset.authMode),
+    enabled: input.enabled,
+    dailyLimit: input.dailyLimit,
+    model: input.model,
+  };
+  if (input.service === "roles") return { ...connection, service: "roles", provider: input.provider ?? "mimo" };
+  return {
+    ...connection, service: "tts", provider: input.provider ?? "mimo",
+    voice: input.voice, additionalVoices: [...new Set(input.additionalVoices ?? [])],
+  };
+}
+
+const keyFields = { apiKey: z.string().trim().max(512, "API Key 最多 512 个字符"), clearApiKey: z.boolean() };
 export const readerSpeechSettingsInput = z.discriminatedUnion("service", [
   roles.extend(keyFields), tts.extend(keyFields),
-]).superRefine(({ baseURL, apiKey, clearApiKey }, ctx) => {
-  const message = apiKey && clearApiKey
+]).superRefine((input, ctx) => {
+  const settings = fillSettings(input);
+  const endpointError = settings.baseURL ? readerSpeechEndpointError(settings) : READER_SPEECH_BASE_URL_ERROR;
+  if (endpointError) ctx.addIssue({ code: "custom", path: ["baseURL"], message: endpointError });
+  const keyError = input.apiKey && input.clearApiKey
     ? "保存新 Key 时请取消清除 Key"
-    : readerSpeechApiKeyError(baseURL ?? "", apiKey);
-  if (message) ctx.addIssue({ code: "custom", path: ["apiKey"], message });
+    : readerSpeechApiKeyError(settings.baseURL, input.apiKey);
+  if (keyError) ctx.addIssue({ code: "custom", path: ["apiKey"], message: keyError });
+  if (settings.service === "tts" && settings.provider === "mimo" && settings.model === MIMO_TTS_MODEL && isMimoApiURL(settings.baseURL)) {
+    const officialVoices: readonly string[] = MIMO_TTS_VOICES;
+    if ([settings.voice, ...settings.additionalVoices].some((voice) => !officialVoices.includes(voice))) {
+      ctx.addIssue({ code: "custom", path: ["voice"], message: "请使用 MiMo 官方预置音色 ID" });
+    }
+  }
 });
 
-const storedFields = {
-  baseURL: baseURLSchema.default(MIMO_API_BASE_URL),
-  encryptedKey: z.string().refine((value) => !value || isEncryptedSecret(value)),
-};
-const storedSchema = z.discriminatedUnion("service", [roles.extend(storedFields), tts.extend(storedFields)]);
-type StoredSettings = z.infer<typeof storedSchema>;
+const encryptedKey = z.string().refine((value) => !value || isEncryptedSecret(value));
+const storedSchema = z.discriminatedUnion("service", [roles.extend({ encryptedKey }), tts.extend({ encryptedKey })]);
+type StoredSettings = ReaderSpeechSettings & { encryptedKey: string };
 type SettingsInput = z.infer<typeof readerSpeechSettingsInput>;
 
 async function loadSettings(service: ReaderSpeechService) {
@@ -70,8 +102,11 @@ async function loadSettings(service: ReaderSpeechService) {
     return { value: null, settings: defaults };
   }
   try {
-    const settings = storedSchema.parse(JSON.parse(row.value));
-    if (settings.service === service) return { value: row.value, settings };
+    const parsed = storedSchema.parse(JSON.parse(row.value));
+    const settings = fillSettings(parsed);
+    if (settings.service === service && settings.baseURL && !readerSpeechEndpointError(settings)) {
+      return { value: row.value, settings: { ...settings, encryptedKey: parsed.encryptedKey } };
+    }
   } catch {
     // Invalid data must not be used to contact a provider.
   }
@@ -91,14 +126,30 @@ function staleSettings() {
   return new ApiError("配置已被更新，请重新加载后保存", 40910, 409);
 }
 
-function resolveBaseURL(requested: string | undefined, saved: string) {
-  if (requested !== undefined) return requested;
-  if (saved !== MIMO_API_BASE_URL) throw staleSettings();
-  return saved;
+function serializeSettings(next: StoredSettings): string {
+  const { provider, authMode, baseURL, ...rest } = next;
+  const legacyProvider = provider === "mimo" && authMode === legacyAuthMode(baseURL);
+  return JSON.stringify({
+    ...rest,
+    provider: legacyProvider ? undefined : provider,
+    authMode: legacyProvider ? undefined : authMode,
+    baseURL: legacyProvider && baseURL === MIMO_API_BASE_URL ? undefined : baseURL,
+    additionalVoices: next.service === "tts" && next.additionalVoices.length ? next.additionalVoices : undefined,
+  });
+}
+
+function resolveDraft(input: SettingsInput, saved: ReaderSpeechSettings): ReaderSpeechSettings {
+  // Older admin pages cannot confirm a destination or authentication mode they never displayed.
+  if ((!input.baseURL && saved.baseURL !== MIMO_API_BASE_URL) ||
+      (!input.provider && saved.provider !== "mimo") ||
+      (!input.authMode && saved.authMode !== legacyAuthMode(saved.baseURL))) {
+    throw staleSettings();
+  }
+  return fillSettings(input);
 }
 
 function requireNewKey() {
-  return new ApiError("更改 Base URL 后请填写对应的 API Key。", 42211, 422);
+  return new ApiError("更改厂商、Base URL 或认证方式后请填写对应的 API Key。", 42211, 422);
 }
 
 function validateKey(baseURL: string, apiKey: string) {
@@ -108,22 +159,20 @@ function validateKey(baseURL: string, apiKey: string) {
 }
 
 export async function saveReaderSpeechSettings(input: SettingsInput): Promise<AdminReaderSpeechSettings> {
-  const { apiKey, clearApiKey, baseURL: requested, ...settings } = input;
-  const previous = await loadSettings(settings.service);
+  const { apiKey, clearApiKey } = input;
+  const previous = await loadSettings(input.service);
+  const settings = resolveDraft(input, previous.settings);
   const key = keys[settings.service];
-  const baseURL = resolveBaseURL(requested, previous.settings.baseURL);
-  validateKey(baseURL, apiKey);
-  if (baseURL !== previous.settings.baseURL && previous.settings.encryptedKey && !apiKey && !clearApiKey) {
+  validateKey(settings.baseURL, apiKey);
+  if (!sameReaderSpeechConnection(settings, previous.settings) && previous.settings.encryptedKey && !apiKey && !clearApiKey) {
     throw requireNewKey();
   }
   const next: StoredSettings = {
     ...settings,
-    baseURL,
     encryptedKey: clearApiKey ? "" : apiKey ? encryptSecret(apiKey) : previous.settings.encryptedKey,
   };
   if (next.enabled && !next.encryptedKey) throw new ApiError("启用服务前请填写 API Key", 42210, 422);
-  // Keep the default profile readable by releases that predate configurable endpoints.
-  const value = JSON.stringify({ ...next, baseURL: baseURL === MIMO_API_BASE_URL ? undefined : baseURL });
+  const value = serializeSettings(next);
 
   if (previous.value === null) {
     try {
@@ -156,13 +205,12 @@ export async function resolveReaderSpeechService(service: ReaderSpeechService): 
 }
 
 export async function resolveReaderSpeechTest(input: SettingsInput): Promise<ReaderSpeechCredentials> {
-  const { apiKey, clearApiKey, baseURL: requested, ...settings } = input;
-  if (apiKey && requested) return credentials({ ...settings, baseURL: requested }, apiKey);
-  const { settings: stored } = await loadSettings(settings.service);
-  const baseURL = resolveBaseURL(requested, stored.baseURL);
-  const draft = { ...settings, baseURL };
+  const { apiKey, clearApiKey } = input;
+  if (apiKey && input.baseURL) return credentials(fillSettings(input), apiKey);
+  const { settings: stored } = await loadSettings(input.service);
+  const draft = resolveDraft(input, stored);
   if (clearApiKey) return credentials(draft, "");
   if (apiKey) return credentials(draft, apiKey);
-  if (baseURL !== stored.baseURL) throw requireNewKey();
+  if (!sameReaderSpeechConnection(draft, stored)) throw requireNewKey();
   return credentials(draft, decryptSecret(stored.encryptedKey));
 }

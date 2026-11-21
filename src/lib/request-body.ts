@@ -9,11 +9,11 @@ export class RequestBodyTooLargeError extends Error {
   }
 }
 
-/** Read a request body without allowing an untrusted callback to grow memory unbounded. */
-export async function readRequestBodyWithLimit(
+async function consumeBodyWithLimit(
   request: Pick<Request, "headers" | "body">,
-  limitBytes = DEFAULT_CALLBACK_BODY_LIMIT_BYTES
-): Promise<string> {
+  limitBytes: number,
+  consume: (chunk: Uint8Array) => void,
+): Promise<number> {
   if (!Number.isSafeInteger(limitBytes) || limitBytes <= 0) {
     throw new TypeError("limitBytes must be a positive safe integer");
   }
@@ -23,11 +23,9 @@ export async function readRequestBodyWithLimit(
     throw new RequestBodyTooLargeError(limitBytes);
   }
 
-  if (!request.body) return "";
+  if (!request.body) return 0;
 
   const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  const chunks: string[] = [];
   let receivedBytes = 0;
 
   try {
@@ -40,11 +38,36 @@ export async function readRequestBodyWithLimit(
         await reader.cancel();
         throw new RequestBodyTooLargeError(limitBytes);
       }
-      chunks.push(decoder.decode(value, { stream: true }));
+      consume(value);
     }
-    chunks.push(decoder.decode());
-    return chunks.join("");
+    return receivedBytes;
   } finally {
     reader.releaseLock();
   }
+}
+
+/** Read a request body without allowing an untrusted callback to grow memory unbounded. */
+export async function readRequestBodyWithLimit(
+  request: Pick<Request, "headers" | "body">,
+  limitBytes = DEFAULT_CALLBACK_BODY_LIMIT_BYTES,
+): Promise<string> {
+  const decoder = new TextDecoder();
+  const chunks: string[] = [];
+  await consumeBodyWithLimit(request, limitBytes, (chunk) => {
+    chunks.push(decoder.decode(chunk, { stream: true }));
+  });
+  chunks.push(decoder.decode());
+  return chunks.join("");
+}
+
+export async function readBodyBytesWithLimit(request: Pick<Request, "headers" | "body">, limitBytes: number) {
+  const chunks: Uint8Array[] = [];
+  const length = await consumeBodyWithLimit(request, limitBytes, (chunk) => { chunks.push(chunk); });
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
 }

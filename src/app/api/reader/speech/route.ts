@@ -1,6 +1,6 @@
 import { ok } from "@/lib/api-response";
 import { requireAuth } from "@/lib/guards";
-import { MIMO_TTS_VOICES } from "@/lib/reader-speech/config";
+import { readerSpeechVoices } from "@/lib/reader-speech/config";
 import { readerSpeechErrorResponse } from "@/lib/reader-speech/http";
 import { getReaderSpeechSettings } from "@/lib/reader-speech/settings";
 
@@ -14,7 +14,7 @@ export async function GET() {
       service: item.service,
       available: item.enabled && item.keyConfigured,
       model: item.model,
-      ...(item.service === "tts" ? { voice: item.voice, voices: MIMO_TTS_VOICES } : {}),
+      ...(item.service === "tts" ? { voice: item.voice, voices: readerSpeechVoices(item) } : {}),
     })));
     response.headers.set("Cache-Control", "private, no-store");
     return response;
