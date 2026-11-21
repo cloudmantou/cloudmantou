@@ -12,6 +12,7 @@ import "@/styles/official.css";
 import "@/styles/official-home.css";
 import "@/styles/editorial-blog.css";
 import "@/styles/feedback.css";
+import "@/styles/hongjian-app.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
