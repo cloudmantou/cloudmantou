@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { AiConfig } from "@/lib/ai/config";
+import { isMimoApiURL } from "@/lib/ai/mimo-config";
 import { createSafeAiFetch } from "@/lib/ai/safe-fetch-server";
 import { resolveAiConfig } from "@/lib/ai/settings-service";
 
@@ -8,7 +9,7 @@ function normalizeAnthropicBaseUrl(baseURL: string): string {
   return baseURL.endsWith("/v1") ? baseURL : `${baseURL}/v1`;
 }
 
-export function createAiTextModel(config: AiConfig) {
+export function createAiTextModel(config: AiConfig, { connectionTest = false } = {}) {
   const secureFetch = createSafeAiFetch(config.baseURL, config.requestTimeoutMs);
   if (config.providerType === "anthropic-compatible") {
     const provider = createAnthropic({
@@ -32,6 +33,13 @@ export function createAiTextModel(config: AiConfig) {
     ...(config.openAiAuthMode === "api-key"
       ? { headers: { "api-key": config.apiKey } }
       : { apiKey: config.apiKey }),
+    ...(isMimoApiURL(config.baseURL) ? {
+      transformRequestBody: ({ max_tokens, ...body }) => ({
+        ...body,
+        max_completion_tokens: max_tokens,
+        ...(connectionTest ? { thinking: { type: "disabled" } } : {}),
+      }),
+    } : {}),
     supportsStructuredOutputs: config.supportsStructuredOutputs,
   });
 

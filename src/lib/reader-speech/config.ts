@@ -1,4 +1,3 @@
-export const MIMO_API_BASE_URL = "https://api.xiaomimimo.com/v1";
 export const MIMO_ROLE_MODELS = ["mimo-v2.6-flash", "mimo-v2.6-pro"] as const;
 export const MIMO_TTS_MODEL = "mimo-v2.5-tts";
 export const MIMO_TTS_VOICES = [

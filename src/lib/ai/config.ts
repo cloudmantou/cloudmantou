@@ -1,4 +1,5 @@
 import { BlockList, isIP } from "node:net";
+import { mimoSettingsError } from "@/lib/ai/mimo-config";
 
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
@@ -211,16 +212,20 @@ export function readAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
     throw new AiConfigurationError("AI_INVALID_CONFIG", "AI_PROVIDER_NAME 格式错误");
   }
 
+  const baseURL = validateAiBaseUrl(
+    env.AI_BASE_URL?.trim()
+    || (providerType === "anthropic-compatible"
+      ? env.ANTHROPIC_BASE_URL?.trim() || DEFAULT_ANTHROPIC_BASE_URL
+      : DEFAULT_AI_BASE_URL),
+    { allowLoopback: true },
+  );
+  const mimoError = mimoSettingsError({ baseURL, providerType, apiKey });
+  if (mimoError) throw new AiConfigurationError("AI_INVALID_CONFIG", mimoError);
+
   return {
     providerType,
     providerName,
-    baseURL: validateAiBaseUrl(
-      env.AI_BASE_URL?.trim()
-      || (providerType === "anthropic-compatible"
-        ? env.ANTHROPIC_BASE_URL?.trim() || DEFAULT_ANTHROPIC_BASE_URL
-        : DEFAULT_AI_BASE_URL),
-      { allowLoopback: true },
-    ),
+    baseURL,
     apiKey,
     textModel,
     supportsStructuredOutputs: readBoolean(

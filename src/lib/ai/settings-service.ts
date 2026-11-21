@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret } from "@/lib/secret-crypto";
+import { mimoSettingsError } from "@/lib/ai/mimo-config";
 import {
   AiConfigurationError,
   readAiConfig,
@@ -148,6 +149,7 @@ export async function getAdminAiSettings(
     const keyMatchesProvider = map.aiApiKeyProviderFingerprint === providerFingerprint(settings);
     let status: AdminAiSettings["status"] = settings.enabled ? "incomplete" : "disabled";
     if (settings.enabled && map.aiApiKey && keyMatchesProvider) status = "ready";
+    if (mimoSettingsError(settings)) status = "invalid";
     return {
       ...settings,
       apiKey: "",
@@ -179,6 +181,7 @@ export async function resolveAiConfig(
   if (map.aiConfigMode !== "database") return readAiConfig(env);
 
   const settings = databaseSettingsFromMap(map);
+  validateMimoSettings(settings);
   const keyMatchesProvider = map.aiApiKeyProviderFingerprint === providerFingerprint(settings);
   const apiKey = map.aiApiKey && keyMatchesProvider ? decryptSecret(map.aiApiKey) : "";
   return buildDatabaseAiConfig(settings, apiKey);
@@ -191,6 +194,7 @@ export async function resolveAiTestConfig(
   const parsed = aiSettingsInputSchema.parse(input);
   if (parsed.mode === "environment") return readAiConfig(env);
 
+  validateMimoSettings(parsed);
   const current = await loadAiSettingMap();
   const fingerprint = providerFingerprint(parsed);
   const canReuseStoredKey = Boolean(
@@ -210,6 +214,11 @@ async function upsertSetting(key: string, value: string, type = "string") {
   });
 }
 
+function validateMimoSettings(settings: AiSettingsInput) {
+  const error = mimoSettingsError(settings);
+  if (error) throw new AiConfigurationError("AI_INVALID_CONFIG", error);
+}
+
 export async function saveAdminAiSettings(input: AiSettingsInput): Promise<void> {
   const parsed = aiSettingsInputSchema.parse(input);
   if (parsed.mode === "environment") {
@@ -217,6 +226,7 @@ export async function saveAdminAiSettings(input: AiSettingsInput): Promise<void>
     return;
   }
 
+  validateMimoSettings(parsed);
   const current = await loadAiSettingMap();
   const enteredKey = parsed.apiKey.trim();
   const fingerprint = providerFingerprint(parsed);

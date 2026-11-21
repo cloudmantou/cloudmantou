@@ -57,7 +57,7 @@ export async function PUT(req: NextRequest) {
     if (error instanceof ApiError) return fail(error.message, error.code, error.status);
     if (error instanceof RequestBodyTooLargeError) return fail("请求内容过大", 41300, 413);
     if (error instanceof AiConfigurationError) {
-      return fail(error.code === "AI_NOT_CONFIGURED" ? "请先填写 API Key" : "AI 设置无效", 42200, 422);
+      return fail(error.code === "AI_NOT_CONFIGURED" ? "请先填写 API Key" : error.message, 42200, 422);
     }
     console.error("[Admin AI Settings PUT Error]", error instanceof Error ? error.name : "UnknownError");
     return fail("保存 AI 设置失败", 50000, 500);

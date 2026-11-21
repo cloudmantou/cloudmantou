@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Bot, Loader2, PlugZap, Save } from "lucide-react";
+import { mimoSettingsError } from "@/lib/ai/mimo-config";
 import {
   AI_PROVIDER_PRESETS,
   getAiProviderPreset,
@@ -55,6 +56,10 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const databaseMode = settings.mode === "database";
+  const endpointError = databaseMode ? mimoSettingsError({ ...settings, apiKey: "" }) : undefined;
+  const validationError = databaseMode ? mimoSettingsError(settings) : undefined;
 
   const loadSettings = useCallback(async () => {
     const response = await fetch("/api/admin/settings/ai");
@@ -78,11 +83,13 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
     patch: Partial<AiSettingsFormState>,
     options: { invalidateApiKey?: boolean } = {},
   ) => {
+    setError(null);
     setSettings((previous) => editAiSettings(previous, patch, options));
   };
 
   const applyPreset = (presetId: AiProviderPresetId) => {
     const preset = getAiProviderPreset(presetId);
+    setError(null);
     setSettings((previous) => editAiSettings(previous, {
       preset: preset.id,
       providerType: preset.providerType,
@@ -95,7 +102,12 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
     }, { invalidateApiKey: true }));
   };
 
-  const buildPayload = () => ({
+  const buildPayload = () => {
+    if (validationError) throw new Error(validationError);
+    if (databaseMode && settings.enabled && !settings.apiKey.trim() && !settings.apiKeyConfigured) {
+      throw new Error("请填写 API Key 后保存或测试连接。");
+    }
+    return {
       mode: settings.mode,
       enabled: settings.enabled,
       preset: settings.preset,
@@ -109,7 +121,8 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       requestTimeoutMs: settings.requestTimeoutMs,
       openAiAuthMode: settings.openAiAuthMode,
       anthropicAuthMode: settings.anthropicAuthMode,
-    });
+    };
+  };
 
   const persistSettings = async (payload = buildPayload()) => {
     const response = await fetch("/api/admin/settings/ai", {
@@ -123,18 +136,20 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
   };
 
   const handleSave = async () => {
+    setError(null);
     setSaving(true);
     try {
       await persistSettings();
       onNotify("AI 设置已保存");
     } catch (error) {
-      onNotify(error instanceof Error ? error.message : "保存 AI 设置失败", "err");
+      setError(error instanceof Error ? error.message : "保存 AI 设置失败");
     } finally {
       setSaving(false);
     }
   };
 
   const handleTest = async () => {
+    setError(null);
     setTesting(true);
     try {
       const payload = buildPayload();
@@ -148,7 +163,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       await persistSettings(payload);
       onNotify(`连接成功：${body.data.provider} / ${body.data.model}（${body.data.latencyMs}ms）`);
     } catch (error) {
-      onNotify(error instanceof Error ? error.message : "模型连接测试失败", "err");
+      setError(error instanceof Error ? error.message : "模型连接测试失败");
     } finally {
       setTesting(false);
     }
@@ -162,7 +177,6 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
     );
   }
 
-  const databaseMode = settings.mode === "database";
   const statusLabel = settings.status === "ready"
     ? "已就绪"
     : settings.status === "disabled"
@@ -178,7 +192,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
         <span className={`ai-settings-status is-${settings.status}`}>{statusLabel}</span>
       </div>
       <div className="ai-settings-intro">
-        支持 DeepSeek、小米 MiMo、MiniMax，以及任意 OpenAI / Anthropic 兼容接口。API Key 仅在服务端加密保存，页面只显示配置状态。
+        此处配置博客的 AI 编辑助手。角色识别和语音合成在同页的「听书服务」分别设置。
       </div>
       {!databaseMode ? (
         <div className="ai-settings-mode-notice" role="status">
@@ -194,6 +208,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
             value={settings.mode}
             onChange={(event) => {
               const mode = event.target.value as AiSettingsFormState["mode"];
+              setError(null);
               setSettings((previous) => mode === "database"
                 ? beginDatabaseEditing(previous)
                 : { ...previous, mode: "environment" });
@@ -285,6 +300,16 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
           </button>
         </div>
       </div>
+      {(validationError || error) && (
+        <div className="settings-form">
+          <p className="auth-error" role="alert">{validationError || error}</p>
+          {endpointError && (
+            <button type="button" className="secondary-button" onClick={() => applyPreset("mimo")}>
+              使用小米 MiMo 按量付费预设
+            </button>
+          )}
+        </div>
+      )}
       <div className="ai-settings-actions">
         <span>{databaseMode ? "测试连接会先发送一条最小请求，成功后再保存当前配置。" : "当前读取服务器 .env；切换为系统设置后可在线配置。"}</span>
         <div className="ai-settings-action-buttons">

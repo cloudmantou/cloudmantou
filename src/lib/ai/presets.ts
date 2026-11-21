@@ -1,4 +1,5 @@
 import type { AiProviderType } from "@/lib/ai/config";
+import { MIMO_API_BASE_URL } from "@/lib/ai/mimo-config";
 
 export type AiProviderPresetId =
   | "deepseek"
@@ -36,10 +37,10 @@ export const AI_PROVIDER_PRESETS: readonly AiProviderPreset[] = [
   {
     id: "mimo",
     label: "小米 MiMo",
-    description: "小米 MiMo 国内 API，使用 api-key 请求头",
+    description: "小米开放平台按量付费 API",
     providerType: "openai-compatible",
     providerName: "mimo",
-    baseURL: "https://api.xiaomimimo.com/v1",
+    baseURL: MIMO_API_BASE_URL,
     textModel: "mimo-v2.6-flash",
     supportsStructuredOutputs: true,
     openAiAuthMode: "api-key",

@@ -93,6 +93,7 @@ describe("AI text model provider", () => {
       baseURL: "https://api.xiaomimimo.com/v1",
       headers: { "api-key": "fixture-mimo-secret" },
       supportsStructuredOutputs: true,
+      transformRequestBody: expect.any(Function),
       fetch: expect.any(Function),
     });
   });

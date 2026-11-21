@@ -16,6 +16,7 @@ const presetIds = [
 
 const apiKeySchema = z
   .string()
+  .trim()
   .max(512, "API Key 最多 512 个字符")
   .refine((value) => value === "" || /^[\x21-\x7E]+$/.test(value), {
     message: "API Key 只支持可打印 ASCII 字符",

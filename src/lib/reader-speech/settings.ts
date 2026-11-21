@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { mimoApiKeyError } from "@/lib/ai/mimo-config";
 import { ApiError } from "@/lib/api-error";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/lib/secret-crypto";
@@ -21,8 +22,9 @@ const tts = z.object({
   ...sharedFields, service: z.literal("tts"), model: z.literal(MIMO_TTS_MODEL), voice: z.enum(MIMO_TTS_VOICES),
 }).strict();
 const keyFields = {
-  apiKey: z.string().trim().max(512).refine((key) => !key || /^sk-\S+$/.test(key), {
-    message: "请填写 MiMo 开放平台的按量付费 API Key",
+  apiKey: z.string().trim().max(512, "API Key 最多 512 个字符").superRefine((key, ctx) => {
+    const message = mimoApiKeyError(key);
+    if (message) ctx.addIssue({ code: "custom", message });
   }),
   clearApiKey: z.boolean(),
 };

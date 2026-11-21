@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { MIMO_API_BASE_URL } from "@/lib/ai/mimo-config";
 import { createSafeAiFetch } from "@/lib/ai/safe-fetch-server";
 import { ApiError } from "@/lib/api-error";
 import { readRequestBodyWithLimit } from "@/lib/request-body";
-import { MIMO_API_BASE_URL, MIMO_TTS_VOICES, type ReaderSpeechCredentials } from "@/lib/reader-speech/config";
+import { MIMO_TTS_VOICES, type ReaderSpeechCredentials } from "@/lib/reader-speech/config";
 
 export const rolesInput = z.object({
   chapter: z.string().max(30_000).refine((value) => value.trim().length > 0),

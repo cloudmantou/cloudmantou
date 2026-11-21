@@ -18,6 +18,7 @@ vi.mock("@/lib/secret-crypto", () => ({
 import {
   getAdminAiSettings,
   resolveAiConfig,
+  resolveAiTestConfig,
   saveAdminAiSettings,
 } from "@/lib/ai/settings-service";
 
@@ -96,9 +97,9 @@ describe("AI settings service", () => {
       { key: "aiProviderType", value: "openai-compatible" },
       { key: "aiProviderName", value: "mimo" },
       { key: "aiBaseURL", value: "https://api.xiaomimimo.com/v1" },
-      { key: "aiApiKey", value: "encrypted:stored-secret" },
+      { key: "aiApiKey", value: "encrypted:sk-stored-secret" },
       { key: "aiApiKeyProviderFingerprint", value: "openai-compatible|https://api.xiaomimimo.com/v1|api-key" },
-      { key: "aiTextModel", value: "mimo-v2.5-pro" },
+      { key: "aiTextModel", value: "mimo-v2.6-pro" },
       { key: "aiSupportsStructuredOutputs", value: "true" },
       { key: "aiRequestTimeoutMs", value: "120000" },
       { key: "aiOpenAiAuthMode", value: "api-key" },
@@ -106,10 +107,34 @@ describe("AI settings service", () => {
 
     await expect(resolveAiConfig({} as NodeJS.ProcessEnv)).resolves.toMatchObject({
       providerName: "mimo",
-      apiKey: "stored-secret",
+      apiKey: "sk-stored-secret",
       openAiAuthMode: "api-key",
     });
-    expect(mocks.decryptSecret).toHaveBeenCalledWith("encrypted:stored-secret");
+    expect(mocks.decryptSecret).toHaveBeenCalledWith("encrypted:sk-stored-secret");
+  });
+
+  it("shows a legacy Token Plan profile as invalid and rejects save, test and runtime use", async () => {
+    const baseURL = "https://token-plan-cn.xiaomimimo.com/v1";
+    mocks.findMany.mockResolvedValue([
+      { key: "aiConfigMode", value: "database" },
+      { key: "aiProviderPreset", value: "mimo" },
+      { key: "aiBaseURL", value: baseURL },
+      { key: "aiApiKey", value: "encrypted:tp-fixture" },
+      { key: "aiApiKeyProviderFingerprint", value: `openai-compatible|${baseURL}|api-key` },
+    ]);
+
+    const { status, apiKeyConfigured, ...settings } = await getAdminAiSettings();
+    expect(status).toBe("invalid");
+    expect(apiKeyConfigured).toBe(true);
+    expect(settings).toMatchObject({ baseURL, apiKey: "" });
+    await expect(resolveAiConfig()).rejects.toThrow(/Token Plan/);
+    await expect(resolveAiTestConfig(settings)).rejects.toThrow(/Token Plan/);
+    await expect(saveAdminAiSettings(settings)).rejects.toThrow(/Token Plan/);
+    await expect(saveAdminAiSettings({
+      ...settings, baseURL: "https://api.xiaomimimo.com/v1", apiKey: "ttp-fixture",
+    })).rejects.toThrow(/Token Plan/);
+    expect(mocks.decryptSecret).not.toHaveBeenCalled();
+    expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
   it("encrypts a rotated key and never persists the plaintext", async () => {

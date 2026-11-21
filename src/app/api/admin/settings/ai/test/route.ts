@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { generateText } from "ai";
+import { APICallError, generateText } from "ai";
 import { fail, ok } from "@/lib/api-response";
 import { AiConfigurationError } from "@/lib/ai/config";
 import { createAiTextModel } from "@/lib/ai/provider";
@@ -20,6 +20,14 @@ const TEST_RATE_LIMIT = {
   scope: "admin-ai-settings-test",
 } as const;
 const TEST_BODY_LIMIT_BYTES = 16 * 1024;
+const PROVIDER_ERROR_HINTS: Record<number, string> = {
+  400: "请检查模型 ID 和兼容协议",
+  401: "请检查 API Key 和认证方式",
+  402: "请检查服务商账户余额",
+  403: "请检查 API Key 是否有权使用该模型",
+  404: "请检查 Base URL 和模型 ID",
+  429: "请检查服务商调用额度或稍后重试",
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,17 +48,17 @@ export async function POST(req: NextRequest) {
     }
 
     const startedAt = Date.now();
-    const { model, config } = createAiTextModel(await resolveAiTestConfig(parsed.data));
+    const { model, config } = createAiTextModel(await resolveAiTestConfig(parsed.data), { connectionTest: true });
     const result = await generateText({
       model,
       prompt: "Reply with exactly: OK",
       temperature: 0,
-      maxOutputTokens: 8,
+      maxOutputTokens: 64,
       maxRetries: 0,
       timeout: Math.min(config.requestTimeoutMs, 30_000),
     });
 
-    if (!result.text.trim()) return fail("模型返回了空内容", 50210, 502);
+    if (!result.text.trim()) return fail("模型已响应，但未返回文本。请核对模型 ID。", 50210, 502);
     return ok({
       connected: true,
       provider: config.providerName,
@@ -61,7 +69,13 @@ export async function POST(req: NextRequest) {
     if (error instanceof ApiError) return fail(error.message, error.code, error.status);
     if (error instanceof RequestBodyTooLargeError) return fail("请求内容过大", 41300, 413);
     if (error instanceof AiConfigurationError) {
-      return fail(error.code === "AI_INVALID_CONFIG" ? "AI 设置无效" : "AI 服务尚未配置", 50310, 503);
+      return error.code === "AI_INVALID_CONFIG"
+        ? fail(error.message, 42200, 422)
+        : fail(error.code === "AI_DISABLED" ? "请先启用 AI 助手" : "请先填写 API Key，或核对服务器环境变量中的 Key 和模型", 50310, 503);
+    }
+    if (APICallError.isInstance(error) && error.statusCode) {
+      const hint = PROVIDER_ERROR_HINTS[error.statusCode] || "请稍后重试";
+      return fail(`模型接口返回 HTTP ${error.statusCode}，${hint}。`, 50210, 502);
     }
     console.error("[Admin AI Settings Test Error]", error instanceof Error ? error.name : "UnknownError");
     return fail("模型连接测试失败", 50210, 502);

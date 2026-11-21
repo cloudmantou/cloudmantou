@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { APICallError } from "ai";
 
 const mocks = vi.hoisted(() => ({
   requireAdminAndAudit: vi.fn(),
@@ -20,7 +21,10 @@ vi.mock("@/lib/guards", () => ({
 vi.mock("@/lib/rate-limit-server", () => ({ checkRateLimit: mocks.checkRateLimit }));
 vi.mock("@/lib/ai/provider", () => ({ createAiTextModel: mocks.createAiTextModel }));
 vi.mock("@/lib/ai/settings-service", () => ({ resolveAiTestConfig: mocks.resolveAiTestConfig }));
-vi.mock("ai", () => ({ generateText: mocks.generateText }));
+vi.mock("ai", async (importOriginal) => ({
+  ...await importOriginal<typeof import("ai")>(),
+  generateText: mocks.generateText,
+}));
 
 import { POST } from "@/app/api/admin/settings/ai/test/route";
 
@@ -73,7 +77,7 @@ describe("admin AI connection test route", () => {
     expect(response.status).toBe(200);
     expect(mocks.generateText).toHaveBeenCalledWith(expect.objectContaining({
       prompt: "Reply with exactly: OK",
-      maxOutputTokens: 8,
+      maxOutputTokens: 64,
       maxRetries: 0,
       timeout: 30_000,
     }));
@@ -83,6 +87,25 @@ describe("admin AI connection test route", () => {
       provider: "deepseek",
       model: "deepseek-v4-flash",
     });
+  });
+
+  it("explains upstream authentication failure without echoing its response body", async () => {
+    mocks.generateText.mockRejectedValueOnce(new APICallError({
+      url: "https://api.deepseek.com/chat/completions",
+      requestBodyValues: { prompt: "fixture" },
+      message: "upstream private details",
+      statusCode: 401,
+      responseBody: "upstream private details",
+    }));
+
+    const response = await POST(new NextRequest("https://cloudmantoua.top/api/admin/settings/ai/test", {
+      method: "POST",
+      body: JSON.stringify(validSettings),
+    }));
+    const body = await response.json();
+    expect(response.status).toBe(502);
+    expect(body.message).toMatch(/HTTP 401.*API Key/);
+    expect(JSON.stringify(body)).not.toContain("upstream private details");
   });
 
   it("honors the per-admin rate limiter before contacting a model", async () => {

@@ -67,7 +67,11 @@ describe("reader speech settings", () => {
   });
 
   it("blocks Token Plan keys, unknown voice IDs and attempts to enable a keyless service", async () => {
-    expect(readerSpeechSettingsInput.safeParse({ ...roles, apiKey: "tp-fixture" }).success).toBe(false);
+    for (const apiKey of ["tp-fixture", "ttp-fixture"]) {
+      const result = readerSpeechSettingsInput.safeParse({ ...roles, apiKey });
+      expect(result.error?.issues[0]?.message).toMatch(/Token Plan.*按量付费/);
+    }
+    expect(readerSpeechSettingsInput.parse({ ...roles, apiKey: " " + roles.apiKey + "\n" }).apiKey).toBe(roles.apiKey);
     expect(readerSpeechSettingsInput.safeParse({ ...tts, voice: "arbitrary" }).success).toBe(false);
     await expect(saveReaderSpeechSettings({ ...roles, apiKey: "" })).rejects.toMatchObject({ status: 422 });
     expect(db.create).not.toHaveBeenCalled();
