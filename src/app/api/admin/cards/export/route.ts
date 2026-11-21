@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { fail } from "@/lib/api-response";
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { buildAdminCardWhere, displayCardStatus } from "@/lib/admin-card-filters";
 
 /**
  * 卡密导出 CSV
@@ -12,15 +13,7 @@ export async function GET(req: NextRequest) {
   try {
     await requireAdmin();
     const { searchParams } = req.nextUrl;
-    const batchNo = searchParams.get("batchNo") || undefined;
-    const type = searchParams.get("type") || undefined;
-    const status = searchParams.get("status") || undefined;
-
-    const where: any = {
-      ...(batchNo && { batchNo }),
-      ...(type && { type }),
-      ...(status && { status }),
-    };
+    const where = buildAdminCardWhere(searchParams);
 
     const cards = await prisma.card.findMany({
       where,
@@ -41,7 +34,7 @@ export async function GET(req: NextRequest) {
         c.cardNo,
         TYPE_LABELS[c.type] || c.type,
         c.value,
-        c.status,
+        displayCardStatus(c),
         c.batchNo || "",
         c.usedBy || "",
         c.usedAt?.toISOString() || "",

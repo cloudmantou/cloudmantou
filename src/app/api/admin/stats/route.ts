@@ -168,7 +168,8 @@ export async function GET() {
         time: comment.createdAt.toISOString(),
       });
     }
-    for (const post of recentPosts.filter((p) => p.publishedAt).slice(0, 3)) {
+    // 撤回为草稿的文章仍保留 publishedAt，不能当作“已发布”动态。
+    for (const post of recentPosts.filter((p) => p.publishedAt && p.status !== "DRAFT").slice(0, 3)) {
       activity.push({
         type: "post",
         color: "var(--accent)",
