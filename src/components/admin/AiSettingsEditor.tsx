@@ -57,6 +57,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const databaseMode = settings.mode === "database";
   const endpointError = databaseMode ? mimoSettingsError({ ...settings, apiKey: "" }) : undefined;
   const validationError = databaseMode ? mimoSettingsError(settings) : undefined;
@@ -84,12 +85,14 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
     options: { invalidateApiKey?: boolean } = {},
   ) => {
     setError(null);
+    setNotice(null);
     setSettings((previous) => editAiSettings(previous, patch, options));
   };
 
   const applyPreset = (presetId: AiProviderPresetId) => {
     const preset = getAiProviderPreset(presetId);
     setError(null);
+    setNotice(null);
     setSettings((previous) => editAiSettings(previous, {
       preset: preset.id,
       providerType: preset.providerType,
@@ -137,12 +140,16 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
 
   const handleSave = async () => {
     setError(null);
+    setNotice(null);
     setSaving(true);
     try {
       await persistSettings();
+      setNotice("AI 设置已保存");
       onNotify("AI 设置已保存");
     } catch (error) {
-      setError(error instanceof Error ? error.message : "保存 AI 设置失败");
+      const message = error instanceof Error ? error.message : "保存 AI 设置失败";
+      setError(message);
+      onNotify(message, "err");
     } finally {
       setSaving(false);
     }
@@ -150,6 +157,13 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
 
   const handleTest = async () => {
     setError(null);
+    setNotice(null);
+    if (!settings.enabled) {
+      const message = "请先开启「启用 AI 编辑助手」后再测试连接。";
+      setError(message);
+      onNotify(message, "err");
+      return;
+    }
     setTesting(true);
     try {
       const payload = buildPayload();
@@ -161,9 +175,13 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.message || "模型连接测试失败");
       await persistSettings(payload);
-      onNotify(`连接成功：${body.data.provider} / ${body.data.model}（${body.data.latencyMs}ms）`);
+      const message = `连接成功：${body.data.provider} / ${body.data.model}（${body.data.latencyMs}ms）`;
+      setNotice(message);
+      onNotify(message);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "模型连接测试失败");
+      const message = error instanceof Error ? error.message : "模型连接测试失败";
+      setError(message);
+      onNotify(message, "err");
     } finally {
       setTesting(false);
     }
@@ -310,6 +328,11 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
           )}
         </div>
       )}
+      {notice && !validationError && !error && (
+        <div className="settings-form">
+          <p className="ai-settings-success" role="status">{notice}</p>
+        </div>
+      )}
       <div className="ai-settings-actions">
         <span>{databaseMode ? "测试连接会先发送一条最小请求，成功后再保存当前配置。" : "当前读取服务器 .env；切换为系统设置后可在线配置。"}</span>
         <div className="ai-settings-action-buttons">
@@ -317,7 +340,7 @@ export function AiSettingsEditor({ onNotify }: { onNotify: Notify }) {
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             {saving ? "保存中…" : "保存 AI 设置"}
           </button>
-          <button type="button" className="secondary-button" onClick={handleTest} disabled={saving || testing || !settings.enabled}>
+          <button type="button" className="secondary-button" onClick={handleTest} disabled={saving || testing}>
             {testing ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
             {testing ? "测试中…" : "保存并测试连接"}
           </button>

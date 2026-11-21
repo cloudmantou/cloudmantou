@@ -4459,6 +4459,16 @@ html[data-backdrop-paused="true"] .home-backdrop-beam {
   background: var(--rose-dim);
 }
 
+.ai-settings-success {
+  padding: 10px 12px;
+  border: 1px solid var(--teal);
+  border-radius: 8px;
+  background: var(--teal-dim);
+  color: var(--teal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .ai-settings-actions {
   display: flex;
   align-items: center;
@@ -4971,6 +4981,13 @@ select.form-input {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   z-index: 100;
   animation: toast-in 200ms ease;
+}
+
+.admin-root .toast {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1000;
+  animation: toast-in 200ms ease forwards;
 }
 
 .toast.toast-err {

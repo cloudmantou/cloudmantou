@@ -31,6 +31,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
   const [additionalVoices, setAdditionalVoices] = useState(initial.service === "tts" ? initial.additionalVoices.join("\n") : "");
   const [operation, setOperation] = useState<"save" | "test" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const baseURL = normalizeReaderSpeechBaseURL(draft.baseURL);
   const baseURLError = baseURL
     ? readerSpeechEndpointError({ ...draft, baseURL })
@@ -47,8 +48,11 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
   const title = readerSpeechLabels[draft.service];
   const prefix = "reader-speech-" + draft.service;
   const preset = readerSpeechPreset(draft);
-  const invalid = !baseURL || Boolean(baseURLError || keyError)
-    || !draft.model.trim() || (draft.service === "tts" && !draft.voice.trim());
+
+  const clearFeedback = () => {
+    setError(null);
+    setNotice(null);
+  };
 
   const selectProvider = (value: string) => {
     if (draft.service === "roles") {
@@ -63,11 +67,40 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
     }
     setApiKey("");
     setClearApiKey(false);
-    setError(null);
+    clearFeedback();
+  };
+
+  const validationError = (action: "save" | "test"): string | null => {
+    if (!baseURL) return baseURLError ?? READER_SPEECH_BASE_URL_ERROR;
+    if (baseURLError) return baseURLError;
+    if (keyError) return keyError;
+    if (!draft.model.trim()) return "请填写模型 ID。";
+    if (draft.service === "tts" && !draft.voice.trim()) return "请填写默认音色 ID。";
+    if (!Number.isInteger(draft.dailyLimit) || draft.dailyLimit < 1 || draft.dailyLimit > 100_000) {
+      return "全站每日请求上限需为 1–100000 之间的整数。";
+    }
+    if (action === "test") {
+      if (clearApiKey) return "已勾选清除 Key，请先取消后再测试连接。";
+      if (!hasNewKey && !canReuseKey) {
+        return needsKeyForNewConnection
+          ? "更改厂商、Base URL 或认证方式后请填写对应的 API Key。"
+          : "请先填写 API Key 再测试连接。";
+      }
+    } else {
+      if (needsKeyForNewConnection) return "更改厂商、Base URL 或认证方式后请填写对应的 API Key。";
+      if (draft.enabled && !hasNewKey && !canReuseKey) return "启用服务前请填写 API Key。";
+    }
+    return null;
   };
 
   const submit = async (action: "save" | "test") => {
-    setError(null);
+    clearFeedback();
+    const issue = validationError(action);
+    if (issue) {
+      setError(issue);
+      onNotify(issue, "err");
+      return;
+    }
     setOperation(action);
     try {
       const settings = draft.service === "tts"
@@ -87,13 +120,19 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
         setKeyConfigured(configured);
         setApiKey("");
         setClearApiKey(false);
-        onNotify(title + "配置已保存");
+        const message = title + "配置已保存";
+        setNotice(message);
+        onNotify(message);
       } else {
         const probe = await readSettingsResponse<{ latencyMs: number }>(response, "连接测试失败");
-        onNotify(title + "连接成功（" + probe.latencyMs + " ms）");
+        const message = title + "连接成功（" + probe.latencyMs + " ms）";
+        setNotice(message);
+        onNotify(message);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "请求失败");
+      const message = error instanceof Error ? error.message : "请求失败";
+      setError(message);
+      onNotify(message, "err");
     } finally {
       setOperation(null);
     }
@@ -107,7 +146,10 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
           id={prefix + "-enabled"}
           type="checkbox"
           checked={draft.enabled}
-          onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
+          onChange={(event) => {
+            setDraft({ ...draft, enabled: event.target.checked });
+            clearFeedback();
+          }}
         />
         启用{title}
       </label>
@@ -135,7 +177,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
           value={draft.baseURL}
           onChange={(event) => {
             setDraft({ ...draft, baseURL: event.target.value });
-            setError(null);
+            clearFeedback();
           }}
         />
         {baseURLError && <p className="auth-error" id={prefix + "-url-error"} role="alert">{baseURLError}</p>}
@@ -179,7 +221,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
           id={prefix + "-auth"} className="form-input" value={draft.authMode}
           onChange={(event) => {
             setDraft({ ...draft, authMode: event.target.value as ReaderSpeechAuthMode });
-            setError(null);
+            clearFeedback();
           }}
         >
           <option value="bearer">Authorization: Bearer</option>
@@ -204,7 +246,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
           value={apiKey}
           onChange={(event) => {
             setApiKey(event.target.value);
-            setError(null);
+            clearFeedback();
           }}
         />
         {keyError && <p className="auth-error" id={prefix + "-key-error"} role="alert">{keyError}</p>}
@@ -239,20 +281,21 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
         />
       </div>
       {error && <p className="auth-error" role="alert">{error}</p>}
+      {notice && !error && <p className="ai-settings-success" role="status">{notice}</p>}
       <div className="flex flex-wrap gap-2">
         <button
           type="button" className="primary-button" onClick={() => void submit("save")}
-          disabled={invalid || needsKeyForNewConnection || (draft.enabled && !hasNewKey && !canReuseKey)}
+          disabled={operation !== null}
         >
           {operation === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          保存{title}
+          {operation === "save" ? "保存中…" : "保存" + title}
         </button>
         <button
           type="button" className="secondary-button" onClick={() => void submit("test")}
-          disabled={invalid || clearApiKey || (!hasNewKey && !canReuseKey)}
+          disabled={operation !== null}
         >
           {operation === "test" ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
-          测试{title}
+          {operation === "test" ? "测试中…" : "测试" + title}
         </button>
       </div>
     </fieldset>

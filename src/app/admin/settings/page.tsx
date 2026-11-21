@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readApiEnvelope } from "@/lib/client-api-response";
 import { Save, Loader2, RefreshCw } from "lucide-react";
 import { ContactLinksEditor } from "@/components/admin/ContactLinksEditor";
@@ -47,6 +47,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [toast, setToast] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 加载失败时绝不能展示默认值表单：否则点“保存”会用空值覆盖线上配置。
   const load = useCallback(async () => {
@@ -91,9 +92,25 @@ export default function AdminSettingsPage() {
   }, [dirty]);
 
   const flash = useCallback((text: string, type: "ok" | "err" = "ok") => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ text, type });
-    setTimeout(() => setToast(null), 2400);
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 3200);
   }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (loading || loadError) return;
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, loadError]);
 
   const handleSave = async () => {
     if (!dirty || loadError) return;
@@ -364,7 +381,15 @@ export default function AdminSettingsPage() {
         </section>
       </div>
 
-      {toast && <div className={`toast ${toast.type === "err" ? "toast-err" : ""}`}>{toast.text}</div>}
+      {toast && (
+        <div
+          className={`toast ${toast.type === "err" ? "toast-err" : ""}`}
+          role={toast.type === "err" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {toast.text}
+        </div>
+      )}
     </div>
   );
 }
