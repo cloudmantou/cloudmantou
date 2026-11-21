@@ -1,4 +1,4 @@
-import { MIMO_API_BASE_URL, MIMO_TOKEN_PLAN_ERROR, isMimoApiURL, mimoApiKeyError, mimoSettingsError } from "@/lib/ai/mimo-config";
+import { MIMO_API_BASE_URL, isMimoApiURL, mimoSettingsError } from "@/lib/ai/mimo-config";
 
 export const MIMO_ROLE_MODELS = ["mimo-v2.6-flash", "mimo-v2.6-pro"] as const;
 export const MIMO_TTS_MODEL = "mimo-v2.5-tts";
@@ -130,10 +130,8 @@ export function readerSpeechEndpointError(settings: ReaderSpeechSettings): strin
   return mimoSettingsError({ baseURL: settings.baseURL, providerType });
 }
 
-export function readerSpeechApiKeyError(baseURL: string, apiKey: string): string | undefined {
+export function readerSpeechApiKeyError(_baseURL: string, apiKey: string): string | undefined {
   const key = apiKey.trim();
   if (!key) return undefined;
-  if (/^(?:tp|ttp)-/.test(key)) return MIMO_TOKEN_PLAN_ERROR;
-  if (isMimoApiURL(baseURL)) return mimoApiKeyError(key);
   if (!/^[\x21-\x7e]+$/.test(key)) return "API Key 只能包含可打印 ASCII 字符。";
 }

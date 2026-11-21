@@ -113,7 +113,7 @@ describe("AI settings service", () => {
     expect(mocks.decryptSecret).toHaveBeenCalledWith("encrypted:sk-stored-secret");
   });
 
-  it("shows a legacy Token Plan profile as invalid and rejects save, test and runtime use", async () => {
+  it("accepts Token Plan endpoints and non-sk key prefixes without blocking save or test", async () => {
     const baseURL = "https://token-plan-cn.xiaomimimo.com/v1";
     mocks.findMany.mockResolvedValue([
       { key: "aiConfigMode", value: "database" },
@@ -124,17 +124,15 @@ describe("AI settings service", () => {
     ]);
 
     const { status, apiKeyConfigured, ...settings } = await getAdminAiSettings();
-    expect(status).toBe("invalid");
+    expect(status).toBe("ready");
     expect(apiKeyConfigured).toBe(true);
     expect(settings).toMatchObject({ baseURL, apiKey: "" });
-    await expect(resolveAiConfig()).rejects.toThrow(/Token Plan/);
-    await expect(resolveAiTestConfig(settings)).rejects.toThrow(/Token Plan/);
-    await expect(saveAdminAiSettings(settings)).rejects.toThrow(/Token Plan/);
+    await expect(resolveAiConfig()).resolves.toMatchObject({ baseURL, apiKey: "tp-fixture" });
+    await expect(resolveAiTestConfig(settings)).resolves.toMatchObject({ baseURL, apiKey: "tp-fixture" });
     await expect(saveAdminAiSettings({
       ...settings, baseURL: "https://api.xiaomimimo.com/v1", apiKey: "ttp-fixture",
-    })).rejects.toThrow(/Token Plan/);
-    expect(mocks.decryptSecret).not.toHaveBeenCalled();
-    expect(mocks.upsert).not.toHaveBeenCalled();
+    })).resolves.toBeUndefined();
+    expect(mocks.upsert).toHaveBeenCalled();
   });
 
   it("encrypts a rotated key and never persists the plaintext", async () => {

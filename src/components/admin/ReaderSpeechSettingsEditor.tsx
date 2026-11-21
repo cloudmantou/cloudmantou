@@ -44,7 +44,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
   const needsKeyForNewConnection = keyConfigured && connectionChanged && !hasNewKey && !clearApiKey;
   const keyHint = connectionChanged && keyConfigured
     ? "连接设置已更改，需填写对应的 Key"
-    : canReuseKey ? "已配置，留空可保留" : official ? "小米 MiMo 按量付费 Key" : "服务商 API Key";
+    : canReuseKey ? "已配置，留空可保留" : official ? "小米 MiMo API Key" : "服务商 API Key";
   const title = readerSpeechLabels[draft.service];
   const prefix = "reader-speech-" + draft.service;
   const preset = readerSpeechPreset(draft);

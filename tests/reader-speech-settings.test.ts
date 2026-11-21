@@ -126,16 +126,15 @@ describe("reader speech settings", () => {
     "https://192.168.0.10/v1",
     "https://account@roles.example.com/v1",
     "https://roles.example.com/v1?token=example",
-    "https://token-plan-cn.xiaomimimo.com/v1",
   ])("rejects an unsupported endpoint %s", (baseURL) => {
     expect(readerSpeechSettingsInput.safeParse({ ...roles, baseURL }).success).toBe(false);
   });
 
-  it("blocks Token Plan keys, unknown voice IDs and attempts to enable a keyless service", async () => {
-    for (const apiKey of ["tp-fixture", "ttp-fixture"]) {
-      const result = readerSpeechSettingsInput.safeParse({ ...roles, apiKey });
-      expect(result.error?.issues[0]?.message).toMatch(/Token Plan.*按量付费/);
+  it("allows any printable ASCII API key format and still blocks unknown voice IDs or keyless enable", async () => {
+    for (const apiKey of ["tp-fixture", "ttp-fixture", "custom-key-123"]) {
+      expect(readerSpeechSettingsInput.safeParse({ ...roles, apiKey }).success).toBe(true);
     }
+    expect(readerSpeechSettingsInput.safeParse({ ...roles, baseURL: "https://token-plan-cn.xiaomimimo.com/v1", apiKey: "tp-fixture" }).success).toBe(true);
     expect(readerSpeechSettingsInput.parse({ ...roles, apiKey: " " + roles.apiKey + "\n" }).apiKey).toBe(roles.apiKey);
     expect(readerSpeechSettingsInput.safeParse({ ...tts, voice: "arbitrary" }).success).toBe(false);
     await expect(saveReaderSpeechSettings({ ...roles, apiKey: "" })).rejects.toMatchObject({ status: 422 });
