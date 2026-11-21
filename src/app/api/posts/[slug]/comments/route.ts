@@ -137,7 +137,7 @@ export async function POST(
     const body = await req.json();
     const parsed = createCommentSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 42200, 422);
+      return fail(parsed.error.issues[0].message, 42200, 422);
     }
 
     const { content, parentId } = parsed.data;

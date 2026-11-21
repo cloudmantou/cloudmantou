@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 40000, 400);
+      return fail(parsed.error.issues[0].message, 40000, 400);
     }
 
     const { email, password, callbackUrl } = parsed.data;

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = editorAiInputSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0]?.message || "AI 请求参数错误", 42200, 422);
+      return fail(parsed.error.issues[0]?.message || "AI 请求参数错误", 42200, 422);
     }
 
     const result = await generateEditorialSuggestion(parsed.data, {

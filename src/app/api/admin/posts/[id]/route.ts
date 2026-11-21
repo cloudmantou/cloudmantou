@@ -95,7 +95,7 @@ export async function PUT(
     const body = await req.json();
     const parsed = updatePostSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 42200, 422);
+      return fail(parsed.error.issues[0].message, 42200, 422);
     }
 
     const data = parsed.data;

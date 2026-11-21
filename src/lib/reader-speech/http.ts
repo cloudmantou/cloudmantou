@@ -5,7 +5,7 @@ import { readRequestBodyWithLimit, RequestBodyTooLargeError } from "@/lib/reques
 
 export async function parseSpeechRequest<T>(
   req: Request,
-  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+  schema: z.ZodType<T>,
   limitBytes: number,
 ): Promise<T> {
   const text = await readRequestBodyWithLimit(req, limitBytes);

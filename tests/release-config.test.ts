@@ -133,7 +133,7 @@ describe("release configuration", () => {
       postcss: "8.5.25",
       sharp: "0.35.5",
       esbuild: "0.25.12",
-      vite: "6.4.3",
+      vite: "6.4.5",
       "js-yaml": "4.3.2",
       "brace-expansion@<1.1.21": "1.1.21",
       "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",

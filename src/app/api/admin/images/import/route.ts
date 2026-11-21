@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = importSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0]?.message || "图片地址格式错误", 42200, 422);
+      return fail(parsed.error.issues[0]?.message || "图片地址格式错误", 42200, 422);
     }
 
     for (const _url of parsed.data.urls) {

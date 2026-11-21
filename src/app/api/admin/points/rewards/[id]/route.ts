@@ -13,7 +13,7 @@ const schema = z.discriminatedUnion("action", [
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await ctx.params; await requireAdminAndAudit(req, "points.reward.update", { targetId: id });
-    const p = schema.safeParse(await feedbackJson(req)); if (!p.success) throw new ApiError(p.error.errors[0].message, 42200, 422);
+    const p = schema.safeParse(await feedbackJson(req)); if (!p.success) throw new ApiError(p.error.issues[0].message, 42200, 422);
     const reward = await prisma.pointReward.findUnique({ where: { id }, include: { package: true } }); if (!reward) throw new ApiError("兑换商品不存在", 40400, 404);
     if (p.data.action === "update") { await prisma.pointReward.update({ where: { id }, data: { cost: p.data.cost, enabled: p.data.enabled } }); return privateOk({ saved: true }); }
     const { count, importLines } = p.data;

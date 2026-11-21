@@ -160,7 +160,7 @@ export async function POST(
 
     const parsed = generateSchema.safeParse(await parseJsonBody(req));
     if (!parsed.success) {
-      return fail(parsed.error.errors[0]?.message || "英文译文请求参数错误", 42200, 422);
+      return fail(parsed.error.issues[0]?.message || "英文译文请求参数错误", 42200, 422);
     }
 
     // This projection is deliberately allow-listed: paidContent is never loaded
@@ -290,7 +290,7 @@ export async function PUT(
     });
     const parsed = translationMutationSchema.safeParse(await parseJsonBody(req));
     if (!parsed.success) {
-      return fail(parsed.error.errors[0]?.message || "英文译文参数错误", 42200, 422);
+      return fail(parsed.error.issues[0]?.message || "英文译文参数错误", 42200, 422);
     }
 
     const { updatedAt, status, ...translatedFields } = parsed.data;

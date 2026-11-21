@@ -16,7 +16,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
     const parsed = updateStoreAppSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 42200, 422);
+      return fail(parsed.error.issues[0].message, 42200, 422);
     }
 
     if (parsed.data.slug && parsed.data.slug !== current.slug) {

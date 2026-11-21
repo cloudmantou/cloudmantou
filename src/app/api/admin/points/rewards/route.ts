@@ -11,7 +11,7 @@ export async function GET() { try { await requireAdmin(); return privateOk(await
 export async function POST(req: NextRequest) {
   try {
     await requireAdminAndAudit(req, "points.reward.create");
-    const p = schema.safeParse(await feedbackJson(req)); if (!p.success) throw new ApiError(p.error.errors[0].message, 42200, 422);
+    const p = schema.safeParse(await feedbackJson(req)); if (!p.success) throw new ApiError(p.error.issues[0].message, 42200, 422);
     const d = p.data;
     const reward = await prisma.$transaction(async tx => {
       const pkg = await tx.cardPackage.create({ data: { name: d.name, slug: `points-${randomUUID()}`, description: d.description, redemptionNote: d.note, cardType: d.type === "MANTOU_ADMIN" ? "GENERIC" : d.type, deliverySource: d.type === "MANTOU_ADMIN" ? "MANTOU_ADMIN" : "BLOG", cardValue: d.type === "MANTOU_ADMIN" ? 1 : d.value, price: 0, published: false, enabled: true, badge: "积分" } });

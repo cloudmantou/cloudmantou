@@ -6,11 +6,13 @@ overrides:
   postcss: 8.5.25
   sharp: 0.35.5
   esbuild: 0.25.12
-  vite: 6.4.3
+  vite: 6.4.5
   js-yaml: 4.3.2
   nanoid: 3.3.18
   # 安全修复（pnpm audit 2026-10）：仅在间接依赖低于修复版本时强制升级
-  undici@>=7.0.0 <7.29.1: 7.29.1
+  undici@>=7.0.0 <7.30.1: 7.30.1
+  "@typescript-eslint/typescript-estree>minimatch@>=7.0.0 <11.0.1": 11.0.1
+  "eslint-plugin-react-hooks>zod": 4.6.6
   browserslist@<4.28.7: 4.28.7
   source-map-js@>=1.0.0 <1.2.2: 1.2.2
   "@ai-sdk/provider-utils@>=4.0.0 <4.0.33": 4.0.33

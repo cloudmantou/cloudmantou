@@ -75,7 +75,7 @@ describe("AI settings validation", () => {
     const parsed = aiSettingsInputSchema.safeParse(candidate);
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
-      expect(parsed.error.errors[0]?.message).toContain(message);
+      expect(parsed.error.issues[0]?.message).toContain(message);
     }
   });
 });

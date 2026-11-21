@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest) {
     }
     const parsed = aiSettingsInputSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0]?.message || "AI 设置格式错误", 42200, 422);
+      return fail(parsed.error.issues[0]?.message || "AI 设置格式错误", 42200, 422);
     }
 
     await saveAdminAiSettings(parsed.data);

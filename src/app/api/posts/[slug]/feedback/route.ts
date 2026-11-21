@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, ctx: Context) {
     const limited = await checkRateLimit(req, { limit: 5, windowMs: 3600000, scope: "feedback-create" }, session.user.id);
     if (limited) return limited;
     const parsed = feedbackCreateSchema.safeParse(await feedbackJson(req));
-    if (!parsed.success) throw new ApiError(parsed.error.errors[0].message, 42200, 422);
+    if (!parsed.success) throw new ApiError(parsed.error.issues[0].message, 42200, 422);
     const post = await postFor((await ctx.params).slug);
     return privateOk(await submitFeedback(post.id, session.user.id, parsed.data));
   } catch (e) { return feedbackFail(e); }

@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json();
     const parsed = dailyRecordUpdateSchema.safeParse(body);
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 42200, 422);
+      return fail(parsed.error.issues[0].message, 42200, 422);
     }
 
     const record = await prisma.dailyRecord.findUnique({ where: { id } });

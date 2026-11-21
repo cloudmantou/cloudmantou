@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const session = await requireAdmin();
     const parsed = createStoreAppSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return fail(parsed.error.errors[0].message, 42200, 422);
+      return fail(parsed.error.issues[0].message, 42200, 422);
     }
 
     const existing = await prisma.storeApp.findUnique({ where: { slug: parsed.data.slug } });

@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const { id } = await ctx.params;
     const session = await requireAdminAndAudit(req, "feedback.update", { targetType: "feedback", targetId: id });
     const parsed = feedbackUpdateSchema.safeParse(await feedbackJson(req));
-    if (!parsed.success) throw new ApiError(parsed.error.errors[0].message, 42200, 422);
+    if (!parsed.success) throw new ApiError(parsed.error.issues[0].message, 42200, 422);
     return privateOk(await updateFeedback(id, session.user.id, parsed.data));
   } catch (e) { return feedbackFail(e); }
 }
