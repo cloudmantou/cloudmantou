@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MIMO_API_BASE_URL } from "@/lib/ai/mimo-config";
+import { isMimoApiURL } from "@/lib/ai/mimo-config";
 import { createSafeAiFetch } from "@/lib/ai/safe-fetch-server";
 import { ApiError } from "@/lib/api-error";
 import { readRequestBodyWithLimit } from "@/lib/request-body";
@@ -55,16 +55,20 @@ async function complete(
 ) {
   const timeout = config.service === "roles" ? 60_000 : 45_000;
   try {
-    const fetchMiMo = createSafeAiFetch(MIMO_API_BASE_URL, timeout);
-    const response = await fetchMiMo(MIMO_API_BASE_URL + "/chat/completions", {
+    const official = isMimoApiURL(config.baseURL);
+    const fetchProvider = createSafeAiFetch(config.baseURL, timeout);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (official) headers["api-key"] = config.apiKey;
+    else headers.Authorization = "Bearer " + config.apiKey;
+    const response = await fetchProvider(config.baseURL + "/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "api-key": config.apiKey },
+      headers,
       body: JSON.stringify({ model: config.model, stream: false, ...payload }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]),
     });
     if (!response.ok) {
       await response.body?.cancel();
-      throw new ApiError("MiMo 服务返回 HTTP " + response.status, 50211, 502);
+      throw new ApiError((official ? "MiMo 服务" : "听书接口") + "返回 HTTP " + response.status, 50211, 502);
     }
     const data = await readRequestBodyWithLimit(response, responseLimit);
     return responseSchema.parse(JSON.parse(data)).choices[0].message;

@@ -119,11 +119,12 @@ export function validateAiBaseUrl(
   }
 
   const hostname = normalizeAiHostname(url.hostname);
-  const isLoopback = isAiLoopbackHostname(hostname);
+  const isLoopback = isAiLoopbackHostname(hostname.replace(/\.$/, ""));
   const protocolIsAllowed = url.protocol === "https:"
     || (url.protocol === "http:" && options.allowLoopback && isLoopback);
   const usesStandardPublicPort = !url.port || url.port === "443";
   const forbiddenHostname = !hostname
+    || (isLoopback && !options.allowLoopback)
     || hostname.endsWith(".localhost")
     || hostname.endsWith(".local")
     || hostname.endsWith(".internal")

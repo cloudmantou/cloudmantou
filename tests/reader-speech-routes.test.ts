@@ -41,8 +41,8 @@ import { POST as adminTest } from "@/app/api/admin/settings/reader-speech/test/r
 import { GET as capabilities } from "@/app/api/reader/speech/route";
 import { POST as officialSpeech } from "@/app/api/reader/speech/[service]/route";
 
-const roleSettings = { service: "roles", enabled: true, model: "mimo-v2.6-flash", dailyLimit: 100 } as const;
-const voiceSettings = { service: "tts", enabled: true, model: "mimo-v2.5-tts", voice: "苏打", dailyLimit: 1_000 } as const;
+const roleSettings = { service: "roles", enabled: true, model: "mimo-v2.6-flash", baseURL: "https://roles.example.com/v1", dailyLimit: 100 } as const;
+const voiceSettings = { service: "tts", enabled: true, model: "mimo-v2.5-tts", baseURL: "https://tts.example.com/v1", voice: "苏打", dailyLimit: 1_000 } as const;
 const fallback = new Uint8Array([0x49, 0x44, 0x33]);
 
 function request(method: string, path: string, data: unknown) {
@@ -80,6 +80,7 @@ describe("reader speech routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { connected: true, service: "tts" } });
     expect(mocks.resolveReaderSpeechTest).toHaveBeenCalledWith(draft);
+    expect(mocks.synthesizeReaderSpeech).toHaveBeenCalledWith(draft, expect.anything(), expect.any(AbortSignal));
     expect(mocks.saveReaderSpeechSettings).not.toHaveBeenCalled();
   });
 
@@ -109,6 +110,7 @@ describe("reader speech routes", () => {
     expect(data[0]).toEqual({ service: "roles", available: false, model: "mimo-v2.6-flash" });
     expect(data[1]).toMatchObject({ service: "tts", available: true, voice: "苏打" });
     expect(data[1]).not.toHaveProperty("apiKey");
+    expect(data[1]).not.toHaveProperty("baseURL");
     expect(data[1]).not.toHaveProperty("dailyLimit");
   });
 });

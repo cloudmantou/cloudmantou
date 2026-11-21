@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Headphones, Loader2, PlugZap, Save } from "lucide-react";
-import { MIMO_API_BASE_URL, mimoApiKeyError } from "@/lib/ai/mimo-config";
+import { MIMO_API_BASE_URL, isMimoApiURL, mimoSettingsError } from "@/lib/ai/mimo-config";
 import {
-  MIMO_ROLE_MODELS, MIMO_TTS_VOICES, readerSpeechLabels,
+  MIMO_ROLE_MODELS, MIMO_TTS_VOICES, normalizeReaderSpeechBaseURL,
+  readerSpeechApiKeyError, readerSpeechLabels, READER_SPEECH_BASE_URL_ERROR,
   type AdminReaderSpeechSettings, type ReaderSpeechSettings,
 } from "@/lib/reader-speech/config";
 import { readApiEnvelope } from "@/lib/client-api-response";
@@ -21,15 +22,28 @@ async function readSettingsResponse<T>(response: Response, message: string): Pro
 function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings; onNotify: Notify }) {
   const { keyConfigured: initialKeyConfigured, ...initialSettings } = initial;
   const [draft, setDraft] = useState<ReaderSpeechSettings>(initialSettings);
+  const [savedBaseURL, setSavedBaseURL] = useState(initialSettings.baseURL);
   const [keyConfigured, setKeyConfigured] = useState(initialKeyConfigured);
   const [apiKey, setApiKey] = useState("");
   const [clearApiKey, setClearApiKey] = useState(false);
   const [operation, setOperation] = useState<"save" | "test" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const keyError = mimoApiKeyError(apiKey);
+  const baseURL = normalizeReaderSpeechBaseURL(draft.baseURL);
+  const baseURLError = baseURL
+    ? mimoSettingsError({ baseURL, providerType: "openai-compatible" })
+    : READER_SPEECH_BASE_URL_ERROR;
+  const keyError = !baseURLError && baseURL ? readerSpeechApiKeyError(baseURL, apiKey) : undefined;
+  const official = baseURL ? isMimoApiURL(baseURL) : false;
+  const endpointChanged = baseURL !== savedBaseURL;
+  const canReuseKey = keyConfigured && !endpointChanged && !clearApiKey;
+  const hasNewKey = Boolean(apiKey.trim());
+  const needsKeyForNewEndpoint = keyConfigured && endpointChanged && !hasNewKey && !clearApiKey;
+  const keyHint = endpointChanged && keyConfigured
+    ? "更换地址后需填写对应的 Key"
+    : canReuseKey ? "已配置，留空可保留" : official ? "小米 MiMo 按量付费 Key" : "服务商 API Key";
   const title = readerSpeechLabels[draft.service];
   const prefix = "reader-speech-" + draft.service;
-  const ready = draft.enabled && (Boolean(apiKey.trim()) || (keyConfigured && !clearApiKey));
+  const invalid = Boolean(baseURLError || keyError);
 
   const submit = async (action: "save" | "test") => {
     setError(null);
@@ -44,6 +58,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
         const saved = await readSettingsResponse<AdminReaderSpeechSettings>(response, "保存失败");
         const { keyConfigured: configured, ...savedSettings } = saved;
         setDraft(savedSettings);
+        setSavedBaseURL(savedSettings.baseURL);
         setKeyConfigured(configured);
         setApiKey("");
         setClearApiKey(false);
@@ -72,6 +87,27 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
         启用{title}
       </label>
       <div className="form-field">
+        <label className="form-field-label" htmlFor={prefix + "-base-url"}>
+          Base URL
+          <span className="form-field-hint">{draft.service === "roles" ? "Chat Completions 接口" : "兼容 MiMo 语音接口"}</span>
+        </label>
+        <input
+          id={prefix + "-base-url"}
+          className="form-input mono"
+          type="url"
+          maxLength={500}
+          placeholder={MIMO_API_BASE_URL}
+          aria-invalid={Boolean(baseURLError)}
+          aria-describedby={baseURLError ? prefix + "-url-error" : undefined}
+          value={draft.baseURL}
+          onChange={(event) => {
+            setDraft({ ...draft, baseURL: event.target.value });
+            setError(null);
+          }}
+        />
+        {baseURLError && <p className="auth-error" id={prefix + "-url-error"} role="alert">{baseURLError}</p>}
+      </div>
+      <div className="form-field">
         <label className="form-field-label" htmlFor={prefix + "-model"}>模型</label>
         {draft.service === "roles" ? (
           <select
@@ -99,7 +135,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
       )}
       <div className="form-field">
         <label className="form-field-label" htmlFor={prefix + "-key"}>
-          API Key <span className="form-field-hint">{keyConfigured ? "已配置，留空可保留" : "小米 MiMo 按量付费 Key"}</span>
+          API Key <span className="form-field-hint">{keyHint}</span>
         </label>
         <input
           id={prefix + "-key"}
@@ -107,7 +143,7 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
           type="password"
           autoComplete="new-password"
           maxLength={512}
-          placeholder={keyConfigured ? undefined : "sk-…"}
+          placeholder={canReuseKey ? undefined : official ? "sk-…" : "输入服务商 API Key"}
           aria-invalid={Boolean(keyError)}
           aria-describedby={keyError ? prefix + "-key-error" : undefined}
           disabled={clearApiKey}
@@ -152,14 +188,14 @@ function ServiceForm({ initial, onNotify }: { initial: AdminReaderSpeechSettings
       <div className="flex flex-wrap gap-2">
         <button
           type="button" className="primary-button" onClick={() => void submit("save")}
-          disabled={Boolean(keyError) || (draft.enabled && !ready)}
+          disabled={invalid || needsKeyForNewEndpoint || (draft.enabled && !hasNewKey && !canReuseKey)}
         >
           {operation === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           保存{title}
         </button>
         <button
           type="button" className="secondary-button" onClick={() => void submit("test")}
-          disabled={Boolean(keyError) || clearApiKey || (!keyConfigured && !apiKey.trim())}
+          disabled={invalid || clearApiKey || (!hasNewKey && !canReuseKey)}
         >
           {operation === "test" ? <Loader2 size={14} className="animate-spin" /> : <PlugZap size={14} />}
           测试{title}
@@ -192,7 +228,7 @@ export function ReaderSpeechSettingsEditor({ onNotify }: { onNotify: Notify }) {
       {status === "error" && <p className="settings-form" role="alert">加载听书服务失败，请刷新后重试。</p>}
       {status === "ready" && (
         <>
-          <p className="settings-form">在小米开放平台的 API Keys 页面创建按量 Key。填入后可先测试连接，成功后勾选启用并保存。<br /><code>{MIMO_API_BASE_URL}</code></p>
+          <p className="settings-form">分别填写两项服务的 Base URL 和 API Key。测试通过后即可启用并保存。</p>
           <div className="grid gap-4 md:grid-cols-2">
             {settings.map((item) => <ServiceForm key={item.service} initial={item} onNotify={onNotify} />)}
           </div>

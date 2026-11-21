@@ -20,6 +20,7 @@ import {
   getReaderSpeechSettings, readerSpeechSettingsInput, resolveReaderSpeechService,
   resolveReaderSpeechTest, saveReaderSpeechSettings,
 } from "@/lib/reader-speech/settings";
+import { MIMO_API_BASE_URL } from "@/lib/ai/mimo-config";
 
 const roles = {
   service: "roles", enabled: true, model: "mimo-v2.6-flash", dailyLimit: 90, apiKey: "sk-roles-fixture", clearApiKey: false,
@@ -49,14 +50,14 @@ describe("reader speech settings", () => {
 
   it("persists two separate encrypted keys and returns only their configured state", async () => {
     expect(await getReaderSpeechSettings()).toMatchObject([
-      { service: "roles", enabled: false, keyConfigured: false },
-      { service: "tts", enabled: false, keyConfigured: false, voice: "苏打" },
+      { service: "roles", baseURL: MIMO_API_BASE_URL, enabled: false, keyConfigured: false },
+      { service: "tts", baseURL: MIMO_API_BASE_URL, enabled: false, keyConfigured: false, voice: "苏打" },
     ]);
     await saveReaderSpeechSettings(roles);
     await saveReaderSpeechSettings(tts);
     await saveReaderSpeechSettings({ ...roles, model: "mimo-v2.6-pro", apiKey: "" });
-    expect(await resolveReaderSpeechService("roles")).toMatchObject({ model: "mimo-v2.6-pro", apiKey: roles.apiKey });
-    expect(await resolveReaderSpeechService("tts")).toMatchObject({ voice: "苏打", apiKey: tts.apiKey });
+    expect(await resolveReaderSpeechService("roles")).toMatchObject({ baseURL: MIMO_API_BASE_URL, model: "mimo-v2.6-pro", apiKey: roles.apiKey });
+    expect(await resolveReaderSpeechService("tts")).toMatchObject({ baseURL: MIMO_API_BASE_URL, voice: "苏打", apiKey: tts.apiKey });
     expect(await getReaderSpeechSettings()).toMatchObject([
       { service: "roles", model: "mimo-v2.6-pro", keyConfigured: true },
       { service: "tts", model: "mimo-v2.5-tts", keyConfigured: true },
@@ -64,6 +65,52 @@ describe("reader speech settings", () => {
     const stored = [...db.rows.values()];
     expect(stored.every((row) => row.includes("test-cipher:") && !row.includes(roles.apiKey) && !row.includes(tts.apiKey))).toBe(true);
     expect(JSON.stringify(await getReaderSpeechSettings())).not.toContain("encryptedKey");
+  });
+
+  it("keeps URLs and gateway keys separate, including after later edits", async () => {
+    const roleDraft = readerSpeechSettingsInput.parse({
+      ...roles, baseURL: " https://roles.example.com/v1/chat/completions/ ", apiKey: "role-gateway-key",
+    });
+    const ttsDraft = readerSpeechSettingsInput.parse({
+      ...tts, baseURL: "https://speech.example.com/api/v2/", apiKey: "tts-gateway-key",
+    });
+    await saveReaderSpeechSettings(roleDraft);
+    await saveReaderSpeechSettings(ttsDraft);
+    await saveReaderSpeechSettings({ ...roleDraft, apiKey: "", dailyLimit: 200 });
+    expect(await getReaderSpeechSettings()).toMatchObject([
+      { service: "roles", baseURL: "https://roles.example.com/v1", keyConfigured: true, dailyLimit: 200 },
+      { service: "tts", baseURL: "https://speech.example.com/api/v2", keyConfigured: true, dailyLimit: 900 },
+    ]);
+    expect(await resolveReaderSpeechService("roles")).toMatchObject({ baseURL: roleDraft.baseURL, apiKey: roleDraft.apiKey });
+    expect(await resolveReaderSpeechService("tts")).toMatchObject({ baseURL: ttsDraft.baseURL, apiKey: ttsDraft.apiKey });
+    expect(await resolveReaderSpeechTest({ ...ttsDraft, apiKey: "" })).toMatchObject({ baseURL: ttsDraft.baseURL, apiKey: ttsDraft.apiKey });
+  });
+
+  it("never reuses a saved key when testing or saving a different endpoint", async () => {
+    await saveReaderSpeechSettings(roles);
+    const newEndpoint = readerSpeechSettingsInput.parse({ ...roles, apiKey: "", baseURL: "https://roles.example.com/v1" });
+    await expect(resolveReaderSpeechTest(newEndpoint)).rejects.toMatchObject({ status: 422, code: 42211 });
+    await expect(saveReaderSpeechSettings({ ...newEndpoint, enabled: false })).rejects.toMatchObject({ status: 422, code: 42211 });
+    await expect(saveReaderSpeechSettings({ ...newEndpoint, apiKey: "test-cipher:fixture" })).rejects.toMatchObject({ status: 422 });
+    await expect(resolveReaderSpeechTest({ ...newEndpoint, apiKey: "new-gateway-key" })).resolves.toMatchObject({
+      baseURL: newEndpoint.baseURL, apiKey: "new-gateway-key",
+    });
+    expect(await resolveReaderSpeechService("roles")).toMatchObject({ baseURL: MIMO_API_BASE_URL, apiKey: roles.apiKey });
+    await saveReaderSpeechSettings({ ...newEndpoint, apiKey: "new-gateway-key" });
+    await expect(saveReaderSpeechSettings(roles)).rejects.toMatchObject({ status: 409 });
+    await expect(resolveReaderSpeechTest(roles)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it.each([
+    "http://roles.example.com/v1",
+    "https://localhost/v1",
+    "https://localhost./v1",
+    "https://192.168.0.10/v1",
+    "https://account@roles.example.com/v1",
+    "https://roles.example.com/v1?token=example",
+    "https://token-plan-cn.xiaomimimo.com/v1",
+  ])("rejects an unsupported endpoint %s", (baseURL) => {
+    expect(readerSpeechSettingsInput.safeParse({ ...roles, baseURL }).success).toBe(false);
   });
 
   it("blocks Token Plan keys, unknown voice IDs and attempts to enable a keyless service", async () => {
