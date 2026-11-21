@@ -95,7 +95,10 @@ async function readRoleResponse(
         max_tokens: 16_000,
         stream: false,
         system: roleInstruction,
-        messages: [{ role: "user", content: contents }],
+        messages: [{ role: "user", content: [{ type: "text", text: contents }] }],
+        ...(config.provider === "minimax" && config.model === ROLE_PRESETS.minimax.model
+          ? { output_config: { effort: "low" } }
+          : {}),
       }, signal, { "anthropic-version": "2023-06-01" });
       const result = messagesResponse.parse(JSON.parse(await readRequestBodyWithLimit(response, roleOutputLimit)));
       return result.content.filter(({ type }) => type === "text").map(({ text }) => text ?? "").join("\n");

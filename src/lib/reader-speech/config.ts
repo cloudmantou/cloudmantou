@@ -26,7 +26,7 @@ type VoiceProtocol = "mimo-tts" | "minimax-tts" | "openai-speech";
 export const ROLE_PRESETS = {
   mimo: { label: "小米 MiMo", protocol: "openai-chat", baseURL: MIMO_API_BASE_URL, model: MIMO_ROLE_MODELS[0], authMode: "api-key" },
   deepseek: { label: "DeepSeek", protocol: "openai-chat", baseURL: "https://api.deepseek.com", model: "deepseek-flash", authMode: "bearer" },
-  minimax: { label: "MiniMax", protocol: "anthropic-messages", baseURL: "https://api.minimax.cn/anthropic", model: "MiniMax-M3.1-Flash", authMode: "bearer" },
+  minimax: { label: "MiniMax", protocol: "anthropic-messages", baseURL: "https://api.minimax.cn/anthropic", model: "MiniMax-M3.1-Flash", authMode: "x-api-key" },
   openai: { label: "OpenAI", protocol: "openai-chat", baseURL: "https://api.openai.com/v1", model: "gpt-6-luna", authMode: "bearer" },
   "custom-openai": { label: "自定义 Chat Completions", protocol: "openai-chat", baseURL: "", model: "", authMode: "bearer" },
   "custom-anthropic": { label: "自定义 Anthropic Messages", protocol: "anthropic-messages", baseURL: "", model: "", authMode: "x-api-key" },

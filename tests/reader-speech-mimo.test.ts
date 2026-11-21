@@ -110,9 +110,11 @@ describe("reader speech provider requests", () => {
     const [miniMaxURL, messagesRequest] = mocks.fetchMiMo.mock.calls[1];
     expect(miniMaxURL).toBe("https://api.minimax.cn/anthropic/v1/messages");
     expect(messagesRequest.headers["anthropic-version"]).toBe("2023-06-01");
+    expect(messagesRequest.headers["x-api-key"]).toBe(roles.apiKey);
     expect(JSON.parse(messagesRequest.body)).toMatchObject({
       model: ROLE_PRESETS.minimax.model, system: expect.any(String),
-      messages: [{ role: "user", content: JSON.stringify(input) }],
+      messages: [{ role: "user", content: [{ type: "text", text: JSON.stringify(input) }] }],
+      output_config: { effort: "low" },
     });
   });
 
