@@ -194,7 +194,8 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/auth") &&
     !pathname.startsWith("/api/payment/notify") &&
     !pathname.startsWith("/api/site/settings/public") &&
-    !pathname.startsWith("/api/assistant/")
+    !pathname.startsWith("/api/assistant/") &&
+    !(pathname === "/api/reader/speech/client-config" && req.method === "POST")
   ) {
     if (!session) {
       return withCsp(
