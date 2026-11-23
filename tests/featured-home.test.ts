@@ -189,15 +189,34 @@ describe("featured editorial homepage contract", () => {
     expect(recentPosts.map((post) => post.slug)).toEqual(["recent-new", "top-old"]);
   });
 
-  it("renders localized featured-section headings on the homepage", () => {
+  it("filters privacy policies, support guides, and welcome demo posts out of homepage feeds", async () => {
+    const posts = [
+      makePost("welcome-to-cloudmantou", { isTop: true }),
+      { ...makePost("xiaoxi-privacy"), title: "小西记账隐私政策" },
+      { ...makePost("xiaoxi-help"), title: "小西记账使用帮助与技术支持" },
+      makePost("real-featured", { isTop: true }),
+      makePost("real-recent"),
+    ];
+
+    const { featuredPosts, recentPosts } = await selectHomepagePosts(posts);
+
+    expect(featuredPosts.map((post) => post.slug)).toEqual(["real-featured"]);
+    expect(recentPosts.map((post) => post.slug)).toEqual(["real-recent"]);
+  });
+
+  it("renders localized featured-section and personal life/dev journey headings on the homepage", () => {
     const posts = [makePost("featured", { isTop: true }), makePost("recent")];
     const zhText = collectText(EditorialBlogHome({ posts, locale: "zh" }));
     const enText = collectText(EditorialBlogHome({ posts, locale: "en" }));
 
     expect(zhText).toContain("精选长文");
     expect(zhText).toContain("先看这几篇");
+    expect(zhText).toContain("个人生活与开发经历");
+    expect(zhText).toContain("开发经历");
+    expect(zhText).toContain("开发之外的生活");
     expect(enText).toContain("Featured essays");
     expect(enText).toContain("Start with these picks");
+    expect(enText).toContain("Personal life & dev journey");
   });
 });
 

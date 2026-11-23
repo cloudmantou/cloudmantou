@@ -1,12 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Code2, Layers3, Rocket, ShieldCheck } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BookOpen, Code2, Coffee, Compass, Layers3, Rocket, ShieldCheck, Wallet } from "lucide-react";
 import type { OfficialLocale } from "@/i18n/official";
 import { localizeOfficialPath } from "@/i18n/official";
 import {
   MANTOU_ASSISTANT_ARTICLE,
   MANTOU_ASSISTANT_ARTICLE_EN,
   getEditorialBlogCopy,
+  getEditorialJourney,
   getEditorialProjects,
 } from "@/config/editorial-blog";
 import { EditorialArticleCard, type EditorialPostCardData } from "@/components/editorial/EditorialArticleCard";
@@ -25,7 +26,7 @@ function getMantouAssistantPost(posts: EditorialPostCardData[], locale: Official
   };
 }
 
-const PROJECT_ICONS = [Code2, Layers3, Rocket] as const;
+const PROJECT_ICONS = [Code2, BookOpen, Wallet, Layers3, Rocket] as const;
 
 export function EditorialBlogHome({
   posts,
@@ -38,6 +39,7 @@ export function EditorialBlogHome({
 }) {
   const copy = getEditorialBlogCopy(locale);
   const projects = getEditorialProjects(locale);
+  const journey = getEditorialJourney(locale);
   const homepagePosts = posts.length > 0
     ? posts
     : allowStaticFallback
@@ -131,7 +133,7 @@ export function EditorialBlogHome({
           <div className="editorial-section-heading"><h2>{copy.sections.projects}</h2></div>
           <div className="editorial-project-rail">
             {projects.map((project, index) => {
-              const Icon = PROJECT_ICONS[index];
+              const Icon = PROJECT_ICONS[index % PROJECT_ICONS.length];
               return (
                 <Link key={project.name} href={localizeOfficialPath(project.href, locale)} className={`editorial-project-card is-${project.accent}`}>
                   <span className="editorial-project-icon"><Icon size={30} /></span>
@@ -151,6 +153,58 @@ export function EditorialBlogHome({
           <div className="editorial-support-actions">
             <Link className="editorial-button editorial-button-red" href={localizeOfficialPath(copy.support.primaryAction.href, locale)}>{copy.support.primaryAction.label}<ArrowRight size={18} /></Link>
             <Link className="editorial-button editorial-button-paper" href={localizeOfficialPath(copy.support.secondaryAction.href, locale)}>{copy.support.secondaryAction.label}</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="editorial-section editorial-journey-section" id="journey" aria-labelledby="journey-section-title">
+        <div className="editorial-container">
+          <div className="editorial-journey-header">
+            <span className="editorial-public-kicker">{journey.eyebrow}</span>
+            <h2 id="journey-section-title">{journey.title}</h2>
+            <p>{journey.subtitle}</p>
+          </div>
+
+          <div className="editorial-journey-grid">
+            <div className="editorial-journey-card editorial-journey-dev">
+              <div className="editorial-journey-card-head">
+                <span className="editorial-journey-badge is-blue"><Compass size={20} /></span>
+                <h3>{journey.devTitle}</h3>
+              </div>
+              <ol className="editorial-journey-timeline">
+                {journey.devItems.map((item) => (
+                  <li key={item.period}>
+                    <span>{item.period}</span>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <aside className="editorial-journey-card editorial-journey-life">
+              <div className="editorial-journey-card-head">
+                <span className="editorial-journey-badge is-yellow"><Coffee size={20} /></span>
+                <h3>{journey.lifeTitle}</h3>
+              </div>
+              <p className="editorial-journey-lead">{journey.lifeLead}</p>
+              <ul className="editorial-journey-life-list">
+                {journey.lifeHighlights.map((item) => (
+                  <li key={item.label}>
+                    <strong>{item.label}</strong>
+                    <p>{item.text}</p>
+                  </li>
+                ))}
+              </ul>
+              <div className="editorial-journey-actions">
+                <Link className="editorial-button editorial-button-blue" href={localizeOfficialPath(journey.dailyLinkHref, locale)}>
+                  {journey.dailyLinkLabel}<ArrowRight size={17} />
+                </Link>
+                <Link className="editorial-button editorial-button-paper" href={localizeOfficialPath(journey.aboutLinkHref, locale)}>
+                  {journey.aboutLinkLabel}<ArrowUpRight size={17} />
+                </Link>
+              </div>
+            </aside>
           </div>
         </div>
       </section>

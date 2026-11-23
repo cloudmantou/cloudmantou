@@ -62,22 +62,28 @@ export const EDITORIAL_BLOG = {
 export const EDITORIAL_PROJECTS = [
   {
     name: "馒头助手",
-    description: "iOS 设备工具与兼容性实践。",
+    description: "免费 iOS 设备工具与系统兼容性实践。",
     href: `/post/${MANTOU_ASSISTANT_ARTICLE.slug}`,
     accent: "blue",
     article: MANTOU_ASSISTANT_ARTICLE,
   },
   {
-    name: "CloudMantou",
-    description: "博客、会员、支付与内容后台的一体化实践。",
+    name: "红笺 / mtsk",
+    description: "面向 iPhone 与 iPad 的本地书架、书源与阅读体验。",
     href: "/blog",
     accent: "red",
   },
   {
-    name: "部署实验室",
-    description: "Node.js、Next.js、反向代理与发布流程复盘。",
-    href: "/blog#articles",
+    name: "小西记账",
+    description: "本地优先的个人收支、资产与共同心愿记账工具。",
+    href: "/blog",
     accent: "yellow",
+  },
+  {
+    name: "部署实验室",
+    description: "Node.js、Next.js、反向代理、MCP 与发布流程复盘。",
+    href: "/blog#articles",
+    accent: "blue",
   },
 ] as const;
 
@@ -90,18 +96,122 @@ export const EDITORIAL_PROJECTS_EN = [
     article: MANTOU_ASSISTANT_ARTICLE_EN,
   },
   {
-    name: "CloudMantou",
-    description: "A unified blog, membership, payment, and content platform.",
+    name: "Hongjian / mtsk",
+    description: "Local bookshelf, custom sources, and reading experience for iPhone & iPad.",
     href: "/blog",
     accent: "red",
   },
   {
-    name: "Deployment Lab",
-    description: "Notes on Node.js, Next.js, reverse proxies, and release workflows.",
-    href: "/blog#articles",
+    name: "Xiaoxi Ledger",
+    description: "Local-first personal finance, asset tracking, and shared goals on iOS.",
+    href: "/blog",
     accent: "yellow",
   },
+  {
+    name: "Deployment Lab",
+    description: "Notes on Node.js, Next.js, reverse proxies, MCP, and release workflows.",
+    href: "/blog#articles",
+    accent: "blue",
+  },
 ] as const;
+
+export const EDITORIAL_JOURNEY = {
+  eyebrow: "LIFE & DEV",
+  title: "个人生活与开发经历",
+  subtitle: "白天和真实业务、服务器与终端打交道，晚上和周末把生活里的念头做成能长期使用的小产品。",
+  devTitle: "开发经历",
+  devItems: [
+    {
+      period: "01 · 工程起点",
+      title: "从 IT 运维到业务系统落地",
+      detail: "长期在一线处理网络、服务器、终端维护和企业内部系统对接，习惯先在真实场景里把问题跑通，再抽象成可复用的工具。",
+    },
+    {
+      period: "02 · 全栈基建",
+      title: "从零搭起 CloudMantou 独立站",
+      detail: "基于 Next.js、Prisma、MySQL 与反向代理，把博客写作、会员与卡密、IPA 版本分发和远程 MCP 反馈工作流整合成一套自托管平台。",
+    },
+    {
+      period: "03 · iOS 产品矩阵",
+      title: "打磨红笺、小西记账与馒头助手",
+      detail: "围绕自己的阅读、记账与设备调试需求持续做 iOS 应用，坚持本地优先、克制设计与长期维护，不追一次性热点。",
+    },
+    {
+      period: "04 · 持续探索",
+      title: "轻资产项目与 AI 工作流",
+      detail: "业余探索小游戏原型、内容创作与自动化脚本，把重复劳动交给工具，把时间留给真正有意思的想法。",
+    },
+  ],
+  lifeTitle: "开发之外的生活",
+  lifeLead: "写代码不是全部，认真生活才能发现真正值得做的工具。",
+  lifeHighlights: [
+    {
+      label: "日常节奏",
+      text: "工作日保持稳定交付，下班后留出安静的整块时间写代码、读长文和整理复盘笔记。",
+    },
+    {
+      label: "生活习惯",
+      text: "喜欢把日常开销、阅读进度和零碎灵感都记录下来——很多小工具最初都是为了解决自己的生活小事。",
+    },
+    {
+      label: "当下状态",
+      text: "少焦虑、多动手，按自己的节奏慢慢迭代产品，也把路上踩过的坑和生活片段留在这个站里。",
+    },
+  ],
+  dailyLinkLabel: "查看日常记录",
+  dailyLinkHref: "/daily-records",
+  aboutLinkLabel: "更多关于我",
+  aboutLinkHref: "/about",
+} as const;
+
+export const EDITORIAL_JOURNEY_EN = {
+  eyebrow: "LIFE & DEV",
+  title: "Personal life & dev journey",
+  subtitle: "Working with real infrastructure and business systems by day, and turning everyday ideas into durable indie apps in the evenings.",
+  devTitle: "Development journey",
+  devItems: [
+    {
+      period: "01 · Foundation",
+      title: "From IT operations to real-world systems",
+      detail: "Hands-on work across networks, servers, endpoints, and internal business systems shaped a habit of verifying every solution in production first.",
+    },
+    {
+      period: "02 · Full-stack",
+      title: "Building CloudMantou from scratch",
+      detail: "Built a self-hosted platform with Next.js, Prisma, and MySQL combining blogging, membership payments, IPA delivery, and MCP-powered feedback.",
+    },
+    {
+      period: "03 · iOS apps",
+      title: "Shipping Hongjian, Xiaoxi Ledger & Mantou Assistant",
+      detail: "Crafting local-first iOS apps around real personal habits—reading, expense tracking, and device utilities—with steady long-term iteration.",
+    },
+    {
+      period: "04 · Exploring",
+      title: "Lightweight prototypes & AI workflows",
+      detail: "Experimenting with mini-game prototypes, creative writing, and automation scripts so more energy stays on product craft.",
+    },
+  ],
+  lifeTitle: "Life outside code",
+  lifeLead: "Code is only half the story—paying attention to daily life is where useful tools come from.",
+  lifeHighlights: [
+    {
+      label: "Rhythm",
+      text: "Steady delivery during work hours, with quiet evening blocks set aside for coding, long-form reading, and writing retrospectives.",
+    },
+    {
+      label: "Habits",
+      text: "Tracking daily spending, reading lists, and stray ideas—most of my apps started as tools built for my own routine.",
+    },
+    {
+      label: "Mindset",
+      text: "Less rush, more shipping. Iterating at a sustainable pace while keeping honest notes of both engineering lessons and life moments.",
+    },
+  ],
+  dailyLinkLabel: "View daily notes",
+  dailyLinkHref: "/daily-records",
+  aboutLinkLabel: "More about me",
+  aboutLinkHref: "/about",
+} as const;
 
 export const EDITORIAL_BLOG_EN = {
   ...EDITORIAL_BLOG,
@@ -154,6 +264,10 @@ export function getEditorialBlogCopy(locale: "zh" | "en") {
 
 export function getEditorialProjects(locale: "zh" | "en") {
   return locale === "en" ? EDITORIAL_PROJECTS_EN : EDITORIAL_PROJECTS;
+}
+
+export function getEditorialJourney(locale: "zh" | "en") {
+  return locale === "en" ? EDITORIAL_JOURNEY_EN : EDITORIAL_JOURNEY;
 }
 
 export type EditorialPublicInfoKey = "about" | "privacy" | "disclaimer" | "contact";
