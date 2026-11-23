@@ -91,6 +91,11 @@ describe("MTSK website speech configuration", () => {
     expect(fakes.attest).not.toHaveBeenCalled();
   });
 
+  it("only accepts JSON requests for device proof", async () => {
+    const response = await credential(new Request(url, { method: "POST", body: "{}" }));
+    expect(response.status).toBe(415);
+  });
+
   it("refreshes using a valid assertion and refuses a repeated counter", async () => {
     fakes.attest.mockResolvedValue({ publicKey: "public-key-fixture" });
     fakes.assert.mockResolvedValue({ signCount: 1 });

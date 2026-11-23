@@ -1,4 +1,5 @@
-import { ok } from "@/lib/api-response";
+import { fail, ok } from "@/lib/api-response";
+import { hasJsonContentType } from "@/lib/csrf-origin";
 import { checkRateLimit } from "@/lib/rate-limit-server";
 import { appAttestRequest, verifyConfigClient } from "@/lib/reader-speech/client-attestation";
 import { parseSpeechRequest, readerSpeechErrorResponse } from "@/lib/reader-speech/http";
@@ -13,6 +14,7 @@ export function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!hasJsonContentType(req)) return fail("请求格式不正确", 41500, 415);
   try {
     const limited = await checkRateLimit(req, { scope: "mtsk-speech-config", limit: 30, windowMs: 60_000 });
     if (limited) return limited;

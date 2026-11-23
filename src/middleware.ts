@@ -104,6 +104,7 @@ export default auth(async (req) => {
   }
 
   const pathname = localeResolution.rewritePath || req.nextUrl.pathname;
+  const isMtskSpeechConfigPost = pathname === "/api/reader/speech/client-config" && req.method === "POST";
   const session = req.auth;
   const isAdmin = session?.user?.role === "ADMIN";
 
@@ -138,7 +139,7 @@ export default auth(async (req) => {
   }
 
   // 所有浏览器写请求统一同源校验，不只依赖 SameSite=Lax（同站子域仍可携带 cookie）。
-  if (requiresSameOriginMutation(pathname, req.method)) {
+  if (!isMtskSpeechConfigPost && requiresSameOriginMutation(pathname, req.method)) {
     if (!isAllowedMutationOrigin(req)) {
       return withCsp(
         req,
@@ -195,7 +196,7 @@ export default auth(async (req) => {
     !pathname.startsWith("/api/payment/notify") &&
     !pathname.startsWith("/api/site/settings/public") &&
     !pathname.startsWith("/api/assistant/") &&
-    !(pathname === "/api/reader/speech/client-config" && req.method === "POST")
+    !isMtskSpeechConfigPost
   ) {
     if (!session) {
       return withCsp(
